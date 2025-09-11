@@ -325,36 +325,50 @@ docker run -it ghostvault
 - Review logs in `~/.ghostvault/audit.log.enc`
 - For issues, check Java and JavaFX versions
 
-## Quick Command Reference
+## Quick Start
 
-```bash
-# Build
-mvn clean compile
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/PathanWasim/GhostVault.git
+   cd GhostVault
+   ```
+2. **Build and run:**
+   ```bash
+   mvn clean javafx:run
+   ```
+3. **First launch:**
+   - Set a strong master password (meets all strength requirements).
+   - Scan the MFA QR code with Google Authenticator or similar app.
+   - Log in using your password and the 6-digit TOTP code.
 
-# Run
-mvn javafx:run
+## Features Overview
+- **Modern UI:** Light/dark themes, tooltips, accessible and responsive layout.
+- **Strong Security:** AES-256 encryption, PBKDF2 key derivation, enforced password policies, TOTP-based MFA, auto-logout after inactivity.
+- **File Integrity:** SHA-256 hash validation on upload/download.
+- **Audit Logging:** Encrypted, rotated, time-stamped logs.
+- **Metadata Management:** Search, filter, and categorize encrypted files.
+- **Backup/Restore:** Encrypted vault backup and restore.
+- **Decoy Vault:** Realistic decoy files, duress mode.
+- **Panic Wipe:** Double confirmation, irreversible vault destruction.
+- **Robust Error Handling:** Friendly messages for all operations.
+- **Code Quality:** Modular package structure, JavaDocs, and unit tests.
 
-# Test
-mvn test
+## Testing
+- Run all unit tests:
+  ```bash
+  mvn test
+  ```
+- Tests cover: encryption/decryption, password hashing, and more.
 
-# Package
-mvn package
+## Code Structure
+- `com.ghostvault.ui` – Main UI and application logic
+- `com.ghostvault.security` – Cryptography, MFA, and secure deletion
+- `com.ghostvault.model` – Data models (e.g., file metadata)
+- `com.ghostvault.util` – Utilities (e.g., hashing)
 
-# Clean
-mvn clean
-
-# Check for updates
-mvn versions:display-dependency-updates
-
-# Dependency tree
-mvn dependency:tree
-
-# Run specific test
-mvn test -Dtest=GhostVaultTest#testEncryption
-
-# Skip tests during build
-mvn package -DskipTests
-```
+## Contributing
+- Fork the repo, create a feature branch, and submit a pull request.
+- Please write clear JavaDocs and unit tests for new features.
 
 ## Legal Notice
 
