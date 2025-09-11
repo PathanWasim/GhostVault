@@ -1,0 +1,10 @@
+# Ignore sensitive and build files
+/.ghostvault/
+/target/
+*.log
+*.class
+*.jar
+*.iml
+.DS_Store
+.idea/
+*.swp

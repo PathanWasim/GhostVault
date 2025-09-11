@@ -1,0 +1,35 @@
+/* GhostVault Light Theme */
+.root {
+    -fx-font-family: 'Segoe UI', 'Arial', sans-serif;
+    -fx-background-color: #f8f9fa;
+    -fx-text-fill: #222;
+}
+.button {
+    -fx-background-color: linear-gradient(to bottom, #e3e9f1, #cfd8dc);
+    -fx-text-fill: #222;
+    -fx-font-weight: bold;
+    -fx-background-radius: 6;
+    -fx-effect: dropshadow(gaussian, #bbb, 1, 0.2, 0, 1);
+}
+.button:hover {
+    -fx-background-color: #b3c6e0;
+    -fx-text-fill: #222;
+}
+.text-field, .password-field {
+    -fx-background-color: #fff;
+    -fx-border-color: #b0bec5;
+    -fx-border-radius: 4;
+    -fx-padding: 6 10 6 10;
+}
+.label.title {
+    -fx-font-size: 2em;
+    -fx-font-weight: bold;
+    -fx-text-fill: #1976d2;
+}
+.toolbar {
+    -fx-background-color: #e3e9f1;
+}
+.alert {
+    -fx-background-color: #fffbe6;
+    -fx-border-color: #ffe082;
+}
