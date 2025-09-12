@@ -1,4 +1,4 @@
-package com.ghostvault.security;
+package com.ghostvault;
 
 import javax.crypto.*;
 import javax.crypto.spec.IvParameterSpec;
