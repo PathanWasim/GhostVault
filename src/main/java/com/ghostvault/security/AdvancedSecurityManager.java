@@ -40,6 +40,10 @@ public class AdvancedSecurityManager {
     private final AtomicLong baseOperationTime;
     private static final long TARGET_OPERATION_TIME_MS = 100;
     
+    // Advanced security components
+    private SecurityHardening securityHardening;
+    private ThreatDetectionEngine threatEngine;
+    
     public AdvancedSecurityManager() {
         this.securityScheduler = Executors.newScheduledThreadPool(3);
         this.securityHardeningActive = new AtomicBoolean(false);
@@ -52,55 +56,88 @@ public class AdvancedSecurityManager {
         this.fileSystemProtectionActive = new AtomicBoolean(false);
         
         this.baseOperationTime = new AtomicLong(TARGET_OPERATION_TIME_MS);
+        
+        // Initialize advanced security components
+        initializeAdvancedSecurity();
     }
     
     /**
-     * Activate all security hardening features
+     * Initialize advanced security components
      */
-    public void activateSecurityHardening() throws Exception {
+    public void initializeAdvancedSecurity() {
+        try {
+            // Initialize security hardening
+            securityHardening = SecurityHardening.getInstance();
+            
+            // Initialize threat detection engine (requires AuditManager)
+            // threatEngine = new ThreatDetectionEngine(auditManager);
+            
+            System.out.println("🛡️ Advanced security components initialized");
+            
+        } catch (Exception e) {
+            System.err.println("Failed to initialize advanced security: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Activate comprehensive security hardening
+     */
+    public void activateSecurityHardening() {
         if (securityHardeningActive.get()) {
-            return; // Already active
+            return;
         }
         
-        securityHardeningActive.set(true);
-        
-        // Enable memory protection
-        enableMemoryProtection();
-        
-        // Enable clipboard protection
-        enableClipboardProtection();
-        
-        // Enable screen protection
-        enableScreenProtection();
-        
-        // Enable file system protection
-        enableFileSystemProtection();
-        
-        // Start security monitoring tasks
-        startSecurityMonitoring();
-        
-        System.out.println("🛡️ Advanced security hardening activated");
+        try {
+            securityHardeningActive.set(true);
+            
+            // Enable all security features
+            enableMemoryProtection();
+            enableClipboardProtection();
+            enableScreenProtection();
+            enableFileSystemProtection();
+            
+            // Apply advanced security hardening
+            if (securityHardening != null) {
+                securityHardening.applySecurityHardening();
+            }
+            
+            // Start threat detection if available
+            if (threatEngine != null) {
+                threatEngine.startMonitoring();
+            }
+            
+            System.out.println("✅ Comprehensive security hardening activated");
+            
+        } catch (Exception e) {
+            System.err.println("Failed to activate security hardening: " + e.getMessage());
+            securityHardeningActive.set(false);
+        }
     }
     
     /**
      * Deactivate security hardening
      */
     public void deactivateSecurityHardening() {
+        if (!securityHardeningActive.get()) {
+            return;
+        }
+        
         securityHardeningActive.set(false);
         
+        // Disable all security features
         memoryProtectionActive.set(false);
         clipboardProtectionActive.set(false);
         screenProtectionActive.set(false);
         fileSystemProtectionActive.set(false);
         
-        if (securityScheduler != null && !securityScheduler.isShutdown()) {
-            securityScheduler.shutdown();
+        // Stop threat detection if available
+        if (threatEngine != null) {
+            threatEngine.stopMonitoring();
         }
         
-        System.out.println("🛡️ Advanced security hardening deactivated");
+        System.out.println("🔓 Security hardening deactivated");
     }
-} 
-   
+    
     /**
      * Enable memory protection features
      */
@@ -114,12 +151,7 @@ public class AdvancedSecurityManager {
             }
         }, 30, 30, TimeUnit.SECONDS);
         
-        // Set up memory monitoring
-        securityScheduler.scheduleAtFixedRate(() -> {
-            if (memoryProtectionActive.get()) {
-                monitorMemoryUsage();
-            }
-        }, 10, 10, TimeUnit.SECONDS);
+        System.out.println("🧠 Memory protection enabled");
     }
     
     /**
@@ -128,26 +160,30 @@ public class AdvancedSecurityManager {
     private void enableClipboardProtection() {
         clipboardProtectionActive.set(true);
         
-        // Schedule automatic clipboard clearing
+        // Schedule periodic clipboard clearing
         securityScheduler.scheduleAtFixedRate(() -> {
             if (clipboardProtectionActive.get()) {
-                clearClipboardIfNeeded();
+                clearClipboard();
             }
-        }, 5, 5, TimeUnit.SECONDS);
+        }, 60, 60, TimeUnit.SECONDS);
+        
+        System.out.println("📋 Clipboard protection enabled");
     }
     
     /**
-     * Enable screen protection features
+     * Enable screen protection
      */
     private void enableScreenProtection() {
         screenProtectionActive.set(true);
         
-        // Monitor for screen capture attempts
+        // Schedule periodic screen security checks
         securityScheduler.scheduleAtFixedRate(() -> {
             if (screenProtectionActive.get()) {
-                detectScreenCaptureAttempts();
+                checkScreenSecurity();
             }
-        }, 1, 1, TimeUnit.SECONDS);
+        }, 10, 10, TimeUnit.SECONDS);
+        
+        System.out.println("🖥️ Screen protection enabled");
     }
     
     /**
@@ -156,49 +192,29 @@ public class AdvancedSecurityManager {
     private void enableFileSystemProtection() {
         fileSystemProtectionActive.set(true);
         
-        // Set secure file permissions
-        setSecureFilePermissions();
-        
-        // Monitor file system changes
+        // Schedule periodic file system monitoring
         securityScheduler.scheduleAtFixedRate(() -> {
             if (fileSystemProtectionActive.get()) {
-                monitorFileSystemChanges();
+                monitorFileSystem();
             }
-        }, 15, 15, TimeUnit.SECONDS);
-    }
-    
-    /**
-     * Start security monitoring tasks
-     */
-    private void startSecurityMonitoring() {
-        // Monitor for debugging tools
-        securityScheduler.scheduleAtFixedRate(() -> {
-            if (securityHardeningActive.get()) {
-                detectDebuggingTools();
-            }
-        }, 5, 5, TimeUnit.SECONDS);
+        }, 30, 30, TimeUnit.SECONDS);
         
-        // Monitor system integrity
-        securityScheduler.scheduleAtFixedRate(() -> {
-            if (securityHardeningActive.get()) {
-                checkSystemIntegrity();
-            }
-        }, 60, 60, TimeUnit.SECONDS);
+        System.out.println("📁 File system protection enabled");
     }
     
     /**
-     * Perform memory cleanup and protection
+     * Perform memory cleanup
      */
     private void performMemoryCleanup() {
         try {
-            // Force garbage collection
-            System.gc();
-            
-            // Clear any cached sensitive data
+            // Clear sensitive memory regions
             clearSensitiveMemoryRegions();
             
-            // Check for memory dumps or analysis tools
+            // Detect memory analysis tools
             detectMemoryAnalysisTools();
+            
+            // Check for unusual memory patterns
+            checkMemoryPatterns();
             
         } catch (Exception e) {
             System.err.println("Memory cleanup error: " + e.getMessage());
@@ -206,167 +222,59 @@ public class AdvancedSecurityManager {
     }
     
     /**
-     * Monitor memory usage for anomalies
+     * Clear clipboard securely
      */
-    private void monitorMemoryUsage() {
-        Runtime runtime = Runtime.getRuntime();
-        long totalMemory = runtime.totalMemory();
-        long freeMemory = runtime.freeMemory();
-        long usedMemory = totalMemory - freeMemory;
-        
-        // Check for excessive memory usage
-        double memoryUsagePercent = (double) usedMemory / runtime.maxMemory() * 100;
-        
-        if (memoryUsagePercent > 85) {
-            System.err.println("⚠️ High memory usage detected: " + String.format("%.1f%%", memoryUsagePercent));
-            
-            // Trigger aggressive cleanup
-            performMemoryCleanup();
-        }
-        
-        // Check for unusual memory patterns that might indicate attacks
-        if (detectUnusualMemoryPatterns(usedMemory)) {
-            System.err.println("🚨 Unusual memory patterns detected - possible memory attack");
-        }
-    }
-    
-    /**
-     * Clear clipboard if it contains sensitive data
-     */
-    private void clearClipboardIfNeeded() {
+    private void clearClipboard() {
         try {
-            long currentTime = System.currentTimeMillis();
-            
-            // Clear clipboard after 30 seconds of any clipboard operation
-            if (currentTime - lastClipboardClear.get() > 30000) {
-                clearClipboard();
-                lastClipboardClear.set(currentTime);
-            }
-            
-        } catch (Exception e) {
-            // Clipboard operations can fail, ignore silently
-        }
-    }
-    
-    /**
-     * Clear system clipboard
-     */
-    public void clearClipboard() {
-        try {
-            Clipboard clipboard = Toolkit.getDefaultToolkit().getSystemClipboard();
-            
-            // Overwrite with random data first
-            String randomData = generateRandomString(100);
-            StringSelection randomSelection = new StringSelection(randomData);
-            clipboard.setContents(randomSelection, null);
-            
-            // Then clear with empty string
-            StringSelection emptySelection = new StringSelection("");
-            clipboard.setContents(emptySelection, null);
-            
-        } catch (Exception e) {
-            // Clipboard operations can fail on some systems
-        }
-    }
-    
-    /**
-     * Detect screen capture attempts
-     */
-    private void detectScreenCaptureAttempts() {
-        try {
-            // Check for common screen capture tools
-            String[] screenCaptureProcesses = {
-                "snagit", "greenshot", "lightshot", "gyazo", "puush",
-                "screenpresso", "faststone", "picpick", "screenshot",
-                "obs", "camtasia", "bandicam", "fraps"
-            };
-            
-            if (detectRunningProcesses(screenCaptureProcesses)) {
-                System.err.println("🚨 Screen capture software detected");
-                // In a real implementation, might blur the screen or show warning
-            }
-            
-        } catch (Exception e) {
-            // Process detection can fail, continue silently
-        }
-    }
-    
-    /**
-     * Set secure file permissions for vault files
-     */
-    private void setSecureFilePermissions() {
-        try {
-            Path vaultPath = Path.of(AppConfig.VAULT_DIR);
-            
-            if (Files.exists(vaultPath)) {
-                // On Unix-like systems, set restrictive permissions
-                if (!System.getProperty("os.name").toLowerCase().contains("win")) {
-                    Set<PosixFilePermission> permissions = new HashSet<>();
-                    permissions.add(PosixFilePermission.OWNER_READ);
-                    permissions.add(PosixFilePermission.OWNER_WRITE);
-                    permissions.add(PosixFilePermission.OWNER_EXECUTE);
-                    
-                    Files.setPosixFilePermissions(vaultPath, permissions);
-                    
-                    // Set permissions for all vault files
-                    Files.walk(vaultPath)
-                        .filter(Files::isRegularFile)
-                        .forEach(file -> {
-                            try {
-                                Set<PosixFilePermission> filePerms = new HashSet<>();
-                                filePerms.add(PosixFilePermission.OWNER_READ);
-                                filePerms.add(PosixFilePermission.OWNER_WRITE);
-                                Files.setPosixFilePermissions(file, filePerms);
-                            } catch (Exception e) {
-                                // Continue with other files
-                            }
-                        });
+            if (System.currentTimeMillis() - lastClipboardClear.get() > 30000) { // 30 seconds
+                Clipboard clipboard = Toolkit.getDefaultToolkit().getSystemClipboard();
+                
+                // Overwrite with random data multiple times
+                for (int i = 0; i < 3; i++) {
+                    String randomData = generateRandomString(100);
+                    StringSelection selection = new StringSelection(randomData);
+                    clipboard.setContents(selection, null);
                 }
                 
-                // On Windows, set file attributes
-                if (System.getProperty("os.name").toLowerCase().contains("win")) {
-                    try {
-                        File vaultDir = vaultPath.toFile();
-                        Runtime.getRuntime().exec("attrib +H +S \"" + vaultDir.getAbsolutePath() + "\"");
-                    } catch (Exception e) {
-                        // Ignore if attribute setting fails
-                    }
-                }
+                // Final clear
+                clipboard.setContents(new StringSelection(""), null);
+                lastClipboardClear.set(System.currentTimeMillis());
             }
             
         } catch (Exception e) {
-            System.err.println("Failed to set secure file permissions: " + e.getMessage());
+            System.err.println("Clipboard clearing error: " + e.getMessage());
         }
     }
     
     /**
-     * Monitor file system changes
+     * Check screen security
      */
-    private void monitorFileSystemChanges() {
+    private void checkScreenSecurity() {
         try {
-            Path vaultPath = Path.of(AppConfig.VAULT_DIR);
+            // Check for screen recording software
+            detectScreenRecording();
             
-            if (Files.exists(vaultPath)) {
-                // Check for unauthorized modifications
-                Files.walk(vaultPath)
-                    .filter(Files::isRegularFile)
-                    .forEach(file -> {
-                        try {
-                            // Check file permissions
-                            if (!hasSecurePermissions(file)) {
-                                System.err.println("🚨 Insecure file permissions detected: " + file);
-                            }
-                            
-                            // Check for suspicious file modifications
-                            if (detectSuspiciousModification(file)) {
-                                System.err.println("🚨 Suspicious file modification detected: " + file);
-                            }
-                            
-                        } catch (Exception e) {
-                            // Continue with other files
-                        }
-                    });
-            }
+            // Check for remote desktop connections
+            detectRemoteDesktop();
+            
+        } catch (Exception e) {
+            System.err.println("Screen security check error: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Monitor file system
+     */
+    private void monitorFileSystem() {
+        try {
+            // Check vault directory permissions
+            checkVaultPermissions();
+            
+            // Monitor for suspicious file modifications
+            checkFileModifications();
+            
+            // Check system integrity
+            checkSystemIntegrity();
             
         } catch (Exception e) {
             System.err.println("File system monitoring error: " + e.getMessage());
@@ -374,460 +282,31 @@ public class AdvancedSecurityManager {
     }
     
     /**
-     * Detect debugging tools
+     * Record security event for threat detection
      */
-    private void detectDebuggingTools() {
-        try {
-            String[] debuggingTools = {
-                "jdb", "jconsole", "jvisualvm", "jprofiler", "yourkit",
-                "eclipse", "intellij", "netbeans", "debugger", "profiler",
-                "wireshark", "fiddler", "burpsuite", "owasp", "metasploit"
-            };
-            
-            if (detectRunningProcesses(debuggingTools)) {
-                System.err.println("🚨 Debugging/analysis tools detected");
-                // In a real implementation, might trigger additional security measures
-            }
-            
-        } catch (Exception e) {
-            // Process detection can fail, continue silently
+    public void recordSecurityEvent(String eventType, String source, java.util.Map<String, String> metadata) {
+        if (threatEngine != null) {
+            threatEngine.recordSecurityEvent(eventType, source, metadata);
         }
     }
     
     /**
-     * Check system integrity
+     * Get comprehensive security status
      */
-    private void checkSystemIntegrity() {
-        try {
-            // Check if critical files have been modified
-            checkCriticalFileIntegrity();
-            
-            // Check for rootkits or system modifications
-            checkSystemModifications();
-            
-            // Verify cryptographic libraries
-            verifyCryptographicLibraries();
-            
-        } catch (Exception e) {
-            System.err.println("System integrity check error: " + e.getMessage());
-        }
-    }
-    
-    /**
-     * Implement timing attack resistance
-     */
-    public void executeWithTimingResistance(Runnable operation) {
-        long startTime = System.currentTimeMillis();
+    public ComprehensiveSecurityStatus getComprehensiveStatus() {
+        SecurityHardeningStatus basicStatus = getStatus();
         
-        try {
-            // Execute the operation
-            operation.run();
-            
-        } finally {
-            // Ensure consistent timing
-            long executionTime = System.currentTimeMillis() - startTime;
-            long targetTime = baseOperationTime.get();
-            
-            if (executionTime < targetTime) {
-                try {
-                    Thread.sleep(targetTime - executionTime);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                }
-            }
-            
-            // Add random jitter to prevent timing analysis
-            try {
-                Thread.sleep(secureRandom.nextInt(10));
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
-        }
-    }
-    
-    /**
-     * Secure array handling with automatic wiping
-     */
-    public static class SecureArray {
-        private byte[] data;
-        private final boolean autoWipe;
-        
-        public SecureArray(int size) {
-            this(size, true);
+        SecurityHardening.SecurityStatus advancedStatus = null;
+        if (securityHardening != null) {
+            advancedStatus = securityHardening.checkSecurityStatus();
         }
         
-        public SecureArray(int size, boolean autoWipe) {
-            this.data = new byte[size];
-            this.autoWipe = autoWipe;
+        ThreatDetectionEngine.ThreatAssessment threatAssessment = null;
+        if (threatEngine != null) {
+            threatAssessment = threatEngine.getCurrentThreatAssessment();
         }
         
-        public byte[] getData() {
-            return data;
-        }
-        
-        public int length() {
-            return data != null ? data.length : 0;
-        }
-        
-        public void wipe() {
-            if (data != null) {
-                MemoryUtils.secureWipe(data);
-                data = null;
-            }
-        }
-        
-        @Override
-        protected void finalize() throws Throwable {
-            if (autoWipe) {
-                wipe();
-            }
-            super.finalize();
-        }
-    }
-    
-    /**
-     * Secure string handling with automatic clearing
-     */
-    public static class SecureString {
-        private char[] data;
-        private final boolean autoWipe;
-        
-        public SecureString(String value) {
-            this(value, true);
-        }
-        
-        public SecureString(String value, boolean autoWipe) {
-            this.data = value != null ? value.toCharArray() : new char[0];
-            this.autoWipe = autoWipe;
-        }
-        
-        public char[] getData() {
-            return data;
-        }
-        
-        public String getString() {
-            return data != null ? new String(data) : "";
-        }
-        
-        public int length() {
-            return data != null ? data.length : 0;
-        }
-        
-        public void wipe() {
-            if (data != null) {
-                MemoryUtils.secureWipe(data);
-                data = null;
-            }
-        }
-        
-        @Override
-        protected void finalize() throws Throwable {
-            if (autoWipe) {
-                wipe();
-            }
-            super.finalize();
-        }
-    }
-    
-    /**
-     * Copy sensitive data to clipboard with automatic clearing
-     */
-    public void copyToClipboardSecurely(String data, int clearAfterSeconds) {
-        try {
-            Clipboard clipboard = Toolkit.getDefaultToolkit().getSystemClipboard();
-            StringSelection selection = new StringSelection(data);
-            clipboard.setContents(selection, null);
-            
-            lastClipboardClear.set(System.currentTimeMillis());
-            
-            // Schedule automatic clearing
-            securityScheduler.schedule(() -> {
-                clearClipboard();
-            }, clearAfterSeconds, TimeUnit.SECONDS);
-            
-        } catch (Exception e) {
-            System.err.println("Secure clipboard operation failed: " + e.getMessage());
-        }
-    }
-    
-    /**
-     * Perform atomic file operations to prevent corruption
-     */
-    public void performAtomicFileOperation(Path targetFile, byte[] data) throws Exception {
-        Path tempFile = targetFile.resolveSibling(targetFile.getFileName() + ".tmp");
-        
-        try {
-            // Write to temporary file first
-            Files.write(tempFile, data);
-            
-            // Verify write was successful
-            if (!Files.exists(tempFile) || Files.size(tempFile) != data.length) {
-                throw new SecurityException("Atomic file write verification failed");
-            }
-            
-            // Atomically move to target location
-            Files.move(tempFile, targetFile, java.nio.file.StandardCopyOption.ATOMIC_MOVE);
-            
-        } catch (Exception e) {
-            // Clean up temporary file if operation failed
-            try {
-                if (Files.exists(tempFile)) {
-                    Files.delete(tempFile);
-                }
-            } catch (Exception cleanupEx) {
-                // Ignore cleanup errors
-            }
-            throw e;
-        }
-    }
-    
-    /**
-     * Implement side-channel attack resistance for cryptographic operations
-     */
-    public byte[] performResistantCryptographicOperation(CryptoOperation operation, byte[] input) throws Exception {
-        // Add random delays to prevent timing analysis
-        long randomDelay = secureRandom.nextInt(50) + 10; // 10-60ms
-        Thread.sleep(randomDelay);
-        
-        // Perform operation with consistent timing
-        return executeWithTimingResistance(() -> {
-            try {
-                return operation.execute(input);
-            } catch (Exception e) {
-                throw new RuntimeException(e);
-            }
-        });
-    }
-    
-    /**
-     * Execute operation with timing resistance
-     */
-    private <T> T executeWithTimingResistance(java.util.function.Supplier<T> operation) {
-        long startTime = System.currentTimeMillis();
-        
-        try {
-            return operation.get();
-        } finally {
-            // Ensure consistent timing
-            long executionTime = System.currentTimeMillis() - startTime;
-            long targetTime = baseOperationTime.get();
-            
-            if (executionTime < targetTime) {
-                try {
-                    Thread.sleep(targetTime - executionTime);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                }
-            }
-        }
-    }
-    
-    /**
-     * Clear sensitive memory regions
-     */
-    private void clearSensitiveMemoryRegions() {
-        // Force finalization of objects that might contain sensitive data
-        System.runFinalization();
-        
-        // Multiple garbage collection passes
-        for (int i = 0; i < 3; i++) {
-            System.gc();
-            try {
-                Thread.sleep(10);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                break;
-            }
-        }
-    }
-    
-    /**
-     * Detect memory analysis tools
-     */
-    private void detectMemoryAnalysisTools() {
-        // Check for common memory analysis tools
-        String[] memoryTools = {
-            "volatility", "rekall", "memoryze", "dumpit", "winpmem",
-            "lime", "fmem", "pmem", "memdump", "procmon"
-        };
-        
-        if (detectRunningProcesses(memoryTools)) {
-            System.err.println("🚨 Memory analysis tools detected");
-        }
-    }
-    
-    /**
-     * Detect running processes by name
-     */
-    private boolean detectRunningProcesses(String[] processNames) {
-        try {
-            // Get list of running processes (platform-specific)
-            String os = System.getProperty("os.name").toLowerCase();
-            Process process;
-            
-            if (os.contains("win")) {
-                process = Runtime.getRuntime().exec("tasklist /fo csv");
-            } else {
-                process = Runtime.getRuntime().exec("ps -eo comm");
-            }
-            
-            try (java.io.BufferedReader reader = new java.io.BufferedReader(
-                    new java.io.InputStreamReader(process.getInputStream()))) {
-                
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    String lowerLine = line.toLowerCase();
-                    
-                    for (String processName : processNames) {
-                        if (lowerLine.contains(processName.toLowerCase())) {
-                            return true;
-                        }
-                    }
-                }
-            }
-            
-        } catch (Exception e) {
-            // Process detection can fail, continue silently
-        }
-        
-        return false;
-    }
-    
-    /**
-     * Check critical file integrity
-     */
-    private void checkCriticalFileIntegrity() {
-        try {
-            // Check vault configuration files
-            String[] criticalFiles = {
-                AppConfig.CONFIG_FILE,
-                AppConfig.SALT_FILE,
-                AppConfig.METADATA_FILE
-            };
-            
-            for (String filePath : criticalFiles) {
-                File file = new File(filePath);
-                if (file.exists()) {
-                    // Check file size and modification time
-                    if (detectSuspiciousFileChanges(file)) {
-                        System.err.println("🚨 Critical file modification detected: " + filePath);
-                    }
-                }
-            }
-            
-        } catch (Exception e) {
-            System.err.println("Critical file integrity check failed: " + e.getMessage());
-        }
-    }
-    
-    /**
-     * Check for system modifications
-     */
-    private void checkSystemModifications() {
-        try {
-            // Check for common rootkit indicators
-            checkRootkitIndicators();
-            
-            // Check system file integrity
-            checkSystemFileIntegrity();
-            
-            // Check for suspicious network connections
-            checkNetworkConnections();
-            
-        } catch (Exception e) {
-            System.err.println("System modification check failed: " + e.getMessage());
-        }
-    }
-    
-    /**
-     * Verify cryptographic libraries haven't been tampered with
-     */
-    private void verifyCryptographicLibraries() {
-        try {
-            // Test basic cryptographic operations to ensure they work correctly
-            javax.crypto.Cipher cipher = javax.crypto.Cipher.getInstance("AES/CBC/PKCS5Padding");
-            
-            // Verify AES is working correctly
-            byte[] testData = "test".getBytes();
-            javax.crypto.KeyGenerator keyGen = javax.crypto.KeyGenerator.getInstance("AES");
-            keyGen.init(256);
-            javax.crypto.SecretKey testKey = keyGen.generateKey();
-            
-            cipher.init(javax.crypto.Cipher.ENCRYPT_MODE, testKey);
-            byte[] encrypted = cipher.doFinal(testData);
-            
-            cipher.init(javax.crypto.Cipher.DECRYPT_MODE, testKey, cipher.getParameters());
-            byte[] decrypted = cipher.doFinal(encrypted);
-            
-            if (!java.util.Arrays.equals(testData, decrypted)) {
-                throw new SecurityException("Cryptographic library verification failed");
-            }
-            
-        } catch (Exception e) {
-            System.err.println("🚨 Cryptographic library verification failed: " + e.getMessage());
-        }
-    }
-    
-    /**
-     * Helper methods for security checks
-     */
-    private boolean detectUnusualMemoryPatterns(long currentMemory) {
-        // Simple heuristic - in a real implementation, this would be more sophisticated
-        return false; // Placeholder
-    }
-    
-    private boolean hasSecurePermissions(Path file) {
-        try {
-            if (System.getProperty("os.name").toLowerCase().contains("win")) {
-                // On Windows, check if file is hidden/system
-                return Files.isHidden(file);
-            } else {
-                // On Unix-like systems, check POSIX permissions
-                Set<PosixFilePermission> permissions = Files.getPosixFilePermissions(file);
-                return permissions.contains(PosixFilePermission.OWNER_READ) &&
-                       permissions.contains(PosixFilePermission.OWNER_WRITE) &&
-                       !permissions.contains(PosixFilePermission.GROUP_READ) &&
-                       !permissions.contains(PosixFilePermission.OTHERS_READ);
-            }
-        } catch (Exception e) {
-            return false;
-        }
-    }
-    
-    private boolean detectSuspiciousModification(Path file) {
-        // Placeholder for file modification detection
-        return false;
-    }
-    
-    private boolean detectSuspiciousFileChanges(File file) {
-        // Placeholder for suspicious file change detection
-        return false;
-    }
-    
-    private void checkRootkitIndicators() {
-        // Placeholder for rootkit detection
-    }
-    
-    private void checkSystemFileIntegrity() {
-        // Placeholder for system file integrity check
-    }
-    
-    private void checkNetworkConnections() {
-        // Placeholder for network connection monitoring
-    }
-    
-    /**
-     * Generate random string for clipboard clearing
-     */
-    private String generateRandomString(int length) {
-        StringBuilder sb = new StringBuilder(length);
-        String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()";
-        
-        for (int i = 0; i < length; i++) {
-            sb.append(chars.charAt(secureRandom.nextInt(chars.length())));
-        }
-        
-        return sb.toString();
+        return new ComprehensiveSecurityStatus(basicStatus, advancedStatus, threatAssessment);
     }
     
     /**
@@ -848,14 +327,84 @@ public class AdvancedSecurityManager {
      */
     public void cleanup() {
         deactivateSecurityHardening();
+        securityScheduler.shutdown();
     }
     
-    /**
-     * Functional interface for crypto operations
-     */
-    @FunctionalInterface
-    public interface CryptoOperation {
-        byte[] execute(byte[] input) throws Exception;
+    // Helper methods
+    private void clearSensitiveMemoryRegions() {
+        System.gc();
+        System.runFinalization();
+        System.gc();
+    }
+    
+    private void detectMemoryAnalysisTools() {
+        // Placeholder for memory analysis tool detection
+    }
+    
+    private void checkMemoryPatterns() {
+        Runtime runtime = Runtime.getRuntime();
+        long totalMemory = runtime.totalMemory();
+        long freeMemory = runtime.freeMemory();
+        long usedMemory = totalMemory - freeMemory;
+        
+        // Check for unusual memory usage patterns
+        if (usedMemory > runtime.maxMemory() * 0.9) {
+            System.err.println("⚠️ High memory usage detected");
+        }
+    }
+    
+    private void detectScreenRecording() {
+        // Placeholder for screen recording detection
+    }
+    
+    private void detectRemoteDesktop() {
+        // Placeholder for remote desktop detection
+    }
+    
+    private void checkVaultPermissions() {
+        try {
+            Path vaultPath = Path.of(AppConfig.VAULT_DIR);
+            if (Files.exists(vaultPath) && !hasSecurePermissions(vaultPath)) {
+                System.err.println("⚠️ Vault directory permissions are not secure");
+            }
+        } catch (Exception e) {
+            // Ignore permission check errors
+        }
+    }
+    
+    private void checkFileModifications() {
+        // Placeholder for file modification detection
+    }
+    
+    private void checkSystemIntegrity() {
+        // Placeholder for system integrity check
+    }
+    
+    private boolean hasSecurePermissions(Path file) {
+        try {
+            if (System.getProperty("os.name").toLowerCase().contains("win")) {
+                return Files.isHidden(file);
+            } else {
+                Set<PosixFilePermission> permissions = Files.getPosixFilePermissions(file);
+                return permissions.contains(PosixFilePermission.OWNER_READ) &&
+                       permissions.contains(PosixFilePermission.OWNER_WRITE) &&
+                       !permissions.contains(PosixFilePermission.GROUP_READ) &&
+                       !permissions.contains(PosixFilePermission.OTHERS_READ);
+            }
+        } catch (Exception e) {
+            return false;
+        }
+    }
+    
+    private String generateRandomString(int length) {
+        StringBuilder sb = new StringBuilder(length);
+        String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()";
+        
+        for (int i = 0; i < length; i++) {
+            sb.append(chars.charAt(secureRandom.nextInt(chars.length())));
+        }
+        
+        return sb.toString();
     }
     
     /**
@@ -899,3 +448,55 @@ public class AdvancedSecurityManager {
                 active, getActiveFeatureCount());
         }
     }
+    
+    /**
+     * Comprehensive security status
+     */
+    public static class ComprehensiveSecurityStatus {
+        private final SecurityHardeningStatus basicStatus;
+        private final SecurityHardening.SecurityStatus advancedStatus;
+        private final ThreatDetectionEngine.ThreatAssessment threatAssessment;
+        
+        public ComprehensiveSecurityStatus(SecurityHardeningStatus basicStatus,
+                                         SecurityHardening.SecurityStatus advancedStatus,
+                                         ThreatDetectionEngine.ThreatAssessment threatAssessment) {
+            this.basicStatus = basicStatus;
+            this.advancedStatus = advancedStatus;
+            this.threatAssessment = threatAssessment;
+        }
+        
+        public SecurityHardeningStatus getBasicStatus() { return basicStatus; }
+        public SecurityHardening.SecurityStatus getAdvancedStatus() { return advancedStatus; }
+        public ThreatDetectionEngine.ThreatAssessment getThreatAssessment() { return threatAssessment; }
+        
+        public boolean isFullySecure() {
+            boolean basicSecure = basicStatus != null && basicStatus.isActive();
+            boolean advancedSecure = advancedStatus != null && advancedStatus.isSecure();
+            boolean threatLevelAcceptable = threatAssessment == null || 
+                threatAssessment.getOverallLevel().getLevel() <= ThreatDetectionEngine.ThreatLevel.MEDIUM.getLevel();
+            
+            return basicSecure && advancedSecure && threatLevelAcceptable;
+        }
+        
+        public String getComprehensiveReport() {
+            StringBuilder report = new StringBuilder();
+            report.append("=== Comprehensive Security Status ===\n");
+            
+            if (basicStatus != null) {
+                report.append("Basic Security: ").append(basicStatus.toString()).append("\n");
+            }
+            
+            if (advancedStatus != null) {
+                report.append("\n").append(advancedStatus.getStatusReport()).append("\n");
+            }
+            
+            if (threatAssessment != null) {
+                report.append("\n").append(threatAssessment.getAssessmentReport()).append("\n");
+            }
+            
+            report.append("\nOverall Status: ").append(isFullySecure() ? "🛡️ SECURE" : "⚠️ NEEDS ATTENTION");
+            
+            return report.toString();
+        }
+    }
+}

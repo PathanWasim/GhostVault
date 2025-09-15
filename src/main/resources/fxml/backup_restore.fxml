@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<VBox xmlns="http://javafx.com/javafx/11.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.ghostvault.ui.BackupRestoreController">
+   <children>
+      <Label styleClass="title-label" text="Backup &amp; Restore" />
+      
+      <Separator />
+      
+      <VBox spacing="15.0">
+         <children>
+            <!-- Backup Section -->
+            <VBox spacing="10.0">
+               <children>
+                  <Label styleClass="section-label" text="Create Backup" />
+                  <Label text="Create an encrypted backup of your entire vault including all files and metadata." wrapText="true" />
+                  <Button fx:id="createBackupButton" maxWidth="200.0" styleClass="primary-button" text="Create Backup" />
+               </children>
+            </VBox>
+            
+            <Separator />
+            
+            <!-- Restore Section -->
+            <VBox spacing="10.0">
+               <children>
+                  <Label styleClass="section-label" text="Restore from Backup" />
+                  <Label text="Restore your vault from a previously created backup. This will replace your current vault." wrapText="true" />
+                  <Button fx:id="restoreBackupButton" maxWidth="200.0" styleClass="secondary-button" text="Restore Backup" />
+               </children>
+            </VBox>
+            
+            <Separator />
+            
+            <!-- Verify Section -->
+            <VBox spacing="10.0">
+               <children>
+                  <Label styleClass="section-label" text="Verify Backup" />
+                  <Label text="Verify the integrity of a backup file without performing a full restore." wrapText="true" />
+                  <Button fx:id="verifyBackupButton" maxWidth="200.0" styleClass="secondary-button" text="Verify Backup" />
+               </children>
+            </VBox>
+            
+            <Separator />
+            
+            <!-- Progress Section -->
+            <VBox spacing="10.0">
+               <children>
+                  <Label styleClass="section-label" text="Status" />
+                  <ProgressBar fx:id="progressBar" maxWidth="Infinity" prefHeight="20.0" />
+                  <Label fx:id="statusLabel" text="Ready" />
+               </children>
+            </VBox>
+            
+            <!-- Info Section -->
+            <VBox spacing="10.0">
+               <children>
+                  <Label styleClass="section-label" text="Information" />
+                  <TextArea fx:id="backupInfoArea" prefRowCount="8" promptText="Backup information will appear here..." />
+               </children>
+            </VBox>
+         </children>
+         <padding>
+            <Insets bottom="20.0" left="20.0" right="20.0" top="20.0" />
+         </padding>
+      </VBox>
+   </children>
+   <padding>
+      <Insets bottom="20.0" left="20.0" right="20.0" top="20.0" />
+   </padding>
+</VBox>

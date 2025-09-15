@@ -1,0 +1,240 @@
+/* Setup Dialog Styles */
+
+.root {
+    -fx-background-color: #f8f9fa;
+    -fx-font-family: "Segoe UI", Arial, sans-serif;
+}
+
+/* Title and subtitle */
+.title-label {
+    -fx-font-size: 28px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #2c3e50;
+    -fx-padding: 0 0 10 0;
+}
+
+.subtitle-label {
+    -fx-font-size: 14px;
+    -fx-text-fill: #7f8c8d;
+    -fx-padding: 0 0 20 0;
+}
+
+.instructions-label {
+    -fx-font-size: 13px;
+    -fx-text-fill: #34495e;
+    -fx-background-color: #ecf0f1;
+    -fx-padding: 15;
+    -fx-background-radius: 8;
+    -fx-border-radius: 8;
+    -fx-border-color: #bdc3c7;
+    -fx-border-width: 1;
+}
+
+/* Password groups */
+.password-group {
+    -fx-background-color: white;
+    -fx-padding: 15;
+    -fx-background-radius: 8;
+    -fx-border-radius: 8;
+    -fx-border-color: #e1e8ed;
+    -fx-border-width: 1;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.1), 4, 0, 0, 2);
+}
+
+.password-title {
+    -fx-font-size: 16px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #2c3e50;
+}
+
+.password-description {
+    -fx-font-size: 12px;
+    -fx-text-fill: #7f8c8d;
+    -fx-padding: 0 0 8 0;
+}
+
+/* Password fields */
+.password-field {
+    -fx-font-size: 14px;
+    -fx-padding: 10;
+    -fx-background-radius: 6;
+    -fx-border-radius: 6;
+    -fx-border-color: #d1d9e0;
+    -fx-border-width: 1;
+    -fx-background-color: white;
+}
+
+.password-field:focused {
+    -fx-border-color: #3498db;
+    -fx-border-width: 2;
+    -fx-effect: dropshadow(gaussian, rgba(52, 152, 219, 0.3), 4, 0, 0, 0);
+}
+
+/* Strength labels */
+.strength-label {
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+    -fx-padding: 5 0 0 0;
+}
+
+.strength-label.weak {
+    -fx-text-fill: #e74c3c;
+}
+
+.strength-label.fair {
+    -fx-text-fill: #f39c12;
+}
+
+.strength-label.good {
+    -fx-text-fill: #f1c40f;
+}
+
+.strength-label.strong {
+    -fx-text-fill: #27ae60;
+}
+
+.strength-label.very-strong {
+    -fx-text-fill: #2ecc71;
+}
+
+/* Setup button */
+.setup-button {
+    -fx-font-size: 16px;
+    -fx-font-weight: bold;
+    -fx-padding: 12 30;
+    -fx-background-color: #3498db;
+    -fx-text-fill: white;
+    -fx-background-radius: 6;
+    -fx-border-radius: 6;
+    -fx-cursor: hand;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.2), 4, 0, 0, 2);
+}
+
+.setup-button:hover {
+    -fx-background-color: #2980b9;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.3), 6, 0, 0, 3);
+}
+
+.setup-button:pressed {
+    -fx-background-color: #21618c;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.4), 2, 0, 0, 1);
+}
+
+.setup-button:disabled {
+    -fx-background-color: #bdc3c7;
+    -fx-text-fill: #7f8c8d;
+    -fx-cursor: default;
+    -fx-effect: none;
+}
+
+/* Progress bar */
+.progress-bar {
+    -fx-accent: #3498db;
+    -fx-background-radius: 4;
+    -fx-border-radius: 4;
+}
+
+.progress-bar .bar {
+    -fx-background-color: linear-gradient(to right, #3498db, #2ecc71);
+    -fx-background-radius: 4;
+    -fx-border-radius: 4;
+}
+
+.progress-bar .track {
+    -fx-background-color: #ecf0f1;
+    -fx-background-radius: 4;
+    -fx-border-radius: 4;
+}
+
+/* Status labels */
+.status-label {
+    -fx-font-size: 13px;
+    -fx-padding: 10 0;
+    -fx-text-alignment: center;
+    -fx-wrap-text: true;
+}
+
+.status-label.success {
+    -fx-text-fill: #27ae60;
+}
+
+.status-label.error {
+    -fx-text-fill: #e74c3c;
+}
+
+/* Separator */
+.separator .line {
+    -fx-border-color: #e1e8ed;
+    -fx-border-width: 1 0 0 0;
+}
+
+/* Scrollpane for long content */
+.scroll-pane {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+}
+
+.scroll-pane .viewport {
+    -fx-background-color: transparent;
+}
+
+.scroll-pane .content {
+    -fx-background-color: transparent;
+}
+
+/* Tooltips */
+.tooltip {
+    -fx-background-color: #34495e;
+    -fx-text-fill: white;
+    -fx-font-size: 12px;
+    -fx-padding: 8;
+    -fx-background-radius: 4;
+    -fx-border-radius: 4;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.3), 4, 0, 0, 2);
+}
+
+/* Alert dialogs */
+.alert .header-panel {
+    -fx-background-color: #3498db;
+}
+
+.alert .header-panel .label {
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+}
+
+.alert .content.label {
+    -fx-text-fill: #2c3e50;
+    -fx-font-size: 13px;
+    -fx-wrap-text: true;
+}
+
+/* Button styling in alerts */
+.alert .button-bar .button {
+    -fx-background-color: #3498db;
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+    -fx-padding: 8 16;
+    -fx-background-radius: 4;
+    -fx-border-radius: 4;
+}
+
+.alert .button-bar .button:hover {
+    -fx-background-color: #2980b9;
+}
+
+.alert .button-bar .button:default {
+    -fx-background-color: #27ae60;
+}
+
+.alert .button-bar .button:default:hover {
+    -fx-background-color: #229954;
+}
+
+.alert .button-bar .button:cancel-button {
+    -fx-background-color: #95a5a6;
+}
+
+.alert .button-bar .button:cancel-button:hover {
+    -fx-background-color: #7f8c8d;
+}
