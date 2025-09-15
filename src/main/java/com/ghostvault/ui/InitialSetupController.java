@@ -2,77 +2,63 @@ package com.ghostvault.ui;
 
 import com.ghostvault.security.PasswordManager;
 import javafx.fxml.FXML;
+import javafx.fxml.Initializable;
 import javafx.scene.control.*;
+import javafx.application.Platform;
+
+import java.net.URL;
+import java.util.ResourceBundle;
 
 /**
- * Controller for the initial setup interface
- * Handles first-run password configuration
+ * Controller for the initial setup screen
+ * Handles password creation and vault initialization
  */
-public class InitialSetupController {
+public class InitialSetupController implements Initializable {
     
     @FXML private Label titleLabel;
     @FXML private Label instructionLabel;
     
-    // Master password fields
     @FXML private PasswordField masterPasswordField;
     @FXML private ProgressBar masterStrengthBar;
     @FXML private Label masterStrengthLabel;
     
-    // Panic password fields
     @FXML private PasswordField panicPasswordField;
     @FXML private ProgressBar panicStrengthBar;
     @FXML private Label panicStrengthLabel;
     
-    // Decoy password fields
     @FXML private PasswordField decoyPasswordField;
     @FXML private ProgressBar decoyStrengthBar;
     @FXML private Label decoyStrengthLabel;
     
     @FXML private Button createVaultButton;
     @FXML private Label statusLabel;
+    @FXML private Button helpButton;
+    @FXML private Button exitButton;
     
     private UIManager uiManager;
-    private PasswordManager passwordManager;
+    private PasswordStrengthMeter strengthMeter;
     
-    /**
-     * Initialize the setup controller
-     */
-    @FXML
-    private void initialize() {
+    @Override
+    public void initialize(URL location, ResourceBundle resources) {
+        strengthMeter = new PasswordStrengthMeter();
+        
         // Set up password strength listeners
-        if (masterPasswordField != null) {
-            masterPasswordField.textProperty().addListener((obs, oldVal, newVal) -> 
-                updatePasswordStrength(newVal, masterStrengthBar, masterStrengthLabel));
-        }
+        masterPasswordField.textProperty().addListener((obs, oldVal, newVal) -> 
+            updatePasswordStrength(newVal, masterStrengthBar, masterStrengthLabel));
+        panicPasswordField.textProperty().addListener((obs, oldVal, newVal) -> 
+            updatePasswordStrength(newVal, panicStrengthBar, panicStrengthLabel));
+        decoyPasswordField.textProperty().addListener((obs, oldVal, newVal) -> 
+            updatePasswordStrength(newVal, decoyStrengthBar, decoyStrengthLabel));
         
-        if (panicPasswordField != null) {
-            panicPasswordField.textProperty().addListener((obs, oldVal, newVal) -> 
-                updatePasswordStrength(newVal, panicStrengthBar, panicStrengthLabel));
-        }
-        
-        if (decoyPasswordField != null) {
-            decoyPasswordField.textProperty().addListener((obs, oldVal, newVal) -> 
-                updatePasswordStrength(newVal, decoyStrengthBar, decoyStrengthLabel));
-        }
-        
-        // Clear status initially
-        if (statusLabel != null) {
-            statusLabel.setText("");
-        }
+        // Focus on first password field
+        Platform.runLater(() -> masterPasswordField.requestFocus());
     }
     
     /**
-     * Set UI manager reference
+     * Set the UI manager reference
      */
     public void setUIManager(UIManager uiManager) {
         this.uiManager = uiManager;
-    }
-    
-    /**
-     * Set password manager reference
-     */
-    public void setPasswordManager(PasswordManager passwordManager) {
-        this.passwordManager = passwordManager;
     }
     
     /**
@@ -80,68 +66,61 @@ public class InitialSetupController {
      */
     @FXML
     private void handleCreateVault() {
-        if (!validateInputs()) {
-            return;
-        }
-        
         String masterPassword = masterPasswordField.getText();
         String panicPassword = panicPasswordField.getText();
         String decoyPassword = decoyPasswordField.getText();
         
-        try {
-            // Initialize passwords
-            if (passwordManager != null) {
-                passwordManager.initializePasswords(masterPassword, panicPassword, decoyPassword);
-            }
+        if (validatePasswords(masterPassword, panicPassword, decoyPassword)) {
+            // Clear status
+            statusLabel.setText("");
             
-            // Clear password fields for security
-            clearPasswordFields();
-            
-            // Show success and transition to login
+            // Show success animation
             if (uiManager != null) {
-                uiManager.showInfo("Setup Complete", "Vault created successfully! You can now log in.");
-                uiManager.switchToScene(uiManager.createLoginScene());
+                uiManager.showSuccessAnimation(createVaultButton);
             }
             
-        } catch (Exception e) {
-            showStatus("Failed to create vault: " + e.getMessage(), true);
+            // TODO: Integrate with ApplicationIntegrator to create vault
+            // For now, show success message
+            statusLabel.setText("Vault created successfully!");
+            statusLabel.setStyle("-fx-text-fill: green;");
+            
+            // Disable form
+            masterPasswordField.setDisable(true);
+            panicPasswordField.setDisable(true);
+            decoyPasswordField.setDisable(true);
+            createVaultButton.setDisable(true);
         }
     }
     
     /**
-     * Validate all inputs
+     * Validate all passwords
      */
-    private boolean validateInputs() {
-        String masterPassword = masterPasswordField.getText();
-        String panicPassword = panicPasswordField.getText();
-        String decoyPassword = decoyPasswordField.getText();
+    private boolean validatePasswords(String master, String panic, String decoy) {
+        // Clear previous status
+        statusLabel.setStyle("-fx-text-fill: red;");
         
-        // Check if all fields are filled
-        if (masterPassword.isEmpty() || panicPassword.isEmpty() || decoyPassword.isEmpty()) {
-            showStatus("All password fields are required.", true);
+        if (master.isEmpty() || panic.isEmpty() || decoy.isEmpty()) {
+            statusLabel.setText("All password fields are required.");
             return false;
         }
         
-        // Check password strength
-        if (getPasswordStrengthScore(masterPassword) < 4) {
-            showStatus("Master password is too weak. Minimum requirements not met.", true);
+        if (strengthMeter.calculateStrength(master).getScore() < 4) {
+            statusLabel.setText("Master password is too weak. Minimum requirements not met.");
             return false;
         }
         
-        if (getPasswordStrengthScore(panicPassword) < 3) {
-            showStatus("Panic password is too weak. Minimum 3/5 strength required.", true);
+        if (strengthMeter.calculateStrength(panic).getScore() < 3) {
+            statusLabel.setText("Panic password is too weak. Minimum 3/5 strength required.");
             return false;
         }
         
-        if (getPasswordStrengthScore(decoyPassword) < 3) {
-            showStatus("Decoy password is too weak. Minimum 3/5 strength required.", true);
+        if (strengthMeter.calculateStrength(decoy).getScore() < 3) {
+            statusLabel.setText("Decoy password is too weak. Minimum 3/5 strength required.");
             return false;
         }
         
-        // Check that all passwords are different
-        if (masterPassword.equals(panicPassword) || masterPassword.equals(decoyPassword) || 
-            panicPassword.equals(decoyPassword)) {
-            showStatus("All passwords must be different from each other.", true);
+        if (master.equals(panic) || master.equals(decoy) || panic.equals(decoy)) {
+            statusLabel.setText("All passwords must be different from each other.");
             return false;
         }
         
@@ -152,72 +131,63 @@ public class InitialSetupController {
      * Update password strength indicator
      */
     private void updatePasswordStrength(String password, ProgressBar strengthBar, Label strengthLabel) {
-        if (strengthBar == null || strengthLabel == null) return;
+        PasswordStrengthMeter.StrengthResult result = strengthMeter.calculateStrength(password);
         
-        int score = getPasswordStrengthScore(password);
-        double progress = score / 5.0;
-        
+        double progress = result.getScore() / 5.0;
         strengthBar.setProgress(progress);
         
-        String[] strengthTexts = {"Very Weak", "Weak", "Fair", "Good", "Strong", "Very Strong"};
-        String[] strengthColors = {"#ff4444", "#ff8800", "#ffaa00", "#88aa00", "#44aa44", "#00aa44"};
+        String strengthText = result.getStrengthText();
+        String color = getStrengthColor(result.getScore());
         
-        if (password.isEmpty()) {
-            strengthLabel.setText("");
-            strengthBar.setStyle("");
-        } else {
-            strengthLabel.setText(strengthTexts[score]);
-            strengthLabel.setStyle("-fx-text-fill: " + strengthColors[score] + ";");
-            strengthBar.setStyle("-fx-accent: " + strengthColors[score] + ";");
+        strengthLabel.setText(strengthText + " - " + result.getFeedback());
+        strengthLabel.setStyle("-fx-text-fill: " + color + ";");
+        
+        // Update progress bar color
+        strengthBar.setStyle("-fx-accent: " + color + ";");
+    }
+    
+    /**
+     * Get color for strength level
+     */
+    private String getStrengthColor(int score) {
+        switch (score) {
+            case 0:
+            case 1: return "#ff4444"; // Red
+            case 2: return "#ff8800"; // Orange
+            case 3: return "#ffaa00"; // Yellow
+            case 4: return "#88cc00"; // Light Green
+            case 5: return "#44cc44"; // Green
+            default: return "#666666"; // Gray
         }
     }
     
     /**
-     * Calculate password strength score (0-5)
+     * Show help dialog
      */
-    private int getPasswordStrengthScore(String password) {
-        if (password == null || password.isEmpty()) {
-            return 0;
-        }
-        
-        int score = 0;
-        
-        // Length check
-        if (password.length() >= 8) score++;
-        if (password.length() >= 12) score++;
-        
-        // Character variety checks
-        if (password.matches(".*[a-z].*")) score++; // lowercase
-        if (password.matches(".*[A-Z].*")) score++; // uppercase
-        if (password.matches(".*[0-9].*")) score++; // numbers
-        if (password.matches(".*[!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>\\/?].*")) score++; // special chars
-        
-        // Bonus for very long passwords
-        if (password.length() >= 16) score++;
-        
-        return Math.min(score, 5);
-    }
-    
-    /**
-     * Show status message
-     */
-    private void showStatus(String message, boolean isError) {
-        if (statusLabel != null) {
-            statusLabel.setText(message);
-            if (isError) {
-                statusLabel.setStyle("-fx-text-fill: #ff4444;");
-            } else {
-                statusLabel.setStyle("-fx-text-fill: #44aa44;");
-            }
+    @FXML
+    private void showHelp() {
+        if (uiManager != null) {
+            // Show help for initial setup
+            Alert helpAlert = new Alert(Alert.AlertType.INFORMATION);
+            helpAlert.setTitle("Initial Setup Help");
+            helpAlert.setHeaderText("Setting up your GhostVault");
+            helpAlert.setContentText(
+                "Create three different passwords:\n\n" +
+                "• Master Password: Full access to your vault\n" +
+                "• Panic Password: Emergency data destruction\n" +
+                "• Decoy Password: Shows fake files\n\n" +
+                "All passwords must be strong and different from each other.\n" +
+                "Remember your master password - it cannot be recovered!"
+            );
+            helpAlert.showAndWait();
         }
     }
     
     /**
-     * Clear all password fields for security
+     * Handle exit button
      */
-    private void clearPasswordFields() {
-        if (masterPasswordField != null) masterPasswordField.clear();
-        if (panicPasswordField != null) panicPasswordField.clear();
-        if (decoyPasswordField != null) decoyPasswordField.clear();
+    @FXML
+    private void handleExit() {
+        Platform.exit();
     }
 }

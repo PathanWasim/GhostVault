@@ -242,3 +242,200 @@
         -fx-opacity: 0;
     }
 }
+
+/*
+ ===== FXML-specific styles ===== */
+
+/* Initial Setup Styles */
+.title-label {
+    -fx-font-size: 28px;
+    -fx-font-weight: bold;
+    -fx-text-alignment: center;
+}
+
+.instruction-label {
+    -fx-font-size: 14px;
+    -fx-text-alignment: center;
+    -fx-wrap-text: true;
+}
+
+.password-section {
+    -fx-alignment: center;
+    -fx-max-width: 450px;
+}
+
+.password-title {
+    -fx-font-size: 16px;
+    -fx-font-weight: bold;
+}
+
+.password-field {
+    -fx-pref-width: 400px;
+    -fx-font-size: 14px;
+    -fx-padding: 10px;
+}
+
+.strength-bar {
+    -fx-pref-width: 400px;
+}
+
+.strength-label {
+    -fx-font-size: 12px;
+}
+
+.description-label {
+    -fx-font-size: 12px;
+    -fx-text-fill: gray;
+}
+
+.status-label {
+    -fx-font-size: 12px;
+}
+
+/* Login Styles */
+.app-title {
+    -fx-font-size: 32px;
+    -fx-font-weight: bold;
+    -fx-text-alignment: center;
+}
+
+.app-subtitle {
+    -fx-font-size: 16px;
+    -fx-text-alignment: center;
+}
+
+.login-password-field {
+    -fx-font-size: 14px;
+    -fx-padding: 10px;
+}
+
+.theme-toggle {
+    -fx-background-color: transparent;
+    -fx-border-color: gray;
+    -fx-font-size: 16px;
+}
+
+.security-notice {
+    -fx-font-size: 12px;
+    -fx-text-fill: #888888;
+}
+
+.error-label {
+    -fx-text-fill: red;
+}
+
+/* Vault Main Styles */
+.main-toolbar {
+    -fx-background-color: derive(-fx-background, -10%);
+    -fx-padding: 8px;
+}
+
+.toolbar-button {
+    -fx-font-size: 12px;
+    -fx-padding: 8px 12px;
+    -fx-margin: 2px;
+}
+
+.upload-button {
+    -fx-background-color: #4CAF50;
+    -fx-text-fill: white;
+}
+
+.download-button {
+    -fx-background-color: #2196F3;
+    -fx-text-fill: white;
+}
+
+.delete-button {
+    -fx-background-color: #ff9800;
+    -fx-text-fill: white;
+}
+
+.backup-button {
+    -fx-background-color: #607D8B;
+    -fx-text-fill: white;
+}
+
+.restore-button {
+    -fx-background-color: #607D8B;
+    -fx-text-fill: white;
+}
+
+.settings-button {
+    -fx-background-color: #9C27B0;
+    -fx-text-fill: white;
+}
+
+.logout-button {
+    -fx-background-color: #f44336;
+    -fx-text-fill: white;
+}
+
+.session-label {
+    -fx-font-size: 12px;
+    -fx-text-fill: #888888;
+}
+
+.section-label {
+    -fx-font-weight: bold;
+    -fx-font-size: 14px;
+}
+
+.search-field {
+    -fx-font-size: 12px;
+    -fx-padding: 8px;
+}
+
+.file-list {
+    -fx-font-family: "Consolas", monospace;
+    -fx-font-size: 12px;
+}
+
+.log-area {
+    -fx-font-family: "Consolas", monospace;
+    -fx-font-size: 11px;
+}
+
+.status-bar {
+    -fx-background-color: derive(-fx-background, -5%);
+    -fx-border-color: derive(-fx-background, -20%);
+    -fx-border-width: 1px 0 0 0;
+}
+
+.operation-progress {
+    -fx-max-width: 16px;
+    -fx-max-height: 16px;
+}
+
+.operation-status {
+    -fx-font-size: 11px;
+    -fx-text-fill: #666666;
+}
+
+/* Button Styles */
+.primary-button {
+    -fx-background-color: #4CAF50;
+    -fx-text-fill: white;
+    -fx-font-size: 14px;
+    -fx-padding: 10px 20px;
+    -fx-background-radius: 4px;
+}
+
+.primary-button:hover {
+    -fx-background-color: #45a049;
+}
+
+.secondary-button {
+    -fx-background-color: transparent;
+    -fx-border-color: #cccccc;
+    -fx-border-width: 1px;
+    -fx-text-fill: -fx-text-base-color;
+    -fx-font-size: 12px;
+    -fx-padding: 8px 16px;
+    -fx-background-radius: 4px;
+    -fx-border-radius: 4px;
+}
+
+.secondary-button:hover {
+    -fx-background-color: derive(-fx-background, -10%);
+}

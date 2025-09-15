@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<ScrollPane xmlns="http://javafx.com/javafx/11.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.ghostvault.ui.InitialSetupController">
+   <content>
+      <VBox alignment="CENTER" spacing="20.0">
+         <padding>
+            <Insets bottom="40.0" left="40.0" right="40.0" top="40.0" />
+         </padding>
+         
+         <!-- Title Section -->
+         <Label fx:id="titleLabel" styleClass="title-label" text="GhostVault - Initial Setup" />
+         <Label fx:id="instructionLabel" styleClass="instruction-label" text="Set up your vault passwords. All three are required for security." wrapText="true" />
+         
+         <!-- Master Password Section -->
+         <VBox spacing="8.0" styleClass="password-section">
+            <Label styleClass="password-title" text="Master Password" />
+            <PasswordField fx:id="masterPasswordField" promptText="Enter master password" styleClass="password-field" />
+            <ProgressBar fx:id="masterStrengthBar" prefWidth="400.0" styleClass="strength-bar" />
+            <Label fx:id="masterStrengthLabel" styleClass="strength-label" />
+            <Label styleClass="description-label" text="Full access to your vault" />
+         </VBox>
+         
+         <!-- Panic Password Section -->
+         <VBox spacing="8.0" styleClass="password-section">
+            <Label styleClass="password-title" text="Panic Password" />
+            <PasswordField fx:id="panicPasswordField" promptText="Enter panic password" styleClass="password-field" />
+            <ProgressBar fx:id="panicStrengthBar" prefWidth="400.0" styleClass="strength-bar" />
+            <Label fx:id="panicStrengthLabel" styleClass="strength-label" />
+            <Label styleClass="description-label" text="Emergency destruction of all data" />
+         </VBox>
+         
+         <!-- Decoy Password Section -->
+         <VBox spacing="8.0" styleClass="password-section">
+            <Label styleClass="password-title" text="Decoy Password" />
+            <PasswordField fx:id="decoyPasswordField" promptText="Enter decoy password" styleClass="password-field" />
+            <ProgressBar fx:id="decoyStrengthBar" prefWidth="400.0" styleClass="strength-bar" />
+            <Label fx:id="decoyStrengthLabel" styleClass="strength-label" />
+            <Label styleClass="description-label" text="Shows fake files to mislead attackers" />
+         </VBox>
+         
+         <!-- Action Section -->
+         <Button fx:id="createVaultButton" onAction="#handleCreateVault" prefWidth="150.0" styleClass="primary-button" text="Create Vault" />
+         <Label fx:id="statusLabel" styleClass="status-label" />
+         
+         <!-- Help Section -->
+         <HBox alignment="CENTER" spacing="10.0">
+            <Button fx:id="helpButton" onAction="#showHelp" styleClass="secondary-button" text="Help" />
+            <Button fx:id="exitButton" onAction="#handleExit" styleClass="secondary-button" text="Exit" />
+         </HBox>
+      </VBox>
+   </content>
+</ScrollPane>

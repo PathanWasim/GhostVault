@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<BorderPane xmlns="http://javafx.com/javafx/11.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.ghostvault.ui.VaultMainController">
+   
+   <!-- Top Toolbar -->
+   <top>
+      <ToolBar styleClass="main-toolbar">
+         <!-- File Operations -->
+         <Button fx:id="uploadButton" onAction="#handleUpload" styleClass="toolbar-button, upload-button" text="📁 Upload">
+            <tooltip>
+               <Tooltip text="Encrypt and store a new file" />
+            </tooltip>
+         </Button>
+         <Button fx:id="downloadButton" onAction="#handleDownload" styleClass="toolbar-button, download-button" text="💾 Download">
+            <tooltip>
+               <Tooltip text="Decrypt and download selected file" />
+            </tooltip>
+         </Button>
+         <Button fx:id="deleteButton" onAction="#handleDelete" styleClass="toolbar-button, delete-button" text="🗑️ Delete">
+            <tooltip>
+               <Tooltip text="Securely delete selected file" />
+            </tooltip>
+         </Button>
+         
+         <Separator />
+         
+         <!-- Vault Operations -->
+         <Button fx:id="backupButton" onAction="#handleBackup" styleClass="toolbar-button, backup-button" text="📦 Backup">
+            <tooltip>
+               <Tooltip text="Create encrypted vault backup" />
+            </tooltip>
+         </Button>
+         <Button fx:id="restoreButton" onAction="#handleRestore" styleClass="toolbar-button, restore-button" text="📥 Restore">
+            <tooltip>
+               <Tooltip text="Restore vault from backup" />
+            </tooltip>
+         </Button>
+         
+         <Separator />
+         
+         <!-- Settings and Session -->
+         <Button fx:id="settingsButton" onAction="#handleSettings" styleClass="toolbar-button, settings-button" text="⚙️ Settings">
+            <tooltip>
+               <Tooltip text="Vault settings and preferences" />
+            </tooltip>
+         </Button>
+         <Button fx:id="logoutButton" onAction="#handleLogout" styleClass="toolbar-button, logout-button" text="🚪 Logout">
+            <tooltip>
+               <Tooltip text="Logout and lock vault" />
+            </tooltip>
+         </Button>
+         
+         <!-- Session Info -->
+         <Region HBox.hgrow="ALWAYS" />
+         <Label fx:id="sessionLabel" styleClass="session-label" text="Session: Active" />
+      </ToolBar>
+   </top>
+   
+   <!-- Main Content Area -->
+   <center>
+      <VBox spacing="10.0">
+         <padding>
+            <Insets bottom="15.0" left="15.0" right="15.0" top="15.0" />
+         </padding>
+         
+         <!-- Search Section -->
+         <VBox spacing="5.0">
+            <Label styleClass="section-label" text="Search Files:" />
+            <TextField fx:id="searchField" maxWidth="300.0" onKeyReleased="#handleSearch" promptText="🔍 Search files..." styleClass="search-field" />
+         </VBox>
+         
+         <!-- File List Section -->
+         <VBox spacing="5.0" VBox.vgrow="ALWAYS">
+            <Label styleClass="section-label" text="Encrypted Files:" />
+            <ListView fx:id="fileListView" styleClass="file-list" VBox.vgrow="ALWAYS" />
+         </VBox>
+         
+         <!-- Activity Log Section -->
+         <VBox spacing="5.0">
+            <Label styleClass="section-label" text="Activity Log:" />
+            <TextArea fx:id="logArea" editable="false" prefHeight="120.0" styleClass="log-area" />
+         </VBox>
+      </VBox>
+   </center>
+   
+   <!-- Status Bar -->
+   <bottom>
+      <HBox alignment="CENTER_LEFT" spacing="10.0" styleClass="status-bar">
+         <padding>
+            <Insets bottom="5.0" left="10.0" right="10.0" top="5.0" />
+         </padding>
+         
+         <Label fx:id="fileCountLabel" styleClass="status-label" text="Files: 0" />
+         <Separator orientation="VERTICAL" />
+         <Label fx:id="vaultSizeLabel" styleClass="status-label" text="Size: 0 MB" />
+         <Separator orientation="VERTICAL" />
+         <Label fx:id="encryptionLabel" styleClass="status-label" text="🔒 AES-256 Encrypted" />
+         
+         <Region HBox.hgrow="ALWAYS" />
+         
+         <ProgressIndicator fx:id="operationProgress" styleClass="operation-progress" visible="false" />
+         <Label fx:id="operationStatusLabel" styleClass="operation-status" />
+      </HBox>
+   </bottom>
+</BorderPane>

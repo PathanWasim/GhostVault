@@ -1,63 +1,54 @@
 package com.ghostvault.ui;
 
-import com.ghostvault.integration.ApplicationIntegrator;
 import javafx.fxml.FXML;
+import javafx.fxml.Initializable;
 import javafx.scene.control.*;
-import javafx.scene.input.KeyCode;
+import javafx.application.Platform;
+
+import java.net.URL;
+import java.util.ResourceBundle;
 
 /**
- * Controller for the login interface
- * Handles user authentication and password entry
+ * Controller for the login screen
+ * Handles user authentication and theme switching
  */
-public class LoginController {
+public class LoginController implements Initializable {
     
+    @FXML private ToggleButton themeToggleButton;
     @FXML private Label titleLabel;
+    @FXML private Label subtitleLabel;
     @FXML private PasswordField passwordField;
     @FXML private Button loginButton;
     @FXML private Label statusLabel;
-    @FXML private ToggleButton themeToggle;
+    @FXML private Button helpButton;
+    @FXML private Button exitButton;
     
     private UIManager uiManager;
-    private ApplicationIntegrator applicationIntegrator;
     
-    /**
-     * Initialize the login controller
-     */
-    @FXML
-    private void initialize() {
-        // Set up password field
-        if (passwordField != null) {
-            passwordField.setOnKeyPressed(event -> {
-                if (event.getCode() == KeyCode.ENTER) {
-                    handleLogin();
-                }
-            });
-        }
-        
+    @Override
+    public void initialize(URL location, ResourceBundle resources) {
         // Set up theme toggle
-        if (themeToggle != null) {
-            themeToggle.setSelected(true); // Default to dark theme
-            themeToggle.setText(themeToggle.isSelected() ? "🌙" : "☀️");
-        }
+        themeToggleButton.setSelected(true); // Default to dark theme
         
-        // Clear status initially
-        if (statusLabel != null) {
+        // Focus on password field
+        Platform.runLater(() -> passwordField.requestFocus());
+        
+        // Clear status on password change
+        passwordField.textProperty().addListener((obs, oldVal, newVal) -> {
             statusLabel.setText("");
-        }
+        });
     }
     
     /**
-     * Set UI manager reference
+     * Set the UI manager reference
      */
     public void setUIManager(UIManager uiManager) {
         this.uiManager = uiManager;
-    }
-    
-    /**
-     * Set application integrator reference
-     */
-    public void setApplicationIntegrator(ApplicationIntegrator applicationIntegrator) {
-        this.applicationIntegrator = applicationIntegrator;
+        
+        // Sync theme toggle with UI manager
+        if (uiManager != null) {
+            themeToggleButton.setSelected(uiManager.isDarkTheme());
+        }
     }
     
     /**
@@ -65,103 +56,92 @@ public class LoginController {
      */
     @FXML
     private void handleLogin() {
-        if (passwordField == null) return;
-        
         String password = passwordField.getText();
         
         if (password.isEmpty()) {
-            showStatus("Please enter a password", true);
+            showError("Please enter a password.");
             return;
-        }
-        
-        // Clear status and disable login button during authentication
-        showStatus("Authenticating...", false);
-        loginButton.setDisabled(true);
-        
-        // Pass authentication to application integrator
-        if (applicationIntegrator != null) {
-            applicationIntegrator.handleAuthentication(password);
         }
         
         // Clear password field for security
         passwordField.clear();
         
-        // Re-enable login button after a short delay
-        javafx.application.Platform.runLater(() -> {
+        // Show loading animation
+        if (uiManager != null) {
+            uiManager.showLoadingAnimation(loginButton);
+        }
+        
+        // TODO: Integrate with ApplicationIntegrator for authentication
+        // For now, show placeholder message
+        statusLabel.setText("Authenticating...");
+        statusLabel.setStyle("-fx-text-fill: blue;");
+        
+        // Simulate authentication delay
+        new Thread(() -> {
             try {
-                Thread.sleep(500);
+                Thread.sleep(1000);
+                Platform.runLater(() -> {
+                    statusLabel.setText("Authentication successful!");
+                    statusLabel.setStyle("-fx-text-fill: green;");
+                });
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             }
-            loginButton.setDisabled(false);
-        });
+        }).start();
     }
     
     /**
-     * Handle theme toggle
+     * Toggle between dark and light themes
      */
     @FXML
-    private void handleThemeToggle() {
-        if (uiManager != null && themeToggle != null) {
-            uiManager.setDarkTheme(themeToggle.isSelected());
-            themeToggle.setText(themeToggle.isSelected() ? "🌙" : "☀️");
+    private void toggleTheme() {
+        if (uiManager != null) {
+            uiManager.toggleTheme();
         }
-    }
-    
-    /**
-     * Show status message
-     */
-    public void showStatus(String message, boolean isError) {
-        if (statusLabel != null) {
-            statusLabel.setText(message);
-            if (isError) {
-                statusLabel.setStyle("-fx-text-fill: #ff4444;");
-            } else {
-                statusLabel.setStyle("-fx-text-fill: #888888;");
-            }
-        }
-    }
-    
-    /**
-     * Clear status message
-     */
-    public void clearStatus() {
-        if (statusLabel != null) {
-            statusLabel.setText("");
-        }
-    }
-    
-    /**
-     * Focus on password field
-     */
-    public void focusPasswordField() {
-        if (passwordField != null) {
-            javafx.application.Platform.runLater(() -> passwordField.requestFocus());
-        }
-    }
-    
-    /**
-     * Show login error
-     */
-    public void showLoginError(String message) {
-        showStatus(message, true);
         
-        // Clear error after a few seconds
-        javafx.concurrent.Task<Void> clearTask = new javafx.concurrent.Task<Void>() {
-            @Override
-            protected Void call() throws Exception {
-                Thread.sleep(5000); // Wait 5 seconds
-                return null;
-            }
-            
-            @Override
-            protected void succeeded() {
-                clearStatus();
-            }
-        };
+        // Update button text
+        themeToggleButton.setText(themeToggleButton.isSelected() ? "🌙" : "☀️");
+    }
+    
+    /**
+     * Show help dialog
+     */
+    @FXML
+    private void showHelp() {
+        if (uiManager != null) {
+            // Show login help
+            Alert helpAlert = new Alert(Alert.AlertType.INFORMATION);
+            helpAlert.setTitle("Login Help");
+            helpAlert.setHeaderText("GhostVault Login");
+            helpAlert.setContentText(
+                "Enter one of your three passwords:\n\n" +
+                "• Master Password: Access your secure vault\n" +
+                "• Panic Password: Emergency data destruction\n" +
+                "• Decoy Password: Show fake files\n\n" +
+                "Press F1 for complete help documentation.\n" +
+                "Use the moon/sun button to toggle themes."
+            );
+            helpAlert.showAndWait();
+        }
+    }
+    
+    /**
+     * Handle exit button
+     */
+    @FXML
+    private void handleExit() {
+        Platform.exit();
+    }
+    
+    /**
+     * Show error message
+     */
+    private void showError(String message) {
+        statusLabel.setText(message);
+        statusLabel.setStyle("-fx-text-fill: red;");
         
-        Thread clearThread = new Thread(clearTask);
-        clearThread.setDaemon(true);
-        clearThread.start();
+        if (uiManager != null) {
+            uiManager.showErrorAnimation(passwordField);
+        }
     }
 }
