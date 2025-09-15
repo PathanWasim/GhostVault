@@ -1,655 +1,398 @@
 package com.ghostvault.ui;
 
+import com.ghostvault.backup.VaultBackupManager;
+import com.ghostvault.core.FileManager;
+import com.ghostvault.core.MetadataManager;
+import com.ghostvault.decoy.DecoyManager;
 import javafx.animation.FadeTransition;
-import javafx.animation.ScaleTransition;
-import javafx.animation.Timeline;
-import javafx.application.Platform;
-import javafx.scene.Node;
+import javafx.fxml.FXMLLoader;
+import javafx.scene.Parent;
 import javafx.scene.Scene;
-import javafx.scene.control.*;
-import javafx.scene.layout.Region;
 import javafx.stage.Stage;
 import javafx.util.Duration;
 
-import java.io.InputStream;
+import javax.crypto.SecretKey;
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.prefs.Preferences;
 
 /**
- * Comprehensive UI manager for consistent styling and theme management
- * Provides centralized control over application appearance and user experience
+ * Comprehensive UI manager for all application scenes and transitions
+ * Handles theme management, scene creation, and smooth transitions
  */
 public class UIManager {
     
-    private static UIManager instance;
-    private Theme currentTheme;
-    private final Map<String, String> styleSheets;
-    private final Preferences preferences;
     private Stage primaryStage;
+    private NotificationManager notificationManager;
+    private AccessibilityManager accessibilityManager;
+    private boolean isDarkTheme = true; // Default to dark theme
+    private Map<String, Scene> sceneCache = new HashMap<>();
     
-    // Theme definitions
-    public enum Theme {
-        LIGHT("Light", "/styles/light-theme.css", "#f4f4f4", "#2c3e50"),
-        DARK("Dark", "/styles/dark-theme.css", "#2b2b2b", "#ecf0f1"),
-        HIGH_CONTRAST("High Contrast", "/styles/high-contrast-theme.css", "#000000", "#ffffff"),
-        STEALTH("Stealth", "/styles/stealth-theme.css", "#1a1a1a", "#00ff00");
-        
-        private final String displayName;
-        private final String cssFile;
-        private final String backgroundColor;
-        private final String textColor;
-        
-        Theme(String displayName, String cssFile, String backgroundColor, String textColor) {
-            this.displayName = displayName;
-            this.cssFile = cssFile;
-            this.backgroundColor = backgroundColor;
-            this.textColor = textColor;
-        }
-        
-        public String getDisplayName() { return displayName; }
-        public String getCssFile() { return cssFile; }
-        public String getBackgroundColor() { return backgroundColor; }
-        public String getTextColor() { return textColor; }
-    }
-    
-    private UIManager() {
-        this.styleSheets = new HashMap<>();
-        this.preferences = Preferences.userNodeForPackage(UIManager.class);
-        this.currentTheme = Theme.valueOf(preferences.get("theme", Theme.LIGHT.name()));
-        
-        // Initialize CSS resources
-        initializeStyleSheets();
-    }
+    // Scene identifiers
+    public static final String FIRST_RUN_SETUP_SCENE = "first_run_setup";
+    public static final String LOGIN_SCENE = "login";
+    public static final String MASTER_VAULT_SCENE = "master_vault";
+    public static final String DECOY_VAULT_SCENE = "decoy_vault";
+    public static final String BACKUP_RESTORE_SCENE = "backup_restore";
     
     /**
-     * Get singleton instance
-     */
-    public static UIManager getInstance() {
-        if (instance == null) {
-            instance = new UIManager();
-        }
-        return instance;
-    }
-    
-    /**
-     * Initialize the UI manager with primary stage
+     * Initialize UI manager with primary stage
      */
     public void initialize(Stage primaryStage) {
         this.primaryStage = primaryStage;
-        applyTheme(currentTheme);
+        
+        // Initialize accessibility manager
+        accessibilityManager = new AccessibilityManager();
+        
+        // Set up stage properties
+        primaryStage.setTitle("GhostVault");
+        primaryStage.setMinWidth(800);
+        primaryStage.setMinHeight(600);
+        primaryStage.setResizable(true);
+        
+        // Set up window close handler
+        primaryStage.setOnCloseRequest(event -> {
+            // Handle graceful shutdown
+            handleApplicationClose();
+        });
+        
+        System.out.println("🎨 UI Manager initialized");
     }
     
     /**
-     * Apply theme to the application
+     * Set notification manager
      */
-    public void applyTheme(Theme theme) {
-        this.currentTheme = theme;
-        preferences.put("theme", theme.name());
-        
-        if (primaryStage != null && primaryStage.getScene() != null) {
-            Scene scene = primaryStage.getScene();
-            scene.getStylesheets().clear();
-            
-            // Add base styles
-            scene.getStylesheets().add(getClass().getResource("/styles/base.css").toExternalForm());
-            
-            // Add theme-specific styles
-            String themeCSS = styleSheets.get(theme.name());
-            if (themeCSS != null) {
-                scene.getStylesheets().add(themeCSS);
-            }
-            
-            // Apply theme-specific properties
-            scene.getRoot().setStyle(
-                "-fx-background-color: " + theme.getBackgroundColor() + ";" +
-                "-fx-text-fill: " + theme.getTextColor() + ";"
-            );
+    public void setNotificationManager(NotificationManager notificationManager) {
+        this.notificationManager = notificationManager;
+    }
+    
+    /**
+     * Create first run setup scene
+     */
+    public Scene createFirstRunSetupScene() throws IOException {
+        if (sceneCache.containsKey(FIRST_RUN_SETUP_SCENE)) {
+            return sceneCache.get(FIRST_RUN_SETUP_SCENE);
         }
-    }
-    
-    /**
-     * Get current theme
-     */
-    public Theme getCurrentTheme() {
-        return currentTheme;
-    }
-    
-    /**
-     * Initialize CSS stylesheets
-     */
-    private void initializeStyleSheets() {
-        // Create CSS content for each theme
-        createLightThemeCSS();
-        createDarkThemeCSS();
-        createHighContrastThemeCSS();
-        createStealthThemeCSS();
-        createBaseCSS();
-    }
-    
-    /**
-     * Create base CSS styles
-     */
-    private void createBaseCSS() {
-        String baseCSS = 
-            "/* Base styles for GhostVault */\n" +
-            ".root {\n" +
-            "    -fx-font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;\n" +
-            "    -fx-font-size: 12px;\n" +
-            "}\n" +
-            "\n" +
-            "/* Button styles */\n" +
-            ".button {\n" +
-            "    -fx-background-radius: 4px;\n" +
-            "    -fx-border-radius: 4px;\n" +
-            "    -fx-padding: 8px 16px;\n" +
-            "    -fx-cursor: hand;\n" +
-            "    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.1), 2, 0, 0, 1);\n" +
-            "}\n" +
-            "\n" +
-            ".button:hover {\n" +
-            "    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.2), 4, 0, 0, 2);\n" +
-            "}\n" +
-            "\n" +
-            ".button:pressed {\n" +
-            "    -fx-effect: innershadow(gaussian, rgba(0,0,0,0.2), 2, 0, 0, 1);\n" +
-            "}\n" +
-            "\n" +
-            "/* Primary button */\n" +
-            ".button-primary {\n" +
-            "    -fx-background-color: #3498db;\n" +
-            "    -fx-text-fill: white;\n" +
-            "    -fx-font-weight: bold;\n" +
-            "}\n" +
-            "\n" +
-            ".button-primary:hover {\n" +
-            "    -fx-background-color: #2980b9;\n" +
-            "}\n" +
-            "\n" +
-            "/* Danger button */\n" +
-            ".button-danger {\n" +
-            "    -fx-background-color: #e74c3c;\n" +
-            "    -fx-text-fill: white;\n" +
-            "    -fx-font-weight: bold;\n" +
-            "}\n" +
-            "\n" +
-            ".button-danger:hover {\n" +
-            "    -fx-background-color: #c0392b;\n" +
-            "}\n" +
-            "\n" +
-            "/* Success button */\n" +
-            ".button-success {\n" +
-            "    -fx-background-color: #27ae60;\n" +
-            "    -fx-text-fill: white;\n" +
-            "    -fx-font-weight: bold;\n" +
-            "}\n" +
-            "\n" +
-            ".button-success:hover {\n" +
-            "    -fx-background-color: #229954;\n" +
-            "}\n" +
-            "\n" +
-            "/* Text field styles */\n" +
-            ".text-field, .password-field {\n" +
-            "    -fx-background-radius: 4px;\n" +
-            "    -fx-border-radius: 4px;\n" +
-            "    -fx-padding: 8px 12px;\n" +
-            "    -fx-border-width: 1px;\n" +
-            "}\n" +
-            "\n" +
-            ".text-field:focused, .password-field:focused {\n" +
-            "    -fx-border-width: 2px;\n" +
-            "    -fx-border-color: #3498db;\n" +
-            "}\n" +
-            "\n" +
-            "/* Progress indicators */\n" +
-            ".progress-bar {\n" +
-            "    -fx-background-radius: 10px;\n" +
-            "}\n" +
-            "\n" +
-            ".progress-bar .bar {\n" +
-            "    -fx-background-radius: 10px;\n" +
-            "    -fx-background-color: #3498db;\n" +
-            "}\n" +
-            "\n" +
-            "/* Table styles */\n" +
-            ".table-view {\n" +
-            "    -fx-background-radius: 4px;\n" +
-            "    -fx-border-radius: 4px;\n" +
-            "    -fx-border-width: 1px;\n" +
-            "}\n" +
-            "\n" +
-            ".table-row-cell:selected {\n" +
-            "    -fx-background-color: #3498db;\n" +
-            "    -fx-text-fill: white;\n" +
-            "}\n" +
-            "\n" +
-            "/* Menu styles */\n" +
-            ".menu-bar {\n" +
-            "    -fx-background-radius: 0;\n" +
-            "    -fx-border-width: 0 0 1px 0;\n" +
-            "}\n" +
-            "\n" +
-            "/* Dialog styles */\n" +
-            ".dialog-pane {\n" +
-            "    -fx-background-radius: 8px;\n" +
-            "}\n" +
-            "\n" +
-            "/* Tooltip styles */\n" +
-            ".tooltip {\n" +
-            "    -fx-background-radius: 4px;\n" +
-            "    -fx-font-size: 11px;\n" +
-            "    -fx-padding: 4px 8px;\n" +
-            "}";
         
-        // Save to temporary file or use in-memory
-        styleSheets.put("BASE", "data:text/css;base64," + 
-            java.util.Base64.getEncoder().encodeToString(baseCSS.getBytes()));
-    }
-    
-    /**
-     * Create light theme CSS
-     */
-    private void createLightThemeCSS() {
-        String lightCSS = 
-            "/* Light Theme */\n" +
-            ".root {\n" +
-            "    -fx-base: #f4f4f4;\n" +
-            "    -fx-background: #ffffff;\n" +
-            "    -fx-control-inner-background: #ffffff;\n" +
-            "    -fx-accent: #3498db;\n" +
-            "    -fx-default-button: #3498db;\n" +
-            "    -fx-focus-color: #3498db;\n" +
-            "    -fx-text-fill: #2c3e50;\n" +
-            "}\n" +
-            "\n" +
-            ".button {\n" +
-            "    -fx-background-color: #ecf0f1;\n" +
-            "    -fx-text-fill: #2c3e50;\n" +
-            "    -fx-border-color: #bdc3c7;\n" +
-            "}\n" +
-            "\n" +
-            ".text-field, .password-field {\n" +
-            "    -fx-background-color: #ffffff;\n" +
-            "    -fx-text-fill: #2c3e50;\n" +
-            "    -fx-border-color: #bdc3c7;\n" +
-            "}\n" +
-            "\n" +
-            ".table-view {\n" +
-            "    -fx-background-color: #ffffff;\n" +
-            "    -fx-border-color: #bdc3c7;\n" +
-            "}\n" +
-            "\n" +
-            ".menu-bar {\n" +
-            "    -fx-background-color: #ecf0f1;\n" +
-            "    -fx-border-color: #bdc3c7;\n" +
-            "}";
+        FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/initial_setup.fxml"));
+        Parent root = loader.load();
         
-        styleSheets.put(Theme.LIGHT.name(), "data:text/css;base64," + 
-            java.util.Base64.getEncoder().encodeToString(lightCSS.getBytes()));
-    }
-    
-    /**
-     * Create dark theme CSS
-     */
-    private void createDarkThemeCSS() {
-        String darkCSS = 
-            "/* Dark Theme */\n" +
-            ".root {\n" +
-            "    -fx-base: #2b2b2b;\n" +
-            "    -fx-background: #1e1e1e;\n" +
-            "    -fx-control-inner-background: #3c3c3c;\n" +
-            "    -fx-accent: #0078d4;\n" +
-            "    -fx-default-button: #0078d4;\n" +
-            "    -fx-focus-color: #0078d4;\n" +
-            "    -fx-text-fill: #ffffff;\n" +
-            "}\n" +
-            "\n" +
-            ".button {\n" +
-            "    -fx-background-color: #404040;\n" +
-            "    -fx-text-fill: #ffffff;\n" +
-            "    -fx-border-color: #555555;\n" +
-            "}\n" +
-            "\n" +
-            ".button:hover {\n" +
-            "    -fx-background-color: #4a4a4a;\n" +
-            "}\n" +
-            "\n" +
-            ".text-field, .password-field {\n" +
-            "    -fx-background-color: #3c3c3c;\n" +
-            "    -fx-text-fill: #ffffff;\n" +
-            "    -fx-border-color: #555555;\n" +
-            "}\n" +
-            "\n" +
-            ".table-view {\n" +
-            "    -fx-background-color: #2b2b2b;\n" +
-            "    -fx-border-color: #555555;\n" +
-            "}\n" +
-            "\n" +
-            ".table-row-cell {\n" +
-            "    -fx-background-color: #2b2b2b;\n" +
-            "    -fx-text-fill: #ffffff;\n" +
-            "}\n" +
-            "\n" +
-            ".table-row-cell:odd {\n" +
-            "    -fx-background-color: #333333;\n" +
-            "}\n" +
-            "\n" +
-            ".menu-bar {\n" +
-            "    -fx-background-color: #2b2b2b;\n" +
-            "    -fx-border-color: #555555;\n" +
-            "}\n" +
-            "\n" +
-            ".label {\n" +
-            "    -fx-text-fill: #ffffff;\n" +
-            "}";
+        Scene scene = new Scene(root, 900, 700);
+        applyTheme(scene);
         
-        styleSheets.put(Theme.DARK.name(), "data:text/css;base64," + 
-            java.util.Base64.getEncoder().encodeToString(darkCSS.getBytes()));
-    }
-    
-    /**
-     * Create high contrast theme CSS
-     */
-    private void createHighContrastThemeCSS() {
-        String highContrastCSS = 
-            "/* High Contrast Theme */\n" +
-            ".root {\n" +
-            "    -fx-base: #000000;\n" +
-            "    -fx-background: #000000;\n" +
-            "    -fx-control-inner-background: #000000;\n" +
-            "    -fx-accent: #ffffff;\n" +
-            "    -fx-default-button: #ffffff;\n" +
-            "    -fx-focus-color: #ffff00;\n" +
-            "    -fx-text-fill: #ffffff;\n" +
-            "}\n" +
-            "\n" +
-            ".button {\n" +
-            "    -fx-background-color: #000000;\n" +
-            "    -fx-text-fill: #ffffff;\n" +
-            "    -fx-border-color: #ffffff;\n" +
-            "    -fx-border-width: 2px;\n" +
-            "}\n" +
-            "\n" +
-            ".button:hover {\n" +
-            "    -fx-background-color: #ffffff;\n" +
-            "    -fx-text-fill: #000000;\n" +
-            "}\n" +
-            "\n" +
-            ".button:focused {\n" +
-            "    -fx-border-color: #ffff00;\n" +
-            "    -fx-border-width: 3px;\n" +
-            "}\n" +
-            "\n" +
-            ".text-field, .password-field {\n" +
-            "    -fx-background-color: #000000;\n" +
-            "    -fx-text-fill: #ffffff;\n" +
-            "    -fx-border-color: #ffffff;\n" +
-            "    -fx-border-width: 2px;\n" +
-            "}\n" +
-            "\n" +
-            ".text-field:focused, .password-field:focused {\n" +
-            "    -fx-border-color: #ffff00;\n" +
-            "    -fx-border-width: 3px;\n" +
-            "}\n" +
-            "\n" +
-            ".table-view {\n" +
-            "    -fx-background-color: #000000;\n" +
-            "    -fx-border-color: #ffffff;\n" +
-            "    -fx-border-width: 2px;\n" +
-            "}\n" +
-            "\n" +
-            ".label {\n" +
-            "    -fx-text-fill: #ffffff;\n" +
-            "    -fx-font-weight: bold;\n" +
-            "}";
+        // Get controller and set up
+        InitialSetupController controller = loader.getController();
+        if (controller != null) {
+            controller.setUIManager(this);
+        }
         
-        styleSheets.put(Theme.HIGH_CONTRAST.name(), "data:text/css;base64," + 
-            java.util.Base64.getEncoder().encodeToString(highContrastCSS.getBytes()));
+        sceneCache.put(FIRST_RUN_SETUP_SCENE, scene);
+        return scene;
     }
     
     /**
-     * Create stealth theme CSS
+     * Create login scene
      */
-    private void createStealthThemeCSS() {
-        String stealthCSS = 
-            "/* Stealth Theme */\n" +
-            ".root {\n" +
-            "    -fx-base: #0a0a0a;\n" +
-            "    -fx-background: #000000;\n" +
-            "    -fx-control-inner-background: #1a1a1a;\n" +
-            "    -fx-accent: #00ff00;\n" +
-            "    -fx-default-button: #00ff00;\n" +
-            "    -fx-focus-color: #00ff00;\n" +
-            "    -fx-text-fill: #00ff00;\n" +
-            "}\n" +
-            "\n" +
-            ".button {\n" +
-            "    -fx-background-color: #1a1a1a;\n" +
-            "    -fx-text-fill: #00ff00;\n" +
-            "    -fx-border-color: #00ff00;\n" +
-            "    -fx-font-family: 'Courier New', monospace;\n" +
-            "}\n" +
-            "\n" +
-            ".button:hover {\n" +
-            "    -fx-background-color: #003300;\n" +
-            "    -fx-effect: dropshadow(gaussian, #00ff00, 5, 0, 0, 0);\n" +
-            "}\n" +
-            "\n" +
-            ".text-field, .password-field {\n" +
-            "    -fx-background-color: #000000;\n" +
-            "    -fx-text-fill: #00ff00;\n" +
-            "    -fx-border-color: #00ff00;\n" +
-            "    -fx-font-family: 'Courier New', monospace;\n" +
-            "}\n" +
-            "\n" +
-            ".label {\n" +
-            "    -fx-text-fill: #00ff00;\n" +
-            "    -fx-font-family: 'Courier New', monospace;\n" +
-            "}\n" +
-            "\n" +
-            ".table-view {\n" +
-            "    -fx-background-color: #000000;\n" +
-            "    -fx-border-color: #00ff00;\n" +
-            "}\n" +
-            "\n" +
-            ".progress-bar .bar {\n" +
-            "    -fx-background-color: #00ff00;\n" +
-            "    -fx-effect: dropshadow(gaussian, #00ff00, 3, 0, 0, 0);\n" +
-            "}";
+    public Scene createLoginScene() throws IOException {
+        if (sceneCache.containsKey(LOGIN_SCENE)) {
+            return sceneCache.get(LOGIN_SCENE);
+        }
         
-        styleSheets.put(Theme.STEALTH.name(), "data:text/css;base64," + 
-            java.util.Base64.getEncoder().encodeToString(stealthCSS.getBytes()));
+        FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/login.fxml"));
+        Parent root = loader.load();
+        
+        Scene scene = new Scene(root, 800, 600);
+        applyTheme(scene);
+        
+        // Get controller and set up
+        LoginController controller = loader.getController();
+        if (controller != null) {
+            controller.setUIManager(this);
+        }
+        
+        sceneCache.put(LOGIN_SCENE, scene);
+        return scene;
     }
     
     /**
-     * Apply smooth theme transition
+     * Create master vault scene
      */
-    public void applyThemeWithTransition(Theme newTheme) {
-        if (primaryStage != null && primaryStage.getScene() != null) {
-            Scene scene = primaryStage.getScene();
-            
-            // Create fade transition
-            FadeTransition fadeOut = new FadeTransition(Duration.millis(200), scene.getRoot());
-            fadeOut.setFromValue(1.0);
-            fadeOut.setToValue(0.3);
-            
-            fadeOut.setOnFinished(e -> {
-                applyTheme(newTheme);
-                
-                FadeTransition fadeIn = new FadeTransition(Duration.millis(200), scene.getRoot());
-                fadeIn.setFromValue(0.3);
-                fadeIn.setToValue(1.0);
-                fadeIn.play();
-            });
-            
-            fadeOut.play();
+    public Scene createMasterVaultScene(FileManager fileManager, MetadataManager metadataManager, 
+                                       VaultBackupManager backupManager, SecretKey encryptionKey) throws IOException {
+        
+        FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/vault_main.fxml"));
+        Parent root = loader.load();
+        
+        Scene scene = new Scene(root, 1200, 800);
+        applyTheme(scene);
+        
+        // Get controller and set up
+        VaultMainController controller = loader.getController();
+        if (controller != null) {
+            controller.initialize(fileManager, metadataManager, backupManager, encryptionKey);
+            controller.setUIManager(this);
+        }
+        
+        return scene;
+    }
+    
+    /**
+     * Create decoy vault scene
+     */
+    public Scene createDecoyVaultScene(DecoyManager decoyManager) throws IOException {
+        
+        FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/vault_main.fxml"));
+        Parent root = loader.load();
+        
+        Scene scene = new Scene(root, 1200, 800);
+        applyTheme(scene);
+        
+        // Get controller and set up for decoy mode
+        VaultMainController controller = loader.getController();
+        if (controller != null) {
+            controller.initializeDecoyMode(decoyManager);
+            controller.setUIManager(this);
+        }
+        
+        return scene;
+    }
+    
+    /**
+     * Create backup/restore scene
+     */
+    public Scene createBackupRestoreScene(VaultBackupManager backupManager, SecretKey encryptionKey) throws IOException {
+        
+        FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/backup_restore.fxml"));
+        Parent root = loader.load();
+        
+        Scene scene = new Scene(root, 800, 700);
+        applyTheme(scene);
+        
+        // Get controller and set up
+        BackupRestoreController controller = loader.getController();
+        if (controller != null) {
+            controller.setBackupManager(backupManager, encryptionKey);
+            controller.setStage(primaryStage);
+        }
+        
+        return scene;
+    }
+    
+    /**
+     * Switch to scene with smooth transition
+     */
+    public void switchToScene(Scene newScene) {
+        AnimationManager.smoothSceneTransition(primaryStage, newScene, () -> {
+            // Apply theme and accessibility to new scene
+            applyTheme(newScene);
+        });
+    }
+    
+    /**
+     * Apply theme to scene
+     */
+    public void applyTheme(Scene scene) {
+        scene.getStylesheets().clear();
+        
+        if (isDarkTheme) {
+            scene.getStylesheets().add(getClass().getResource("/styles/dark_theme.css").toExternalForm());
         } else {
-            applyTheme(newTheme);
+            scene.getStylesheets().add(getClass().getResource("/styles/light_theme.css").toExternalForm());
+        }
+        
+        // Add common styles
+        scene.getStylesheets().add(getClass().getResource("/styles/common.css").toExternalForm());
+        
+        // Initialize accessibility for the scene
+        if (accessibilityManager != null) {
+            accessibilityManager.initializeAccessibility(scene);
         }
     }
     
     /**
-     * Add responsive feedback to a button
+     * Toggle between dark and light themes
      */
-    public void addButtonFeedback(Button button) {
-        button.setOnMouseEntered(e -> {
-            ScaleTransition scale = new ScaleTransition(Duration.millis(100), button);
-            scale.setToX(1.05);
-            scale.setToY(1.05);
-            scale.play();
-        });
+    public void toggleTheme() {
+        isDarkTheme = !isDarkTheme;
         
-        button.setOnMouseExited(e -> {
-            ScaleTransition scale = new ScaleTransition(Duration.millis(100), button);
-            scale.setToX(1.0);
-            scale.setToY(1.0);
-            scale.play();
-        });
+        // Apply new theme to current scene
+        if (primaryStage.getScene() != null) {
+            applyTheme(primaryStage.getScene());
+        }
         
-        button.setOnMousePressed(e -> {
-            ScaleTransition scale = new ScaleTransition(Duration.millis(50), button);
-            scale.setToX(0.95);
-            scale.setToY(0.95);
-            scale.play();
-        });
+        // Clear scene cache to force recreation with new theme
+        sceneCache.clear();
         
-        button.setOnMouseReleased(e -> {
-            ScaleTransition scale = new ScaleTransition(Duration.millis(50), button);
-            scale.setToX(1.05);
-            scale.setToY(1.05);
-            scale.play();
-        });
+        // Notify user
+        if (notificationManager != null) {
+            String themeName = isDarkTheme ? "Dark" : "Light";
+            notificationManager.showInfo("Theme Changed", "Switched to " + themeName + " theme");
+        }
     }
     
     /**
-     * Add progress feedback to long-running operations
+     * Show progress dialog
      */
-    public ProgressDialog createProgressDialog(String title, String message) {
-        return new ProgressDialog(primaryStage, title, message);
+    public ProgressDialog showProgress(String title, String message) {
+        ProgressDialog progressDialog = new ProgressDialog(primaryStage);
+        progressDialog.setTitle(title);
+        progressDialog.setMessage(message);
+        progressDialog.show();
+        return progressDialog;
     }
     
     /**
-     * Show loading indicator
+     * Show error dialog
      */
-    public void showLoadingIndicator(Region parent, String message) {
-        ProgressIndicator indicator = new ProgressIndicator();
-        indicator.setPrefSize(50, 50);
+    public void showError(String title, String message) {
+        if (notificationManager != null) {
+            notificationManager.showError(title, message);
+        } else {
+            // Fallback to simple alert
+            javafx.scene.control.Alert alert = new javafx.scene.control.Alert(
+                javafx.scene.control.Alert.AlertType.ERROR);
+            alert.setTitle(title);
+            alert.setHeaderText(null);
+            alert.setContentText(message);
+            alert.showAndWait();
+        }
+    }
+    
+    /**
+     * Show warning dialog
+     */
+    public void showWarning(String title, String message) {
+        if (notificationManager != null) {
+            notificationManager.showWarning(title, message);
+        } else {
+            // Fallback to simple alert
+            javafx.scene.control.Alert alert = new javafx.scene.control.Alert(
+                javafx.scene.control.Alert.AlertType.WARNING);
+            alert.setTitle(title);
+            alert.setHeaderText(null);
+            alert.setContentText(message);
+            alert.showAndWait();
+        }
+    }
+    
+    /**
+     * Show info dialog
+     */
+    public void showInfo(String title, String message) {
+        if (notificationManager != null) {
+            notificationManager.showInfo(title, message);
+        } else {
+            // Fallback to simple alert
+            javafx.scene.control.Alert alert = new javafx.scene.control.Alert(
+                javafx.scene.control.Alert.AlertType.INFORMATION);
+            alert.setTitle(title);
+            alert.setHeaderText(null);
+            alert.setContentText(message);
+            alert.showAndWait();
+        }
+    }
+    
+    /**
+     * Show confirmation dialog
+     */
+    public boolean showConfirmation(String title, String message) {
+        javafx.scene.control.Alert alert = new javafx.scene.control.Alert(
+            javafx.scene.control.Alert.AlertType.CONFIRMATION);
+        alert.setTitle(title);
+        alert.setHeaderText(null);
+        alert.setContentText(message);
         
-        Label messageLabel = new Label(message);
-        messageLabel.getStyleClass().add("loading-message");
+        return alert.showAndWait().orElse(javafx.scene.control.ButtonType.CANCEL) == 
+               javafx.scene.control.ButtonType.OK;
+    }
+    
+    /**
+     * Handle application close
+     */
+    private void handleApplicationClose() {
+        // Show confirmation dialog
+        boolean confirmed = showConfirmation("Exit GhostVault", 
+            "Are you sure you want to exit GhostVault?");
         
-        // Add to parent with overlay
-        // Implementation would depend on parent layout
+        if (confirmed) {
+            // Perform cleanup and shutdown
+            System.out.println("🚪 Application closing...");
+        }
     }
     
     /**
-     * Apply consistent styling to a node
-     */
-    public void styleNode(Node node, String... styleClasses) {
-        node.getStyleClass().addAll(styleClasses);
-    }
-    
-    /**
-     * Create styled button with consistent appearance
-     */
-    public Button createStyledButton(String text, String styleClass) {
-        Button button = new Button(text);
-        button.getStyleClass().add(styleClass);
-        addButtonFeedback(button);
-        return button;
-    }
-    
-    /**
-     * Create primary action button
-     */
-    public Button createPrimaryButton(String text) {
-        return createStyledButton(text, "button-primary");
-    }
-    
-    /**
-     * Create danger action button
-     */
-    public Button createDangerButton(String text) {
-        return createStyledButton(text, "button-danger");
-    }
-    
-    /**
-     * Create success action button
-     */
-    public Button createSuccessButton(String text) {
-        return createStyledButton(text, "button-success");
-    }
-    
-    /**
-     * Add fade-in animation to node
-     */
-    public void fadeIn(Node node) {
-        fadeIn(node, Duration.millis(300));
-    }
-    
-    /**
-     * Add fade-in animation with custom duration
-     */
-    public void fadeIn(Node node, Duration duration) {
-        node.setOpacity(0);
-        FadeTransition fade = new FadeTransition(duration, node);
-        fade.setFromValue(0);
-        fade.setToValue(1);
-        fade.play();
-    }
-    
-    /**
-     * Add fade-out animation to node
-     */
-    public void fadeOut(Node node) {
-        fadeOut(node, Duration.millis(300));
-    }
-    
-    /**
-     * Add fade-out animation with custom duration
-     */
-    public void fadeOut(Node node, Duration duration) {
-        FadeTransition fade = new FadeTransition(duration, node);
-        fade.setFromValue(1);
-        fade.setToValue(0);
-        fade.play();
-    }
-    
-    /**
-     * Get available themes
-     */
-    public Theme[] getAvailableThemes() {
-        return Theme.values();
-    }
-    
-    /**
-     * Check if current theme is dark
+     * Get current theme status
      */
     public boolean isDarkTheme() {
-        return currentTheme == Theme.DARK || currentTheme == Theme.STEALTH || currentTheme == Theme.HIGH_CONTRAST;
+        return isDarkTheme;
     }
     
     /**
-     * Get theme-appropriate icon color
+     * Set theme
      */
-    public String getIconColor() {
-        return isDarkTheme() ? "#ffffff" : "#2c3e50";
-    }
-    
-    /**
-     * Get theme-appropriate accent color
-     */
-    public String getAccentColor() {
-        switch (currentTheme) {
-            case LIGHT:
-            case DARK:
-                return "#3498db";
-            case HIGH_CONTRAST:
-                return "#ffffff";
-            case STEALTH:
-                return "#00ff00";
-            default:
-                return "#3498db";
+    public void setDarkTheme(boolean darkTheme) {
+        if (this.isDarkTheme != darkTheme) {
+            toggleTheme();
         }
+    }
+    
+    /**
+     * Clear scene cache
+     */
+    public void clearSceneCache() {
+        sceneCache.clear();
+    }
+    
+    /**
+     * Get primary stage
+     */
+    public Stage getPrimaryStage() {
+        return primaryStage;
+    }
+    
+    /**
+     * Get accessibility manager
+     */
+    public AccessibilityManager getAccessibilityManager() {
+        return accessibilityManager;
+    }
+    
+    /**
+     * Show success animation on node
+     */
+    public void showSuccessAnimation(javafx.scene.Node node) {
+        AnimationManager.successGlow(node).play();
+        AnimationManager.bounce(node).play();
+    }
+    
+    /**
+     * Show error animation on node
+     */
+    public void showErrorAnimation(javafx.scene.Node node) {
+        AnimationManager.errorGlow(node).play();
+        AnimationManager.shake(node).play();
+    }
+    
+    /**
+     * Show loading animation on node
+     */
+    public javafx.animation.RotateTransition showLoadingAnimation(javafx.scene.Node node) {
+        javafx.animation.RotateTransition rotation = AnimationManager.continuousRotate(node);
+        rotation.play();
+        return rotation;
+    }
+    
+    /**
+     * Animate progress bar
+     */
+    public void animateProgress(javafx.scene.control.ProgressBar progressBar, double progress) {
+        AnimationManager.animateProgress(progressBar, progressBar.getProgress(), progress).play();
+    }
+    
+    /**
+     * Show typewriter effect on label
+     */
+    public void showTypewriterEffect(javafx.scene.control.Label label, String text) {
+        AnimationManager.typewriter(label, text).play();
     }
 }

@@ -1,0 +1,175 @@
+/* High Contrast Theme for Accessibility */
+
+.root {
+    -fx-base: #000000;
+    -fx-background: #000000;
+    -fx-control-inner-background: #000000;
+    -fx-control-inner-background-alt: #111111;
+}
+
+/* Text colors */
+.label,
+.text {
+    -fx-text-fill: #ffffff;
+}
+
+/* Button styles */
+.button {
+    -fx-background-color: #000000;
+    -fx-text-fill: #ffffff;
+    -fx-border-color: #ffffff;
+    -fx-border-width: 2px;
+    -fx-border-radius: 3px;
+    -fx-background-radius: 3px;
+}
+
+.button:hover {
+    -fx-background-color: #333333;
+}
+
+.button:pressed {
+    -fx-background-color: #555555;
+}
+
+.button:focused {
+    -fx-border-color: #ffff00;
+    -fx-border-width: 3px;
+}
+
+/* Text input fields */
+.text-field,
+.password-field,
+.text-area {
+    -fx-background-color: #000000;
+    -fx-text-fill: #ffffff;
+    -fx-border-color: #ffffff;
+    -fx-border-width: 2px;
+    -fx-prompt-text-fill: #cccccc;
+}
+
+.text-field:focused,
+.password-field:focused,
+.text-area:focused {
+    -fx-border-color: #ffff00;
+    -fx-border-width: 3px;
+}
+
+/* List views */
+.list-view {
+    -fx-background-color: #000000;
+    -fx-border-color: #ffffff;
+    -fx-border-width: 2px;
+}
+
+.list-cell {
+    -fx-background-color: #000000;
+    -fx-text-fill: #ffffff;
+}
+
+.list-cell:selected {
+    -fx-background-color: #ffffff;
+    -fx-text-fill: #000000;
+}
+
+.list-cell:focused {
+    -fx-border-color: #ffff00;
+    -fx-border-width: 2px;
+}
+
+/* Progress bars */
+.progress-bar {
+    -fx-background-color: #000000;
+    -fx-border-color: #ffffff;
+    -fx-border-width: 2px;
+}
+
+.progress-bar .bar {
+    -fx-background-color: #ffffff;
+}
+
+/* Menu and toolbar */
+.menu-bar,
+.tool-bar {
+    -fx-background-color: #000000;
+    -fx-border-color: #ffffff;
+    -fx-border-width: 0 0 2px 0;
+}
+
+.menu-item,
+.menu {
+    -fx-background-color: #000000;
+    -fx-text-fill: #ffffff;
+}
+
+.menu-item:focused,
+.menu:focused {
+    -fx-background-color: #ffffff;
+    -fx-text-fill: #000000;
+}
+
+/* Scroll bars */
+.scroll-bar {
+    -fx-background-color: #000000;
+    -fx-border-color: #ffffff;
+}
+
+.scroll-bar .thumb {
+    -fx-background-color: #ffffff;
+}
+
+/* Tabs */
+.tab-pane {
+    -fx-background-color: #000000;
+}
+
+.tab {
+    -fx-background-color: #000000;
+    -fx-text-fill: #ffffff;
+    -fx-border-color: #ffffff;
+    -fx-border-width: 2px 2px 0 2px;
+}
+
+.tab:selected {
+    -fx-background-color: #ffffff;
+    -fx-text-fill: #000000;
+}
+
+/* Dialog styles */
+.dialog-pane {
+    -fx-background-color: #000000;
+    -fx-border-color: #ffffff;
+    -fx-border-width: 3px;
+}
+
+.dialog-pane .header-panel {
+    -fx-background-color: #000000;
+    -fx-text-fill: #ffffff;
+}
+
+.dialog-pane .content {
+    -fx-background-color: #000000;
+    -fx-text-fill: #ffffff;
+}
+
+/* Focus indicators */
+*:focused {
+    -fx-effect: dropshadow(gaussian, #ffff00, 10, 0.5, 0, 0);
+}
+
+/* Error states */
+.error {
+    -fx-border-color: #ff0000;
+    -fx-border-width: 3px;
+}
+
+/* Success states */
+.success {
+    -fx-border-color: #00ff00;
+    -fx-border-width: 3px;
+}
+
+/* Warning states */
+.warning {
+    -fx-border-color: #ffff00;
+    -fx-border-width: 3px;
+}

@@ -1,375 +1,289 @@
-# GhostVault
+# GhostVault - Secure File Vault
 
-![Java](https://img.shields.io/badge/language-Java-blue.svg) ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-green.svg) ![Build](https://img.shields.io/badge/build-Maven-blue)
+![GhostVault Logo](docs/logo.png)
 
-**A modern, secure, and cross-platform file vault with panic mode, decoy vault, and strong encryption.**
+GhostVault is a comprehensive secure file storage application built with JavaFX that provides military-grade encryption, advanced security features, and multiple protection modes including panic and decoy functionality.
 
----
+## 🔐 Key Features
 
-## Table of Contents
-- [Project Structure](#project-structure)
-- [Setup Instructions](#step-by-step-setup-instructions)
-- [Build & Run](#first-build-and-run)
-- [Troubleshooting](#troubleshooting-common-issues)
-- [Configuration Files](#configuration-files-optional)
-- [IDE Setup](#ide-setup)
-- [Deployment Options](#deployment-options)
-- [Security Best Practices](#security-best-practices)
-- [Getting Help](#getting-help)
-- [Quick Command Reference](#quick-command-reference)
-- [Legal Notice](#legal-notice)
+### Core Security
+- **AES-256-CBC Encryption** - Military-grade encryption for all files
+- **PBKDF2 Password Hashing** - 100,000+ iterations with secure salt
+- **SHA-256 Integrity Verification** - Ensures file integrity and detects corruption
+- **Secure Memory Management** - Automatic memory wiping and protection
 
----
+### Multi-Password System
+- **Master Password** - Full access to your secure vault
+- **Panic Password** - Emergency data destruction (silent operation)
+- **Decoy Password** - Shows fake files to mislead attackers
 
-## Project Structure
+### Advanced Security Features
+- **Session Management** - Automatic timeout and activity monitoring
+- **Threat Detection** - Real-time monitoring and anomaly detection
+- **Anti-Debugging** - Protection against reverse engineering attempts
+- **Secure Deletion** - DoD 5220.22-M standard multi-pass overwriting
 
-```text
-GhostVault/
-│
-├── pom.xml            # Maven configuration
-├── README.md          # Documentation
-├── build.sh           # Unix/Linux/Mac build script
-├── build.bat          # Windows build script
-│
-├── src/
-│   ├── main/
-│   │   ├── java/
-│   │   │   └── com/
-│   │   │       └── ghostvault/
-│   │   │           ├── GhostVault.java      # Main application
-│   │   │           └── SecurityManager.java # Security utilities
-│   │   └── resources/
-│   │       ├── icon.png        # App icon (optional)
-│   │       ├── icon.ico        # Windows icon (optional)
-│   │       └── logback.xml     # Logging config (optional)
-│   └── test/
-│       └── java/
-│           └── com/
-│               └── ghostvault/
-│                   └── GhostVaultTest.java # Test suite
-└── target/             # Build output
-    └── (build artifacts)
-```
+### User Interface
+- **Modern JavaFX UI** - Clean, intuitive interface
+- **Dark/Light Themes** - Professional theme support with smooth transitions
+- **Accessibility Features** - Screen reader support, high contrast mode, keyboard navigation
+- **Smooth Animations** - Professional animations and transitions
+- **Progress Feedback** - Real-time progress for all operations
 
-## Step-by-Step Setup Instructions
+### Backup & Recovery
+- **Encrypted Backups** - Secure vault backup with integrity verification
+- **Flexible Restore** - Merge or replace options with conflict resolution
+- **Cross-Platform** - Backups work across different operating systems
 
-### 1. Prerequisites Installation
+## 🚀 Quick Start
 
-#### Windows
-- Download Java 17+ from [Adoptium](https://adoptium.net/)
-- Download Maven from [Apache Maven](https://maven.apache.org/download.cgi)
-- Add Java and Maven to your PATH environment variable
+### Prerequisites
+- Java 11 or higher
+- JavaFX 11 or higher (included in most Java distributions)
 
-#### macOS
+### Installation
+1. Download the latest release from the releases page
+2. Extract the archive to your desired location
+3. Run the application:
+   ```bash
+   java -jar ghostvault.jar
+   ```
+
+### First Run Setup
+1. Launch GhostVault
+2. Create three strong passwords:
+   - **Master Password**: Your main vault access
+   - **Panic Password**: Emergency destruction trigger
+   - **Decoy Password**: Fake vault access
+3. All passwords must be different and meet strength requirements
+4. Your vault is now ready to use!
+
+## 📖 Usage Guide
+
+### Basic Operations
+
+#### Uploading Files
+1. Click the "📁 Upload" button
+2. Select the file you want to encrypt
+3. File is automatically encrypted and stored securely
+
+#### Downloading Files
+1. Select a file from the vault list
+2. Click the "💾 Download" button
+3. Choose where to save the decrypted file
+4. File integrity is automatically verified
+
+#### Secure Deletion
+1. Select a file from the vault list
+2. Click the "🗑️ Delete" button
+3. Confirm deletion in the dialog
+4. File is securely overwritten multiple times
+
+#### Searching Files
+- Use the search box to find files by name
+- Results update in real-time as you type
+- Search works on original file names
+
+### Advanced Features
+
+#### Creating Backups
+1. Click the "📦 Backup" button
+2. Choose a secure location for the backup file
+3. Enter your master password to confirm
+4. Backup file (.gvbackup) is created with full encryption
+
+#### Restoring from Backup
+1. Click the "📥 Restore" button
+2. Select your .gvbackup file
+3. Enter your master password
+4. Choose merge or replace option
+
+#### Security Modes
+
+**Panic Mode**
+- Enter your panic password at login
+- Silently destroys all vault data
+- Appears as normal failed login
+- Cannot be undone - use with extreme caution
+
+**Decoy Mode**
+- Enter your decoy password at login
+- Shows fake files to mislead attackers
+- Completely separate from real vault
+- Maintains plausible deniability
+
+## 🛡️ Security Architecture
+
+### Encryption Details
+- **Algorithm**: AES-256-CBC with PKCS5 padding
+- **Key Derivation**: PBKDF2WithHmacSHA256 (100,000+ iterations)
+- **IV Generation**: Cryptographically secure random
+- **File Integrity**: SHA-256 hash verification
+- **Metadata Protection**: Encrypted separately from file data
+
+### Password Security
+- Passwords stored as salted hashes only
+- Memory wiping after password operations
+- Strong password requirements enforced
+- Protection against timing attacks
+
+### File Storage
+- Files stored with random UUID names
+- Original names encrypted in metadata
+- Flat storage structure (no directory preservation)
+- Secure deletion with multiple overwrites
+
+### Session Security
+- Configurable session timeout
+- Activity monitoring (mouse/keyboard)
+- Failed login attempt tracking
+- Automatic lockout after max attempts
+
+## 🎨 Themes and Accessibility
+
+### Theme Support
+- **Dark Theme** - Professional dark interface (default)
+- **Light Theme** - Clean light interface
+- **High Contrast** - Enhanced visibility for accessibility
+- **Smooth Transitions** - Professional animations between themes
+
+### Accessibility Features
+- Full keyboard navigation support
+- Screen reader compatibility
+- High contrast mode for visual impairments
+- Tooltips and descriptive labels
+- Configurable font sizes
+
+### Keyboard Shortcuts
+- `Tab/Shift+Tab` - Navigate controls
+- `Ctrl+U` - Upload file
+- `Ctrl+D` - Download file
+- `Delete` - Secure delete file
+- `Ctrl+T` - Toggle theme
+- `Ctrl+H` - Toggle high contrast
+- `F1` - Show help
+- `Escape` - Close dialogs
+
+## 🔧 Technical Details
+
+### System Requirements
+- **Operating System**: Windows, macOS, Linux
+- **Java Version**: 11 or higher
+- **Memory**: 512MB RAM minimum, 1GB recommended
+- **Storage**: 50MB for application, additional space for vault files
+
+### File Locations
+- **Vault Directory**: `~/.ghostvault/`
+- **Configuration**: `~/.ghostvault/config.enc`
+- **Encrypted Files**: `~/.ghostvault/files/`
+- **Decoy Files**: `~/.ghostvault/decoys/`
+- **Audit Logs**: `~/.ghostvault/audit.log.enc`
+
+### Performance
+- **Encryption Speed**: ~50-100 MB/s (depends on hardware)
+- **File Size Limits**: Limited only by available disk space
+- **Concurrent Operations**: Background processing for large files
+- **Memory Usage**: Efficient streaming for large files
+
+## 🧪 Testing
+
+The application includes comprehensive test coverage:
+
+### Test Categories
+- **Unit Tests** - Individual component testing
+- **Integration Tests** - Component interaction testing
+- **Security Tests** - Cryptographic and security validation
+- **Performance Tests** - Load and stress testing
+- **Penetration Tests** - Security vulnerability assessment
+
+### Running Tests
 ```bash
-# Using Homebrew
-brew install openjdk@17
-brew install maven
-
-# Set JAVA_HOME
-export JAVA_HOME=/usr/local/opt/openjdk@17
-```
-
-#### Linux (Ubuntu/Debian)
-```bash
-# Install Java 17
-sudo apt update
-sudo apt install openjdk-17-jdk
-
-# Install Maven
-sudo apt install maven
-
-# Verify installations
-java -version
-mvn -version
-```
-
----
-
-### 2. Project Setup
-
-1. **Create project directory:**
-    ```bash
-    mkdir GhostVault
-    cd GhostVault
-    ```
-
-2. **Create directory structure:**
-    ```bash
-    # Unix/Linux/Mac
-    mkdir -p src/main/java/com/ghostvault
-    mkdir -p src/main/resources
-    mkdir -p src/test/java/com/ghostvault
-
-    # Windows
-    mkdir src\main\java\com\ghostvault
-    mkdir src\main\resources
-    mkdir src\test\java\com\ghostvault
-    ```
-
-3. **Copy the provided files:**
-    - `pom.xml` to project root
-    - `GhostVault.java` to `src/main/java/com/ghostvault/`
-    - `SecurityManager.java` to `src/main/java/com/ghostvault/`
-    - `GhostVaultTest.java` to `src/test/java/com/ghostvault/`
-    - Build scripts to project root
-
-4. **Make scripts executable (Unix/Linux/Mac):**
-    ```bash
-    chmod +x build.sh
-    ```
-
----
-
-### 3. First Build and Run
-
-#### Option A: Using Build Scripts
-
-**Windows:**
-```batch
-build.bat
-REM Then select option 6 for Quick Start
-```
-
-**Unix/Linux/Mac:**
-```bash
-./build.sh
-# Then select option 7 for Quick Start
-```
-
----
-
-#### Option B: Using Maven Directly
-
-```bash
-# Download dependencies
-mvn dependency:resolve
-
-# Compile the project
-mvn clean compile
-
-# Run the application
-mvn javafx:run
-
-# Run tests
+# Run all tests
 mvn test
 
-# Create executable JAR
-mvn clean package
+# Run specific test categories
+mvn test -Dtest=SecurityValidationTest
+mvn test -Dtest=PerformanceValidationTest
+mvn test -Dtest=PenetrationTest
 ```
+
+## 🔒 Security Considerations
+
+### Best Practices
+1. **Use Strong Passwords** - Follow the strength requirements
+2. **Regular Backups** - Create encrypted backups frequently
+3. **Secure Storage** - Store backups in multiple secure locations
+4. **Password Management** - Never reuse vault passwords elsewhere
+5. **Physical Security** - Secure your computer and backup media
+
+### Threat Model
+GhostVault protects against:
+- **Data Theft** - Files encrypted with strong algorithms
+- **Password Attacks** - Strong hashing with high iteration counts
+- **Coercion** - Panic mode for emergency data destruction
+- **Surveillance** - Decoy mode for plausible deniability
+- **Forensic Analysis** - Secure deletion and encrypted metadata
+
+### Limitations
+- **Password Recovery** - Lost passwords cannot be recovered (by design)
+- **Quantum Resistance** - AES-256 is currently quantum-resistant
+- **Side-Channel Attacks** - Mitigated but not completely eliminated
+- **Physical Access** - Cannot protect against hardware-level attacks
+
+## 📚 Documentation
+
+### Help System
+- Built-in comprehensive help system (F1 key)
+- Getting started guide
+- Security features explanation
+- Troubleshooting guide
+- Keyboard shortcuts reference
+
+### API Documentation
+- JavaDoc documentation included
+- Component architecture diagrams
+- Security implementation details
+- Extension points for customization
+
+## 🤝 Contributing
+
+We welcome contributions to GhostVault! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
+
+### Development Setup
+1. Clone the repository
+2. Install Java 11+ and Maven
+3. Run `mvn compile` to build
+4. Run `mvn test` to execute tests
+5. Run `mvn javafx:run` to start the application
+
+### Code Style
+- Follow Java naming conventions
+- Include comprehensive JavaDoc comments
+- Write unit tests for new features
+- Follow security best practices
+
+## 📄 License
+
+GhostVault is released under the MIT License. See [LICENSE](LICENSE) for details.
+
+## 🆘 Support
+
+### Getting Help
+1. Check the built-in help system (F1 key)
+2. Review this README and documentation
+3. Search existing issues on GitHub
+4. Create a new issue with detailed information
+
+### Reporting Security Issues
+Please report security vulnerabilities privately to [security@ghostvault.com](mailto:security@ghostvault.com).
+
+## 🏆 Acknowledgments
+
+- JavaFX team for the excellent UI framework
+- Bouncy Castle for cryptographic implementations
+- The security community for best practices guidance
+- All contributors and testers
 
 ---
 
-### 4. Running the Application
-
-After building, you can run GhostVault in several ways:
-
-- **Using Maven:**
-  ```bash
-  mvn javafx:run
-  ```
-- **Using JAR file:**
-  ```bash
-  java -jar target/ghostvault-1.0.0-jar-with-dependencies.jar
-  ```
-- **Using build scripts:**
-  - Run `build.sh` (Unix/Linux/Mac) or `build.bat` (Windows)
-  - Select option 2 to run the application
-
----
-
-## Troubleshooting Common Issues
-
-### Issue: JavaFX not found
-**Solution:** The pom.xml includes JavaFX dependencies. Run:
-```bash
-mvn clean compile
-```
-
-### Issue: Module not found errors
-**Solution:** Ensure you're using Java 17 or higher:
-```bash
-java -version
-```
-
-### Issue: Maven not found
-**Solution:** Install Maven or use the Maven wrapper:
-```bash
-# Download Maven wrapper
-curl -o mvnw https://raw.githubusercontent.com/takari/maven-wrapper/master/mvnw
-chmod +x mvnw
-./mvnw clean compile
-```
-
-### Issue: Application won't start on Linux
-**Solution:** Install JavaFX runtime:
-```bash
-sudo apt install openjfx
-```
-
-### Issue: Tests fail on first run
-**Solution:** This is normal as the test vault is created. Run tests again:
-```bash
-mvn test
-```
-
-## Configuration Files (Optional)
-
-### Logging Configuration (src/main/resources/logback.xml)
-```xml
-<configuration>
-    <appender name="FILE" class="ch.qos.logback.core.FileAppender">
-        <file>ghostvault.log</file>
-        <encoder>
-            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
-        </encoder>
-    </appender>
-    
-    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
-        <encoder>
-            <pattern>%d{HH:mm:ss.SSS} %-5level %logger{36} - %msg%n</pattern>
-        </encoder>
-    </appender>
-    
-    <root level="INFO">
-        <appender-ref ref="FILE" />
-        <appender-ref ref="STDOUT" />
-    </root>
-</configuration>
-```
-
-### Application Properties (src/main/resources/application.properties)
-```properties
-# GhostVault Configuration
-app.name=GhostVault
-app.version=1.0.0
-vault.location=${user.home}/.ghostvault
-encryption.algorithm=AES
-encryption.keysize=256
-encryption.iterations=100000
-panic.overwrite.passes=3
-duress.max.attempts=3
-```
-
-## IDE Setup
-
-### IntelliJ IDEA
-1. Open IntelliJ IDEA
-2. Select "Open" and choose the project directory
-3. IntelliJ will automatically detect the Maven project
-4. Right-click on `GhostVault.java` and select "Run"
-
-### Eclipse
-1. Open Eclipse
-2. File → Import → Maven → Existing Maven Projects
-3. Select the project directory
-4. Right-click on project → Run As → Java Application
-
-### Visual Studio Code
-1. Install Java Extension Pack
-2. Open the project folder
-3. Open `GhostVault.java`
-4. Click "Run" above the main method
-
-## Deployment Options
-
-### 1. Standalone JAR
-```bash
-mvn clean package
-# Distribute: target/ghostvault-1.0.0-jar-with-dependencies.jar
-```
-
-### 2. Native Installer (requires Java 14+)
-```bash
-mvn clean compile javafx:jlink
-mvn jpackage:jpackage
-# Installer in: target/dist/
-```
-
-### 3. Docker Container
-Create `Dockerfile`:
-```dockerfile
-FROM openjdk:17-jdk-slim
-COPY target/ghostvault-1.0.0.jar app.jar
-ENTRYPOINT ["java", "-jar", "/app.jar"]
-```
-
-Build and run:
-```bash
-docker build -t ghostvault .
-docker run -it ghostvault
-```
-
-## Security Best Practices
-
-1. **Never commit sensitive data:**
-   - Add `.ghostvault/` to `.gitignore`
-   - Never commit passwords or keys
-
-2. **Production deployment:**
-   - Use environment variables for configuration
-   - Enable security manager
-   - Implement rate limiting
-   - Add intrusion detection
-
-3. **Regular updates:**
-   ```bash
-   mvn versions:display-dependency-updates
-   mvn dependency:analyze
-   ```
-
-## Getting Help
-
-- Check the README.md for usage instructions
-- Run tests to verify functionality: `mvn test`
-- Review logs in `~/.ghostvault/audit.log.enc`
-- For issues, check Java and JavaFX versions
-
-## Quick Start
-
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/PathanWasim/GhostVault.git
-   cd GhostVault
-   ```
-2. **Build and run:**
-   ```bash
-   mvn clean javafx:run
-   ```
-3. **First launch:**
-   - Set a strong master password (meets all strength requirements).
-   - Scan the MFA QR code with Google Authenticator or similar app.
-   - Log in using your password and the 6-digit TOTP code.
-
-## Features Overview
-- **Modern UI:** Light/dark themes, tooltips, accessible and responsive layout.
-- **Strong Security:** AES-256 encryption, PBKDF2 key derivation, enforced password policies, TOTP-based MFA, auto-logout after inactivity.
-- **File Integrity:** SHA-256 hash validation on upload/download.
-- **Audit Logging:** Encrypted, rotated, time-stamped logs.
-- **Metadata Management:** Search, filter, and categorize encrypted files.
-- **Backup/Restore:** Encrypted vault backup and restore.
-- **Decoy Vault:** Realistic decoy files, duress mode.
-- **Panic Wipe:** Double confirmation, irreversible vault destruction.
-- **Robust Error Handling:** Friendly messages for all operations.
-- **Code Quality:** Modular package structure, JavaDocs, and unit tests.
-
-## Testing
-- Run all unit tests:
-  ```bash
-  mvn test
-  ```
-- Tests cover: encryption/decryption, password hashing, and more.
-
-## Code Structure
-- `com.ghostvault.ui` – Main UI and application logic
-- `com.ghostvault.security` – Cryptography, MFA, and secure deletion
-- `com.ghostvault.model` – Data models (e.g., file metadata)
-- `com.ghostvault.util` – Utilities (e.g., hashing)
-
-## Contributing
-- Fork the repo, create a feature branch, and submit a pull request.
-- Please write clear JavaDocs and unit tests for new features.
-
-## Legal Notice
-
-This software is for legitimate privacy protection only. Users must comply with all applicable laws and regulations. Do not use for illegal purposes.
+**⚠️ Important Security Notice**: GhostVault is designed for legitimate privacy and security needs. Users are responsible for complying with all applicable laws and regulations in their jurisdiction. The panic mode feature permanently destroys data and should be used with extreme caution.

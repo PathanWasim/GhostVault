@@ -1,0 +1,331 @@
+/* Light Theme for GhostVault */
+
+.root {
+    -fx-base: #f8f9fa;
+    -fx-background: #ffffff;
+    -fx-control-inner-background: #ffffff;
+    -fx-control-inner-background-alt: #f8f9fa;
+    -fx-accent: #0078d4;
+    -fx-default-button: #0078d4;
+    -fx-focus-color: #0078d4;
+    -fx-faint-focus-color: #0078d422;
+    -fx-text-fill: #212529;
+    -fx-text-base-color: #212529;
+}
+
+/* Window and containers */
+.scene {
+    -fx-background-color: #ffffff;
+}
+
+.split-pane {
+    -fx-background-color: #f8f9fa;
+}
+
+.tab-pane {
+    -fx-background-color: #f8f9fa;
+}
+
+.tab-pane .tab-header-area .tab-header-background {
+    -fx-background-color: #e9ecef;
+}
+
+.tab {
+    -fx-background-color: #ffffff;
+    -fx-text-fill: #212529;
+    -fx-border-color: #dee2e6;
+}
+
+.tab:selected {
+    -fx-background-color: #0078d4;
+    -fx-text-fill: white;
+}
+
+/* Buttons */
+.button {
+    -fx-background-color: #ffffff;
+    -fx-text-fill: #212529;
+    -fx-border-color: #ced4da;
+    -fx-border-width: 1px;
+    -fx-background-radius: 3px;
+    -fx-border-radius: 3px;
+    -fx-padding: 8px 16px;
+    -fx-font-size: 13px;
+}
+
+.button:hover {
+    -fx-background-color: #f8f9fa;
+    -fx-border-color: #adb5bd;
+}
+
+.button:pressed {
+    -fx-background-color: #e9ecef;
+}
+
+.button:focused {
+    -fx-border-color: #0078d4;
+    -fx-border-width: 2px;
+}
+
+/* Primary buttons */
+.primary-button {
+    -fx-background-color: #0078d4;
+    -fx-text-fill: white;
+    -fx-border-color: #0078d4;
+}
+
+.primary-button:hover {
+    -fx-background-color: #106ebe;
+    -fx-border-color: #106ebe;
+}
+
+.primary-button:pressed {
+    -fx-background-color: #005a9e;
+    -fx-border-color: #005a9e;
+}
+
+/* Secondary buttons */
+.secondary-button {
+    -fx-background-color: #6c757d;
+    -fx-text-fill: white;
+    -fx-border-color: #6c757d;
+}
+
+.secondary-button:hover {
+    -fx-background-color: #5a6268;
+    -fx-border-color: #5a6268;
+}
+
+/* Danger buttons */
+.danger-button {
+    -fx-background-color: #dc3545;
+    -fx-text-fill: white;
+    -fx-border-color: #dc3545;
+}
+
+.danger-button:hover {
+    -fx-background-color: #c82333;
+    -fx-border-color: #c82333;
+}
+
+/* Text fields and areas */
+.text-field,
+.password-field {
+    -fx-background-color: #ffffff;
+    -fx-text-fill: #212529;
+    -fx-border-color: #ced4da;
+    -fx-border-width: 1px;
+    -fx-background-radius: 3px;
+    -fx-border-radius: 3px;
+    -fx-padding: 8px;
+}
+
+.text-field:focused,
+.password-field:focused {
+    -fx-border-color: #0078d4;
+    -fx-border-width: 2px;
+}
+
+.text-area {
+    -fx-background-color: #ffffff;
+    -fx-text-fill: #212529;
+    -fx-border-color: #ced4da;
+    -fx-control-inner-background: #ffffff;
+}
+
+.text-area .content {
+    -fx-background-color: #ffffff;
+}
+
+.text-area:focused {
+    -fx-border-color: #0078d4;
+}
+
+/* Lists and tables */
+.list-view {
+    -fx-background-color: #ffffff;
+    -fx-border-color: #ced4da;
+    -fx-border-width: 1px;
+}
+
+.list-cell {
+    -fx-background-color: transparent;
+    -fx-text-fill: #212529;
+    -fx-padding: 8px;
+}
+
+.list-cell:selected {
+    -fx-background-color: #0078d4;
+    -fx-text-fill: white;
+}
+
+.list-cell:hover {
+    -fx-background-color: #f8f9fa;
+}
+
+/* Progress bars */
+.progress-bar {
+    -fx-background-color: #e9ecef;
+    -fx-border-color: #ced4da;
+    -fx-border-width: 1px;
+    -fx-background-radius: 3px;
+    -fx-border-radius: 3px;
+}
+
+.progress-bar .bar {
+    -fx-background-color: #0078d4;
+    -fx-background-radius: 2px;
+}
+
+/* Labels */
+.label {
+    -fx-text-fill: #212529;
+}
+
+.title-label {
+    -fx-font-size: 24px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #212529;
+}
+
+.section-label {
+    -fx-font-size: 16px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #212529;
+}
+
+.error-label {
+    -fx-text-fill: #dc3545;
+}
+
+.success-label {
+    -fx-text-fill: #28a745;
+}
+
+.warning-label {
+    -fx-text-fill: #ffc107;
+}
+
+/* Toolbar */
+.tool-bar {
+    -fx-background-color: #f8f9fa;
+    -fx-border-color: #dee2e6;
+    -fx-border-width: 0 0 1px 0;
+}
+
+/* Menu bar */
+.menu-bar {
+    -fx-background-color: #f8f9fa;
+    -fx-border-color: #dee2e6;
+}
+
+.menu {
+    -fx-text-fill: #212529;
+}
+
+.menu-item {
+    -fx-background-color: #ffffff;
+    -fx-text-fill: #212529;
+}
+
+.menu-item:hover {
+    -fx-background-color: #0078d4;
+    -fx-text-fill: white;
+}
+
+/* Scroll bars */
+.scroll-bar {
+    -fx-background-color: #f8f9fa;
+}
+
+.scroll-bar .thumb {
+    -fx-background-color: #ced4da;
+    -fx-background-radius: 5px;
+}
+
+.scroll-bar .thumb:hover {
+    -fx-background-color: #adb5bd;
+}
+
+.scroll-bar .track {
+    -fx-background-color: #e9ecef;
+}
+
+/* Separators */
+.separator {
+    -fx-background-color: #dee2e6;
+}
+
+/* Toggle buttons */
+.toggle-button {
+    -fx-background-color: #ffffff;
+    -fx-text-fill: #212529;
+    -fx-border-color: #ced4da;
+}
+
+.toggle-button:selected {
+    -fx-background-color: #0078d4;
+    -fx-text-fill: white;
+    -fx-border-color: #0078d4;
+}
+
+/* Check boxes */
+.check-box {
+    -fx-text-fill: #212529;
+}
+
+.check-box .box {
+    -fx-background-color: #ffffff;
+    -fx-border-color: #ced4da;
+}
+
+.check-box:selected .mark {
+    -fx-background-color: #0078d4;
+}
+
+/* Radio buttons */
+.radio-button {
+    -fx-text-fill: #212529;
+}
+
+.radio-button .radio {
+    -fx-background-color: #ffffff;
+    -fx-border-color: #ced4da;
+}
+
+.radio-button:selected .dot {
+    -fx-background-color: #0078d4;
+}
+
+/* Tooltips */
+.tooltip {
+    -fx-background-color: #ffffff;
+    -fx-text-fill: #212529;
+    -fx-border-color: #ced4da;
+    -fx-border-width: 1px;
+    -fx-background-radius: 3px;
+    -fx-border-radius: 3px;
+    -fx-font-size: 12px;
+}
+
+/* Dialogs */
+.dialog-pane {
+    -fx-background-color: #ffffff;
+}
+
+.dialog-pane .header-panel {
+    -fx-background-color: #f8f9fa;
+}
+
+.dialog-pane .content {
+    -fx-background-color: #ffffff;
+}
+
+/* Animations */
+.fade-in {
+    -fx-opacity: 0;
+}
+
+.fade-in:hover {
+    -fx-opacity: 1;
+}
