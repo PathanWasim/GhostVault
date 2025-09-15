@@ -1,59 +1,56 @@
 package com.ghostvault.exception;
 
 /**
- * Exception for cryptographic operations failures
+ * Exception for cryptographic operations errors
  */
 public class CryptographicException extends GhostVaultException {
     
-    public CryptographicException(String message) {
-        super(ErrorCode.ENCRYPTION_FAILED, ErrorSeverity.HIGH, false, message, null, null);
+    public enum CryptoErrorType {
+        ENCRYPTION_FAILED("Encryption operation failed"),
+        DECRYPTION_FAILED("Decryption operation failed"),
+        KEY_GENERATION_FAILED("Key generation failed"),
+        KEY_DERIVATION_FAILED("Key derivation failed"),
+        INVALID_KEY("Invalid encryption key"),
+        INVALID_IV("Invalid initialization vector"),
+        HASH_CALCULATION_FAILED("Hash calculation failed"),
+        SIGNATURE_VERIFICATION_FAILED("Signature verification failed"),
+        RANDOM_GENERATION_FAILED("Random number generation failed"),
+        ALGORITHM_NOT_AVAILABLE("Cryptographic algorithm not available");
+        
+        private final String description;
+        
+        CryptoErrorType(String description) {
+            this.description = description;
+        }
+        
+        public String getDescription() {
+            return description;
+        }
     }
     
-    public CryptographicException(String message, Throwable cause) {
-        super(ErrorCode.ENCRYPTION_FAILED, ErrorSeverity.HIGH, false, message, null, cause);
+    private final CryptoErrorType cryptoErrorType;
+    
+    public CryptographicException(String message, CryptoErrorType errorType) {
+        super(message, ErrorCategory.CRYPTOGRAPHIC, ErrorSeverity.HIGH);
+        this.cryptoErrorType = errorType;
     }
     
-    public CryptographicException(ErrorCode errorCode, String message) {
-        super(errorCode, ErrorSeverity.HIGH, false, message, null, null);
+    public CryptographicException(String message, Throwable cause, CryptoErrorType errorType) {
+        super(message, cause, ErrorCategory.CRYPTOGRAPHIC, ErrorSeverity.HIGH);
+        this.cryptoErrorType = errorType;
     }
     
-    public CryptographicException(ErrorCode errorCode, String message, Throwable cause) {
-        super(errorCode, ErrorSeverity.HIGH, false, message, null, cause);
+    public CryptographicException(String message, CryptoErrorType errorType, ErrorSeverity severity) {
+        super(message, ErrorCategory.CRYPTOGRAPHIC, severity);
+        this.cryptoErrorType = errorType;
     }
     
-    public CryptographicException(ErrorCode errorCode, String message, String technicalDetails) {
-        super(errorCode, ErrorSeverity.HIGH, false, message, technicalDetails, null);
+    public CryptoErrorType getCryptoErrorType() {
+        return cryptoErrorType;
     }
     
-    /**
-     * Create exception for encryption failure
-     */
-    public static CryptographicException encryptionFailed(String details, Throwable cause) {
-        return new CryptographicException(ErrorCode.ENCRYPTION_FAILED, 
-            "Failed to encrypt data", cause);
-    }
-    
-    /**
-     * Create exception for decryption failure
-     */
-    public static CryptographicException decryptionFailed(String details, Throwable cause) {
-        return new CryptographicException(ErrorCode.DECRYPTION_FAILED, 
-            "Failed to decrypt data", cause);
-    }
-    
-    /**
-     * Create exception for key generation failure
-     */
-    public static CryptographicException keyGenerationFailed(Throwable cause) {
-        return new CryptographicException(ErrorCode.KEY_GENERATION_FAILED, 
-            "Failed to generate encryption key", cause);
-    }
-    
-    /**
-     * Create exception for invalid key
-     */
-    public static CryptographicException invalidKey(String details) {
-        return new CryptographicException(ErrorCode.INVALID_KEY, 
-            "Invalid encryption key provided", details);
+    @Override
+    public String getUserMessage() {
+        return "A security error occurred. Please try again or contact support if the problem persists.";
     }
 }

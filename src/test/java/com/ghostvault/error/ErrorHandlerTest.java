@@ -1,279 +1,335 @@
 package com.ghostvault.error;
 
 import com.ghostvault.audit.AuditManager;
-import com.ghostvault.config.AppConfig;
-import com.ghostvault.core.VaultInitializer;
-import com.ghostvault.exception.CryptographicException;
-import com.ghostvault.exception.GhostVaultException;
-import com.ghostvault.exception.SecurityException;
-import com.ghostvault.exception.VaultException;
-import com.ghostvault.security.PasswordManager;
-import com.ghostvault.security.PanicModeExecutor;
+import com.ghostvault.exception.*;
+import com.ghostvault.ui.NotificationManager;
+import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
+import java.nio.file.Path;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
 /**
- * Comprehensive test for ErrorHandler functionality
+ * Comprehensive tests for ErrorHandler
  */
-public class ErrorHandlerTest {
+class ErrorHandlerTest {
     
-    public static void main(String[] args) {
-        System.out.println("=================================================");
-        System.out.println("         ErrorHandler Comprehensive Test");
-        System.out.println("=================================================");
-        
-        try {
-            runAllTests();
-            System.out.println("\n✅ All ErrorHandler tests passed!");
-            
-        } catch (Exception e) {
-            System.err.println("\n❌ ErrorHandler test failed: " + e.getMessage());
-            e.printStackTrace();
-            System.exit(1);
-        }
+    @TempDir
+    Path tempDir;
+    
+    private ErrorHandler errorHandler;
+    private AuditManager mockAuditManager;
+    private NotificationManager mockNotificationManager;
+    
+    @BeforeEach
+    void setUp() {
+        mockAuditManager = mock(AuditManager.class);
+        mockNotificationManager = mock(NotificationManager.class);
+        errorHandler = new ErrorHandler(mockAuditManager, mockNotificationManager);
     }
     
-    private static void runAllTests() throws Exception {
-        testBasicErrorHandling();
-        testExceptionConversion();
-        testRecoveryActions();
-        testErrorCounting();
-        testCriticalConditions();
-        testCustomRecoveryStrategies();
-        testErrorStatistics();
+    @Test
+    @DisplayName("Should handle successful operation without recovery")
+    void testSuccessfulOperation() {
+        AtomicInteger callCount = new AtomicInteger(0);
+        
+        String result = errorHandler.handleWithRecovery(
+            "test_operation",
+            () -> {
+                callCount.incrementAndGet();
+                return "success";
+            },
+            null
+        );
+        
+        assertEquals("success", result);
+        assertEquals(1, callCount.get());
     }
     
-    /**
-     * Test basic error handling functionality
-     */
-    private static void testBasicErrorHandling() throws Exception {
-        System.out.println("\n🧪 Testing basic error handling...");
+    @Test
+    @DisplayName("Should retry recoverable exceptions")
+    void testRecoverableExceptionRetry() {
+        AtomicInteger callCount = new AtomicInteger(0);
         
-        // Set up error handler
-        ErrorHandler errorHandler = new ErrorHandler(null, null);
-        
-        // Test handling a simple exception
-        IOException testException = new IOException("Test file not found");
-        ErrorHandlingResult result = errorHandler.handleException(testException, "file_operation");
-        
-        assert result != null : "Should return error handling result";
-        assert result.getException() != null : "Should have converted exception";
-        assert result.getRecoveryAction() != null : "Should have recovery action";
-        
-        System.out.println("   ✓ Basic error handling: " + result.getRecoveryAction());
-        
-        // Test with GhostVaultException
-        GhostVaultException gvException = new GhostVaultException(
-            GhostVaultException.ErrorCode.FILE_NOT_FOUND, "Test file missing");
-        
-        ErrorHandlingResult gvResult = errorHandler.handleException(gvException, "vault_operation");
-        
-        assert gvResult.getException().getErrorCode() == GhostVaultException.ErrorCode.FILE_NOT_FOUND : 
-            "Should preserve error code";
-        
-        System.out.println("   ✓ GhostVault exception handling: " + gvResult.getErrorCode());
-        
-        System.out.println("   ✅ Basic error handling test passed");
-    }
-    
-    /**
-     * Test exception conversion
-     */
-    private static void testExceptionConversion() throws Exception {
-        System.out.println("\n🧪 Testing exception conversion...");
-        
-        ErrorHandler errorHandler = new ErrorHandler(null, null);
-        
-        // Test various exception types
-        Exception[] testExceptions = {
-            new IOException("IO error"),
-            new java.security.GeneralSecurityException("Crypto error"),
-            new OutOfMemoryError("Memory error"),
-            new SecurityException("Security violation"),
-            new RuntimeException("Generic runtime error")
-        };
-        
-        for (Exception ex : testExceptions) {
-            ErrorHandlingResult result = errorHandler.handleException(ex, "test_context");
-            
-            assert result.getException() instanceof GhostVaultException : 
-                "Should convert to GhostVaultException: " + ex.getClass().getSimpleName();
-            
-            System.out.println("   ✓ Converted " + ex.getClass().getSimpleName() + 
-                " to " + result.getException().getErrorCode());
-        }
-        
-        System.out.println("   ✅ Exception conversion test passed");
-    }
-    
-    /**
-     * Test recovery actions
-     */
-    private static void testRecoveryActions() throws Exception {
-        System.out.println("\n🧪 Testing recovery actions...");
-        
-        ErrorHandler errorHandler = new ErrorHandler(null, null);
-        
-        // Test different severity levels
-        GhostVaultException[] testExceptions = {
-            new GhostVaultException(GhostVaultException.ErrorCode.FILE_NOT_FOUND, 
-                GhostVaultException.ErrorSeverity.LOW, true, "Low severity", null, null),
-            new GhostVaultException(GhostVaultException.ErrorCode.IO_ERROR, 
-                GhostVaultException.ErrorSeverity.MEDIUM, true, "Medium severity", null, null),
-            new GhostVaultException(GhostVaultException.ErrorCode.VAULT_CORRUPTED, 
-                GhostVaultException.ErrorSeverity.HIGH, false, "High severity", null, null),
-            new GhostVaultException(GhostVaultException.ErrorCode.TAMPERING_DETECTED, 
-                GhostVaultException.ErrorSeverity.CRITICAL, false, "Critical severity", null, null)
-        };
-        
-        for (GhostVaultException ex : testExceptions) {
-            ErrorHandlingResult result = errorHandler.handleException(ex, "test_context");
-            
-            System.out.println("   ✓ " + ex.getSeverity() + " -> " + result.getRecoveryAction());
-            
-            // Verify appropriate recovery actions
-            switch (ex.getSeverity()) {
-                case LOW:
-                    assert result.getRecoveryAction() == ErrorHandler.RecoveryAction.IGNORE : 
-                        "Low severity should be ignored";
-                    break;
-                case CRITICAL:
-                    assert result.getRecoveryAction() == ErrorHandler.RecoveryAction.PANIC_MODE ||
-                           result.getRecoveryAction() == ErrorHandler.RecoveryAction.RESTART_APPLICATION : 
-                        "Critical severity should trigger panic or restart";
-                    break;
+        String result = errorHandler.handleWithRecovery(
+            "test_operation",
+            () -> {
+                int count = callCount.incrementAndGet();
+                if (count < 3) {
+                    throw new FileOperationException("Temporary failure", 
+                        FileOperationException.FileErrorType.FILE_LOCKED, null, "test");
+                }
+                return "success_after_retry";
+            },
+            (exception, attempt) -> {
+                // Simple recovery: just retry
+                return ErrorHandler.RecoveryResult.failure("Retry needed");
             }
-        }
+        );
         
-        System.out.println("   ✅ Recovery actions test passed");
+        assertEquals("success_after_retry", result);
+        assertEquals(3, callCount.get());
     }
     
-    /**
-     * Test error counting and thresholds
-     */
-    private static void testErrorCounting() throws Exception {
-        System.out.println("\n🧪 Testing error counting...");
+    @Test
+    @DisplayName("Should handle successful recovery")
+    void testSuccessfulRecovery() {
+        AtomicInteger callCount = new AtomicInteger(0);
         
-        ErrorHandler errorHandler = new ErrorHandler(null, null);
-        
-        // Generate multiple crypto errors
-        for (int i = 0; i < 3; i++) {
-            CryptographicException cryptoEx = CryptographicException.encryptionFailed("Test " + i, null);
-            errorHandler.handleException(cryptoEx, "crypto_test");
-        }
-        
-        // Generate file errors
-        for (int i = 0; i < 5; i++) {
-            IOException fileEx = new IOException("File error " + i);
-            errorHandler.handleException(fileEx, "file_test");
-        }
-        
-        // Check statistics
-        ErrorStatistics stats = errorHandler.getErrorStatistics();
-        
-        assert stats.getTotalErrors() >= 8 : "Should have at least 8 errors";
-        assert stats.getCryptographicErrors() >= 3 : "Should have at least 3 crypto errors";
-        
-        System.out.println("   ✓ Error counts: " + stats.getTotalErrors() + " total, " + 
-            stats.getCryptographicErrors() + " crypto");
-        System.out.println("   ✓ Health score: " + stats.getHealthScore() + "/100");
-        
-        System.out.println("   ✅ Error counting test passed");
-    }
-    
-    /**
-     * Test critical conditions detection
-     */
-    private static void testCriticalConditions() throws Exception {
-        System.out.println("\n🧪 Testing critical conditions...");
-        
-        // Create error handler without panic executor to avoid actual panic
-        ErrorHandler errorHandler = new ErrorHandler(null, null);
-        
-        // Test tampering detection
-        SecurityException tamperingEx = SecurityException.tamperingDetected("Test tampering");
-        ErrorHandlingResult result = errorHandler.handleException(tamperingEx, "security_test");
-        
-        assert result.getRecoveryAction() == ErrorHandler.RecoveryAction.PANIC_MODE : 
-            "Tampering should trigger panic mode";
-        
-        System.out.println("   ✓ Tampering detection triggers panic mode");
-        
-        // Test intrusion detection
-        SecurityException intrusionEx = SecurityException.intrusionDetected("192.168.1.100", "Brute force");
-        ErrorHandlingResult intrusionResult = errorHandler.handleException(intrusionEx, "auth_test");
-        
-        assert intrusionResult.getRecoveryAction() == ErrorHandler.RecoveryAction.PANIC_MODE : 
-            "Intrusion should trigger panic mode";
-        
-        System.out.println("   ✓ Intrusion detection triggers panic mode");
-        
-        System.out.println("   ✅ Critical conditions test passed");
-    }
-    
-    /**
-     * Test custom recovery strategies
-     */
-    private static void testCustomRecoveryStrategies() throws Exception {
-        System.out.println("\n🧪 Testing custom recovery strategies...");
-        
-        ErrorHandler errorHandler = new ErrorHandler(null, null);
-        
-        // Add custom recovery strategy
-        errorHandler.addRecoveryStrategy(new ErrorHandler.RecoveryStrategy() {
-            @Override
-            public boolean canHandle(GhostVaultException exception, String context) {
-                return exception.getErrorCode() == GhostVaultException.ErrorCode.NETWORK_ERROR;
+        String result = errorHandler.handleWithRecovery(
+            "test_operation",
+            () -> {
+                callCount.incrementAndGet();
+                throw new FileOperationException("File locked", 
+                    FileOperationException.FileErrorType.FILE_LOCKED, null, "test");
+            },
+            (exception, attempt) -> {
+                // Simulate successful recovery
+                return ErrorHandler.RecoveryResult.success("recovered_result");
             }
-            
-            @Override
-            public ErrorHandler.RecoveryAction getRecoveryAction(GhostVaultException exception, String context) {
-                return ErrorHandler.RecoveryAction.FALLBACK;
-            }
+        );
+        
+        assertEquals("recovered_result", result);
+        assertEquals(1, callCount.get());
+    }
+    
+    @Test
+    @DisplayName("Should fail after max retry attempts")
+    void testMaxRetryAttempts() {
+        AtomicInteger callCount = new AtomicInteger(0);
+        
+        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
+            errorHandler.handleWithRecovery(
+                "test_operation",
+                () -> {
+                    callCount.incrementAndGet();
+                    throw new FileOperationException("Persistent failure", 
+                        FileOperationException.FileErrorType.FILE_LOCKED, null, "test");
+                },
+                (ex, attempt) -> ErrorHandler.RecoveryResult.failure("Recovery failed")
+            );
         });
         
-        // Test custom strategy
-        GhostVaultException networkEx = new GhostVaultException(
-            GhostVaultException.ErrorCode.NETWORK_ERROR, "Network timeout");
-        
-        ErrorHandlingResult result = errorHandler.handleException(networkEx, "network_test");
-        
-        assert result.getRecoveryAction() == ErrorHandler.RecoveryAction.FALLBACK : 
-            "Custom strategy should return FALLBACK";
-        
-        System.out.println("   ✓ Custom recovery strategy applied");
-        
-        System.out.println("   ✅ Custom recovery strategies test passed");
+        assertTrue(exception.getMessage().contains("Operation failed after"));
+        assertEquals(3, callCount.get()); // Should try 3 times
     }
     
-    /**
-     * Test error statistics
-     */
-    private static void testErrorStatistics() throws Exception {
-        System.out.println("\n🧪 Testing error statistics...");
+    @Test
+    @DisplayName("Should not retry non-recoverable exceptions")
+    void testNonRecoverableException() {
+        AtomicInteger callCount = new AtomicInteger(0);
         
-        ErrorHandler errorHandler = new ErrorHandler(null, null);
+        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
+            errorHandler.handleWithRecovery(
+                "test_operation",
+                () -> {
+                    callCount.incrementAndGet();
+                    throw new CryptographicException("Critical crypto error", 
+                        CryptographicException.CryptoErrorType.ALGORITHM_NOT_AVAILABLE);
+                },
+                null
+            );
+        });
         
-        // Generate various errors
-        errorHandler.handleException(new IOException("File error 1"), "test");
-        errorHandler.handleException(CryptographicException.encryptionFailed("Crypto error", null), "test");
-        errorHandler.handleException(SecurityException.accessDenied("resource"), "test");
-        errorHandler.handleException(VaultException.corrupted("Vault corrupted"), "test");
+        assertEquals(1, callCount.get()); // Should only try once
+        assertTrue(exception.getMessage().contains("Operation failed after 1 attempts"));
+    }
+    
+    @Test
+    @DisplayName("Should handle error without recovery")
+    void testHandleErrorWithoutRecovery() {
+        AtomicReference<String> userMessage = new AtomicReference<>();
         
-        ErrorStatistics stats = errorHandler.getErrorStatistics();
+        Exception testException = new ValidationException("Invalid input", 
+            ValidationException.ValidationType.INPUT_FORMAT);
         
-        assert stats.getTotalErrors() > 0 : "Should have errors";
-        assert stats.getHealthScore() >= 0 && stats.getHealthScore() <= 100 : 
-            "Health score should be 0-100";
+        errorHandler.handleError("test_operation", testException, userMessage::set);
         
-        String summary = stats.getSummary();
-        assert summary.contains("Error Statistics") : "Summary should contain statistics";
+        assertNotNull(userMessage.get());
+        assertTrue(userMessage.get().contains("Invalid"));
         
-        System.out.println("   ✓ Statistics generated:");
-        System.out.println("     Total errors: " + stats.getTotalErrors());
-        System.out.println("     Health: " + stats.getHealthStatus() + " (" + stats.getHealthScore() + "/100)");
-        System.out.println("     Stability: " + (stats.indicatesInstability() ? "Unstable" : "Stable"));
+        // Verify audit logging
+        verify(mockAuditManager).logSecurityEvent(
+            eq("ERROR_OCCURRED"), 
+            anyString(), 
+            any(AuditManager.AuditSeverity.class), 
+            isNull(), 
+            anyString()
+        );
         
-        System.out.println("   ✅ Error statistics test passed");
+        // Verify notification
+        verify(mockNotificationManager).showError(eq("Error"), anyString());
+    }
+    
+    @Test
+    @DisplayName("Should generate user-friendly messages for common exceptions")
+    void testUserFriendlyMessages() {
+        // Test IOException
+        errorHandler.handleError("test", new IOException("File not found"), null);
+        verify(mockNotificationManager).showError(eq("Error"), 
+            eq("A file operation failed. Please check file permissions and disk space."));
+        
+        reset(mockNotificationManager);
+        
+        // Test SecurityException
+        errorHandler.handleError("test", new SecurityException("Access denied"), null);
+        verify(mockNotificationManager).showError(eq("Error"), 
+            eq("A security error occurred. Please try again."));
+        
+        reset(mockNotificationManager);
+        
+        // Test IllegalArgumentException
+        errorHandler.handleError("test", new IllegalArgumentException("Invalid argument"), null);
+        verify(mockNotificationManager).showError(eq("Error"), 
+            eq("Invalid input provided. Please check your data and try again."));
+    }
+    
+    @Test
+    @DisplayName("Should handle GhostVault exceptions with proper user messages")
+    void testGhostVaultExceptionHandling() {
+        AuthenticationException authEx = new AuthenticationException("Invalid password", 
+            AuthenticationException.AuthErrorType.INVALID_PASSWORD);
+        
+        errorHandler.handleError("login", authEx, null);
+        
+        verify(mockNotificationManager).showError(eq("Error"), 
+            eq("Invalid password. Please try again."));
+    }
+    
+    @Test
+    @DisplayName("Should track error statistics")
+    void testErrorStatistics() {
+        // Generate some errors
+        for (int i = 0; i < 5; i++) {
+            try {
+                errorHandler.handleWithRecovery(
+                    "test_operation_" + i,
+                    () -> {
+                        throw new IOException("Test error " + i);
+                    },
+                    null
+                );
+            } catch (Exception e) {
+                // Expected
+            }
+        }
+        
+        ErrorHandler.ErrorStatistics stats = errorHandler.getErrorStatistics();
+        assertTrue(stats.getTotalErrorCount() > 0);
+        assertTrue(stats.getUniqueErrorTypes() > 0);
+    }
+    
+    @Test
+    @DisplayName("Should detect high error rates")
+    void testErrorRateDetection() {
+        // This test would need to be implemented based on the actual error rate logic
+        // For now, just verify the method exists and returns a boolean
+        boolean isHighRate = errorHandler.isErrorRateTooHigh("test_operation");
+        assertFalse(isHighRate); // Should be false initially
+    }
+    
+    @Test
+    @DisplayName("Should handle concurrent error operations")
+    void testConcurrentErrorHandling() throws InterruptedException {
+        AtomicInteger successCount = new AtomicInteger(0);
+        AtomicInteger errorCount = new AtomicInteger(0);
+        
+        // Create multiple threads that generate errors
+        Thread[] threads = new Thread[10];
+        for (int i = 0; i < threads.length; i++) {
+            final int threadId = i;
+            threads[i] = new Thread(() -> {
+                try {
+                    errorHandler.handleWithRecovery(
+                        "concurrent_test_" + threadId,
+                        () -> {
+                            if (threadId % 2 == 0) {
+                                return "success";
+                            } else {
+                                throw new IOException("Test error");
+                            }
+                        },
+                        null
+                    );
+                    successCount.incrementAndGet();
+                } catch (Exception e) {
+                    errorCount.incrementAndGet();
+                }
+            });
+        }
+        
+        // Start all threads
+        for (Thread thread : threads) {
+            thread.start();
+        }
+        
+        // Wait for all threads to complete
+        for (Thread thread : threads) {
+            thread.join(5000); // Wait up to 5 seconds per thread
+        }
+        
+        // Verify results
+        assertEquals(5, successCount.get()); // Even numbered threads should succeed
+        assertEquals(5, errorCount.get());   // Odd numbered threads should fail
+    }
+    
+    @Test
+    @DisplayName("Should handle null parameters gracefully")
+    void testNullParameterHandling() {
+        // Test with null operation name
+        assertDoesNotThrow(() -> {
+            errorHandler.handleError(null, new IOException("Test"), null);
+        });
+        
+        // Test with null exception
+        assertDoesNotThrow(() -> {
+            errorHandler.handleError("test", null, null);
+        });
+        
+        // Test with null callback
+        assertDoesNotThrow(() -> {
+            errorHandler.handleError("test", new IOException("Test"), null);
+        });
+    }
+    
+    @Test
+    @DisplayName("Should generate proper error codes")
+    void testErrorCodeGeneration() {
+        GhostVaultException gve = new ValidationException("Test validation error", 
+            ValidationException.ValidationType.INPUT_FORMAT);
+        
+        String errorCode = gve.getErrorCode();
+        assertNotNull(errorCode);
+        assertTrue(errorCode.contains("VALIDATION"));
+        assertTrue(errorCode.contains("LOW"));
+    }
+    
+    @Test
+    @DisplayName("Should handle recovery strategy exceptions")
+    void testRecoveryStrategyExceptions() {
+        AtomicInteger callCount = new AtomicInteger(0);
+        
+        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
+            errorHandler.handleWithRecovery(
+                "test_operation",
+                () -> {
+                    callCount.incrementAndGet();
+                    throw new FileOperationException("Test error", 
+                        FileOperationException.FileErrorType.FILE_LOCKED, null, "test");
+                },
+                (ex, attempt) -> {
+                    // Recovery strategy that throws exception
+                    throw new RuntimeException("Recovery failed");
+                }
+            );
+        });
+        
+        assertTrue(exception.getMessage().contains("Operation failed after"));
+        assertTrue(callCount.get() >= 1);
     }
 }

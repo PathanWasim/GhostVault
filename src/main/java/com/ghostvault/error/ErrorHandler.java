@@ -1,492 +1,431 @@
 package com.ghostvault.error;
 
+import com.ghostvault.exception.*;
 import com.ghostvault.audit.AuditManager;
-import com.ghostvault.exception.GhostVaultException;
-import com.ghostvault.exception.SecurityException;
-import com.ghostvault.security.PanicModeExecutor;
+import com.ghostvault.ui.NotificationManager;
 
-import java.io.PrintWriter;
-import java.io.StringWriter;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
+import java.util.logging.Logger;
+import java.util.logging.Level;
 
 /**
- * Comprehensive error handling and recovery system for GhostVault
- * Provides centralized error processing, logging, and recovery mechanisms
+ * Centralized error handling and recovery system
+ * Provides consistent error processing, logging, and recovery mechanisms
  */
 public class ErrorHandler {
     
+    private static final Logger logger = Logger.getLogger(ErrorHandler.class.getName());
+    
     private final AuditManager auditManager;
-    private final PanicModeExecutor panicModeExecutor;
+    private final NotificationManager notificationManager;
     private final ConcurrentHashMap<String, AtomicInteger> errorCounts;
-    private final List<ErrorListener> errorListeners;
-    private final List<RecoveryStrategy> recoveryStrategies;
+    private final ConcurrentHashMap<String, LocalDateTime> lastErrorTimes;
     
-    // Error thresholds
-    private static final int MAX_CRYPTO_ERRORS = 5;
-    private static final int MAX_SECURITY_ERRORS = 3;
-    private static final int MAX_VAULT_ERRORS = 10;
+    // Error handling configuration
+    private static final int MAX_RETRY_ATTEMPTS = 3;
+    private static final long ERROR_COOLDOWN_MS = 5000; // 5 seconds
+    private static final int MAX_ERRORS_PER_MINUTE = 10;
     
-    // Recovery options
-    public enum RecoveryAction {
-        RETRY,
-        IGNORE,
-        FALLBACK,
-        RESTART_COMPONENT,
-        RESTART_APPLICATION,
-        PANIC_MODE,
-        USER_INTERVENTION
-    }
-    
-    public ErrorHandler(AuditManager auditManager, PanicModeExecutor panicModeExecutor) {
+    public ErrorHandler(AuditManager auditManager, NotificationManager notificationManager) {
         this.auditManager = auditManager;
-        this.panicModeExecutor = panicModeExecutor;
+        this.notificationManager = notificationManager;
         this.errorCounts = new ConcurrentHashMap<>();
-        this.errorListeners = new ArrayList<>();
-        this.recoveryStrategies = new ArrayList<>();
-        
-        // Initialize default recovery strategies
-        initializeDefaultRecoveryStrategies();
+        this.lastErrorTimes = new ConcurrentHashMap<>();
     }
     
     /**
-     * Handle an exception with automatic recovery
+     * Handle exception with automatic recovery attempt
      */
-    public ErrorHandlingResult handleException(Throwable throwable, String context) {
-        return handleException(throwable, context, null);
+    public <T> T handleWithRecovery(String operation, ThrowingSupplier<T> supplier, 
+                                   RecoveryStrategy<T> recoveryStrategy) {
+        return handleWithRecovery(operation, supplier, recoveryStrategy, null);
     }
     
     /**
-     * Handle an exception with custom recovery callback
+     * Handle exception with automatic recovery attempt and user notification
      */
-    public ErrorHandlingResult handleException(Throwable throwable, String context, 
-                                             Consumer<RecoveryAction> recoveryCallback) {
-        try {
-            // Convert to GhostVaultException if needed
-            GhostVaultException gvException = convertToGhostVaultException(throwable);
-            
-            // Log the error
-            logError(gvException, context);
-            
-            // Update error counts
-            updateErrorCounts(gvException);
-            
-            // Check for critical conditions
-            checkCriticalConditions(gvException);
-            
-            // Determine recovery action
-            RecoveryAction action = determineRecoveryAction(gvException, context);
-            
-            // Execute recovery if callback provided
-            if (recoveryCallback != null) {
-                recoveryCallback.accept(action);
-            }
-            
-            // Notify listeners
-            notifyErrorListeners(gvException, context, action);
-            
-            // Execute automatic recovery
-            boolean recovered = executeRecovery(gvException, action, context);
-            
-            return new ErrorHandlingResult(gvException, action, recovered, getRecoveryMessage(action));
-            
-        } catch (Exception e) {
-            // Error in error handling - log to console as fallback
-            System.err.println("CRITICAL: Error in error handler: " + e.getMessage());
-            e.printStackTrace();
-            
-            return new ErrorHandlingResult(
-                convertToGhostVaultException(throwable), 
-                RecoveryAction.USER_INTERVENTION, 
-                false, 
-                "Error handling failed - manual intervention required"
-            );
-        }
-    }
-    
-    /**
-     * Convert any throwable to GhostVaultException
-     */
-    private GhostVaultException convertToGhostVaultException(Throwable throwable) {
-        if (throwable instanceof GhostVaultException) {
-            return (GhostVaultException) throwable;
-        }
+    public <T> T handleWithRecovery(String operation, ThrowingSupplier<T> supplier, 
+                                   RecoveryStrategy<T> recoveryStrategy, 
+                                   Consumer<String> userNotification) {
         
-        // Map common exceptions to appropriate error codes
-        if (throwable instanceof java.io.FileNotFoundException) {
-            return new GhostVaultException(GhostVaultException.ErrorCode.FILE_NOT_FOUND, 
-                throwable.getMessage(), throwable);
-        }
+        String errorKey = operation + "_" + Thread.currentThread().getId();
+        AtomicInteger attemptCount = errorCounts.computeIfAbsent(errorKey, k -> new AtomicInteger(0));
         
-        if (throwable instanceof java.io.IOException) {
-            return new GhostVaultException(GhostVaultException.ErrorCode.IO_ERROR, 
-                throwable.getMessage(), throwable);
-        }
-        
-        if (throwable instanceof java.security.GeneralSecurityException) {
-            return new com.ghostvault.exception.CryptographicException(
-                GhostVaultException.ErrorCode.CRYPTO_ALGORITHM_ERROR, 
-                throwable.getMessage(), throwable);
-        }
-        
-        if (throwable instanceof OutOfMemoryError) {
-            return new GhostVaultException(GhostVaultException.ErrorCode.INSUFFICIENT_MEMORY, 
-                GhostVaultException.ErrorSeverity.CRITICAL, false,
-                "Application is out of memory", null, throwable);
-        }
-        
-        if (throwable instanceof SecurityException) {
-            return new com.ghostvault.exception.SecurityException(
-                GhostVaultException.ErrorCode.SECURITY_VIOLATION, 
-                throwable.getMessage());
-        }
-        
-        // Default to internal error
-        return new GhostVaultException(GhostVaultException.ErrorCode.INTERNAL_ERROR, 
-            GhostVaultException.ErrorSeverity.MEDIUM, true,
-            "An unexpected error occurred: " + throwable.getMessage(), 
-            getStackTrace(throwable), throwable);
-    }
-    
-    /**
-     * Log error to audit system
-     */
-    private void logError(GhostVaultException exception, String context) {
-        if (auditManager != null) {
-            auditManager.logError(
-                exception.getErrorCode().toString(),
-                exception.getUserMessage(),
-                exception.getTechnicalDetails(),
-                context
-            );
-        } else {
-            // Fallback to console logging
-            System.err.println(String.format("[%s] ERROR %s in %s: %s", 
-                LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME),
-                exception.getErrorCode(),
-                context,
-                exception.getFormattedMessage()));
-        }
-    }
-    
-    /**
-     * Update error counts for pattern detection
-     */
-    private void updateErrorCounts(GhostVaultException exception) {
-        String errorKey = exception.getErrorCode().toString();
-        errorCounts.computeIfAbsent(errorKey, k -> new AtomicInteger(0)).incrementAndGet();
-        
-        // Also track by category
-        String categoryKey = getCategoryKey(exception.getErrorCode());
-        errorCounts.computeIfAbsent(categoryKey, k -> new AtomicInteger(0)).incrementAndGet();
-    }
-    
-    /**
-     * Get category key for error code
-     */
-    private String getCategoryKey(GhostVaultException.ErrorCode errorCode) {
-        int code = errorCode.getCode();
-        
-        if (code >= 1000 && code < 1100) return "AUTH_ERRORS";
-        if (code >= 1100 && code < 1200) return "CRYPTO_ERRORS";
-        if (code >= 1200 && code < 1300) return "FILE_ERRORS";
-        if (code >= 1300 && code < 1400) return "VAULT_ERRORS";
-        if (code >= 1700 && code < 1800) return "SECURITY_ERRORS";
-        
-        return "OTHER_ERRORS";
-    }
-    
-    /**
-     * Check for critical conditions that require immediate action
-     */
-    private void checkCriticalConditions(GhostVaultException exception) {
-        // Check if panic mode should be triggered
-        if (exception.shouldTriggerPanicMode()) {
-            triggerPanicMode("Critical security exception: " + exception.getErrorCode());
-            return;
-        }
-        
-        // Check error count thresholds
-        String categoryKey = getCategoryKey(exception.getErrorCode());
-        int categoryCount = errorCounts.getOrDefault(categoryKey, new AtomicInteger(0)).get();
-        
-        switch (categoryKey) {
-            case "CRYPTO_ERRORS":
-                if (categoryCount >= MAX_CRYPTO_ERRORS) {
-                    triggerPanicMode("Too many cryptographic errors detected");
-                }
-                break;
+        for (int attempt = 1; attempt <= MAX_RETRY_ATTEMPTS; attempt++) {
+            try {
+                T result = supplier.get();
                 
-            case "SECURITY_ERRORS":
-                if (categoryCount >= MAX_SECURITY_ERRORS) {
-                    triggerPanicMode("Multiple security violations detected");
-                }
-                break;
+                // Reset error count on success
+                errorCounts.remove(errorKey);
+                lastErrorTimes.remove(errorKey);
                 
-            case "VAULT_ERRORS":
-                if (categoryCount >= MAX_VAULT_ERRORS) {
-                    // Don't panic, but log critical alert
-                    if (auditManager != null) {
-                        auditManager.logSecurityEvent("VAULT_INSTABILITY", 
-                            "Multiple vault errors detected", 
-                            AuditManager.AuditSeverity.CRITICAL, null, 
-                            "Error count: " + categoryCount);
+                return result;
+                
+            } catch (Exception e) {
+                attemptCount.incrementAndGet();
+                lastErrorTimes.put(errorKey, LocalDateTime.now());
+                
+                // Log the error
+                logError(operation, e, attempt);
+                
+                // Check if we should attempt recovery
+                if (attempt < MAX_RETRY_ATTEMPTS && shouldAttemptRecovery(e)) {
+                    
+                    // Wait before retry
+                    waitForRetry(attempt);
+                    
+                    // Attempt recovery if strategy provided
+                    if (recoveryStrategy != null) {
+                        try {
+                            RecoveryResult<T> recoveryResult = recoveryStrategy.recover(e, attempt);
+                            
+                            if (recoveryResult.isSuccessful()) {
+                                // Recovery successful
+                                errorCounts.remove(errorKey);
+                                lastErrorTimes.remove(errorKey);
+                                
+                                if (userNotification != null) {
+                                    userNotification.accept("Operation recovered successfully");
+                                }
+                                
+                                return recoveryResult.getResult();
+                            }
+                            
+                        } catch (Exception recoveryException) {
+                            // Recovery failed, log and continue with original error
+                            logError("Recovery for " + operation, recoveryException, attempt);
+                        }
                     }
+                    
+                } else {
+                    // Final attempt failed or non-recoverable error
+                    handleFinalError(operation, e, userNotification);
+                    throw new RuntimeException("Operation failed after " + attempt + " attempts", e);
                 }
-                break;
-        }
-    }
-    
-    /**
-     * Trigger panic mode
-     */
-    private void triggerPanicMode(String reason) {
-        try {
-            if (auditManager != null) {
-                auditManager.logPanicMode("ERROR_HANDLER", reason);
-            }
-            
-            if (panicModeExecutor != null) {
-                panicModeExecutor.executePanicMode();
-            }
-            
-        } catch (Exception e) {
-            System.err.println("CRITICAL: Failed to execute panic mode: " + e.getMessage());
-        }
-    }
-    
-    /**
-     * Determine appropriate recovery action
-     */
-    private RecoveryAction determineRecoveryAction(GhostVaultException exception, String context) {
-        // Check custom recovery strategies first
-        for (RecoveryStrategy strategy : recoveryStrategies) {
-            if (strategy.canHandle(exception, context)) {
-                return strategy.getRecoveryAction(exception, context);
             }
         }
         
-        // Default recovery logic based on error type and severity
-        switch (exception.getSeverity()) {
-            case CRITICAL:
-                if (exception.isSecurityError()) {
-                    return RecoveryAction.PANIC_MODE;
-                }
-                return RecoveryAction.RESTART_APPLICATION;
-                
-            case HIGH:
-                if (exception.isRecoverable()) {
-                    return RecoveryAction.RESTART_COMPONENT;
-                }
-                return RecoveryAction.USER_INTERVENTION;
-                
-            case MEDIUM:
-                if (exception.isRecoverable()) {
-                    return RecoveryAction.RETRY;
-                }
-                return RecoveryAction.FALLBACK;
-                
-            case LOW:
-                return RecoveryAction.IGNORE;
-                
-            default:
-                return RecoveryAction.USER_INTERVENTION;
+        // Should never reach here
+        throw new RuntimeException("Unexpected error in recovery loop for operation: " + operation);
+    }
+    
+    /**
+     * Handle exception without recovery
+     */
+    public void handleError(String operation, Exception e) {
+        handleError(operation, e, null);
+    }
+    
+    /**
+     * Handle exception without recovery with user notification
+     */
+    public void handleError(String operation, Exception e, Consumer<String> userNotification) {
+        logError(operation, e, 1);
+        
+        // Notify user if callback provided
+        if (userNotification != null) {
+            String userMessage = getUserFriendlyMessage(e);
+            userNotification.accept(userMessage);
+        }
+        
+        // Show notification if manager available
+        if (notificationManager != null) {
+            String userMessage = getUserFriendlyMessage(e);
+            notificationManager.showError("Error", userMessage);
         }
     }
     
     /**
-     * Execute recovery action
+     * Log error with appropriate severity
      */
-    private boolean executeRecovery(GhostVaultException exception, RecoveryAction action, String context) {
-        try {
-            switch (action) {
-                case RETRY:
-                    // Automatic retry is handled by the caller
-                    return true;
-                    
-                case IGNORE:
-                    // Log and continue
-                    return true;
-                    
-                case FALLBACK:
-                    // Execute fallback logic if available
-                    return executeFallback(exception, context);
-                    
-                case RESTART_COMPONENT:
-                    // Component restart is handled by the caller
-                    return false;
-                    
-                case RESTART_APPLICATION:
-                    // Application restart requires user action
-                    return false;
-                    
-                case PANIC_MODE:
-                    triggerPanicMode("Recovery action: " + exception.getErrorCode());
-                    return true;
-                    
-                case USER_INTERVENTION:
-                    // Requires manual intervention
-                    return false;
-                    
-                default:
-                    return false;
-            }
+    private void logError(String operation, Exception e, int attempt) {
+        String errorCode = generateErrorCode(e);
+        
+        // Determine log level based on exception type and attempt
+        Level logLevel = determineLogLevel(e, attempt);
+        
+        // Log to system logger
+        logger.log(logLevel, String.format("Error in operation '%s' (attempt %d): %s [%s]", 
+            operation, attempt, e.getMessage(), errorCode), e);
+        
+        // Log to audit manager if available
+        if (auditManager != null) {
+            AuditManager.AuditSeverity severity = mapToAuditSeverity(e);
+            String details = String.format("Operation: %s; Attempt: %d; Error: %s", 
+                operation, attempt, errorCode);
             
-        } catch (Exception e) {
-            System.err.println("Recovery execution failed: " + e.getMessage());
+            auditManager.logSecurityEvent("ERROR_OCCURRED", e.getMessage(), severity, null, details);
+        }
+    }
+    
+    /**
+     * Determine if recovery should be attempted for this exception
+     */
+    private boolean shouldAttemptRecovery(Exception e) {
+        if (e instanceof GhostVaultException) {
+            GhostVaultException gve = (GhostVaultException) e;
+            return gve.isRecoverable();
+        }
+        
+        // Check for specific recoverable exceptions
+        if (e instanceof java.io.IOException) {
+            return true; // File I/O errors are often recoverable
+        }
+        
+        if (e instanceof java.net.SocketTimeoutException) {
+            return true; // Network timeouts are recoverable
+        }
+        
+        if (e instanceof java.util.concurrent.TimeoutException) {
+            return true; // General timeouts are recoverable
+        }
+        
+        // Default to non-recoverable for unknown exceptions
+        return false;
+    }
+    
+    /**
+     * Wait before retry with exponential backoff
+     */
+    private void waitForRetry(int attempt) {
+        try {
+            long waitTime = Math.min(1000 * (long) Math.pow(2, attempt - 1), 5000); // Max 5 seconds
+            Thread.sleep(waitTime);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+    
+    /**
+     * Handle final error after all recovery attempts failed
+     */
+    private void handleFinalError(String operation, Exception e, Consumer<String> userNotification) {
+        String errorCode = generateErrorCode(e);
+        
+        // Log critical error
+        logger.severe(String.format("Final error in operation '%s' after all recovery attempts: %s [%s]", 
+            operation, e.getMessage(), errorCode));
+        
+        // Audit critical failure
+        if (auditManager != null) {
+            auditManager.logSecurityEvent("CRITICAL_ERROR", 
+                "Operation failed after all recovery attempts", 
+                AuditManager.AuditSeverity.CRITICAL, null, 
+                "Operation: " + operation + "; Error: " + errorCode);
+        }
+        
+        // Notify user
+        if (userNotification != null) {
+            String userMessage = getUserFriendlyMessage(e);
+            userNotification.accept("Critical error: " + userMessage);
+        }
+    }
+    
+    /**
+     * Generate user-friendly error message
+     */
+    private String getUserFriendlyMessage(Exception e) {
+        if (e instanceof GhostVaultException) {
+            return ((GhostVaultException) e).getUserMessage();
+        }
+        
+        // Map common exceptions to user-friendly messages
+        if (e instanceof java.io.FileNotFoundException) {
+            return "The requested file could not be found.";
+        }
+        
+        if (e instanceof java.io.IOException) {
+            return "A file operation failed. Please check file permissions and disk space.";
+        }
+        
+        if (e instanceof java.net.ConnectException) {
+            return "Network connection failed. Please check your connection.";
+        }
+        
+        if (e instanceof java.security.GeneralSecurityException) {
+            return "A security error occurred. Please try again.";
+        }
+        
+        if (e instanceof IllegalArgumentException) {
+            return "Invalid input provided. Please check your data and try again.";
+        }
+        
+        if (e instanceof OutOfMemoryError) {
+            return "Insufficient memory to complete the operation. Please close other applications and try again.";
+        }
+        
+        // Generic message for unknown exceptions
+        return "An unexpected error occurred. Please try again or contact support.";
+    }
+    
+    /**
+     * Generate error code for tracking
+     */
+    private String generateErrorCode(Exception e) {
+        if (e instanceof GhostVaultException) {
+            return ((GhostVaultException) e).getErrorCode();
+        }
+        
+        // Generate code based on exception class and message
+        String className = e.getClass().getSimpleName();
+        int messageHash = e.getMessage() != null ? Math.abs(e.getMessage().hashCode()) % 10000 : 0;
+        return String.format("%s_%d", className, messageHash);
+    }
+    
+    /**
+     * Determine log level based on exception type and attempt
+     */
+    private Level determineLogLevel(Exception e, int attempt) {
+        if (e instanceof GhostVaultException) {
+            GhostVaultException gve = (GhostVaultException) e;
+            switch (gve.getSeverity()) {
+                case CRITICAL:
+                    return Level.SEVERE;
+                case HIGH:
+                    return Level.WARNING;
+                case MEDIUM:
+                    return attempt > 1 ? Level.WARNING : Level.INFO;
+                case LOW:
+                    return Level.INFO;
+            }
+        }
+        
+        // Default based on attempt number
+        if (attempt > 2) {
+            return Level.WARNING;
+        } else {
+            return Level.INFO;
+        }
+    }
+    
+    /**
+     * Map exception to audit severity
+     */
+    private AuditManager.AuditSeverity mapToAuditSeverity(Exception e) {
+        if (e instanceof GhostVaultException) {
+            GhostVaultException gve = (GhostVaultException) e;
+            switch (gve.getSeverity()) {
+                case CRITICAL:
+                    return AuditManager.AuditSeverity.CRITICAL;
+                case HIGH:
+                    return AuditManager.AuditSeverity.ERROR;
+                case MEDIUM:
+                    return AuditManager.AuditSeverity.WARNING;
+                case LOW:
+                    return AuditManager.AuditSeverity.INFO;
+            }
+        }
+        
+        // Default mapping
+        if (e instanceof SecurityException || e instanceof java.security.GeneralSecurityException) {
+            return AuditManager.AuditSeverity.CRITICAL;
+        }
+        
+        return AuditManager.AuditSeverity.ERROR;
+    }
+    
+    /**
+     * Check if error rate is too high
+     */
+    public boolean isErrorRateTooHigh(String operation) {
+        String errorKey = operation + "_rate";
+        AtomicInteger count = errorCounts.get(errorKey);
+        LocalDateTime lastError = lastErrorTimes.get(errorKey);
+        
+        if (count == null || lastError == null) {
             return false;
         }
-    }
-    
-    /**
-     * Execute fallback logic
-     */
-    private boolean executeFallback(GhostVaultException exception, String context) {
-        // Implement specific fallback strategies based on error type
-        switch (exception.getErrorCode()) {
-            case FILE_NOT_FOUND:
-                // Could try alternative file locations
-                return false;
-                
-            case NETWORK_ERROR:
-                // Could switch to offline mode
-                return false;
-                
-            case INSUFFICIENT_MEMORY:
-                // Could trigger garbage collection
-                System.gc();
-                return true;
-                
-            default:
-                return false;
-        }
-    }
-    
-    /**
-     * Get recovery message for user display
-     */
-    private String getRecoveryMessage(RecoveryAction action) {
-        switch (action) {
-            case RETRY:
-                return "The operation will be retried automatically.";
-            case IGNORE:
-                return "The error has been logged and will be ignored.";
-            case FALLBACK:
-                return "Attempting alternative approach.";
-            case RESTART_COMPONENT:
-                return "The affected component needs to be restarted.";
-            case RESTART_APPLICATION:
-                return "The application needs to be restarted to recover.";
-            case PANIC_MODE:
-                return "Critical security issue detected - emergency procedures activated.";
-            case USER_INTERVENTION:
-                return "Manual intervention is required to resolve this issue.";
-            default:
-                return "Recovery action determined.";
-        }
-    }
-    
-    /**
-     * Initialize default recovery strategies
-     */
-    private void initializeDefaultRecoveryStrategies() {
-        // Add default strategies for common scenarios
         
-        // File system recovery
-        recoveryStrategies.add(new RecoveryStrategy() {
-            @Override
-            public boolean canHandle(GhostVaultException exception, String context) {
-                return exception.getErrorCode() == GhostVaultException.ErrorCode.DISK_FULL;
-            }
-            
-            @Override
-            public RecoveryAction getRecoveryAction(GhostVaultException exception, String context) {
-                return RecoveryAction.USER_INTERVENTION;
-            }
-        });
-        
-        // Authentication recovery
-        recoveryStrategies.add(new RecoveryStrategy() {
-            @Override
-            public boolean canHandle(GhostVaultException exception, String context) {
-                return exception.getErrorCode() == GhostVaultException.ErrorCode.INVALID_PASSWORD;
-            }
-            
-            @Override
-            public RecoveryAction getRecoveryAction(GhostVaultException exception, String context) {
-                return RecoveryAction.USER_INTERVENTION;
-            }
-        });
+        // Check if we have too many errors in the last minute
+        LocalDateTime oneMinuteAgo = LocalDateTime.now().minusMinutes(1);
+        return lastError.isAfter(oneMinuteAgo) && count.get() > MAX_ERRORS_PER_MINUTE;
     }
     
     /**
-     * Add custom recovery strategy
-     */
-    public void addRecoveryStrategy(RecoveryStrategy strategy) {
-        recoveryStrategies.add(strategy);
-    }
-    
-    /**
-     * Add error listener
-     */
-    public void addErrorListener(ErrorListener listener) {
-        errorListeners.add(listener);
-    }
-    
-    /**
-     * Notify error listeners
-     */
-    private void notifyErrorListeners(GhostVaultException exception, String context, RecoveryAction action) {
-        for (ErrorListener listener : errorListeners) {
-            try {
-                listener.onError(exception, context, action);
-            } catch (Exception e) {
-                System.err.println("Error listener failed: " + e.getMessage());
-            }
-        }
-    }
-    
-    /**
-     * Get error statistics
+     * Get error statistics for monitoring
      */
     public ErrorStatistics getErrorStatistics() {
-        return new ErrorStatistics(errorCounts);
+        return new ErrorStatistics(errorCounts, lastErrorTimes);
     }
     
     /**
-     * Reset error counts
+     * Functional interface for operations that can throw exceptions
      */
-    public void resetErrorCounts() {
-        errorCounts.clear();
-    }
-    
-    /**
-     * Get stack trace as string
-     */
-    private String getStackTrace(Throwable throwable) {
-        StringWriter sw = new StringWriter();
-        PrintWriter pw = new PrintWriter(sw);
-        throwable.printStackTrace(pw);
-        return sw.toString();
+    @FunctionalInterface
+    public interface ThrowingSupplier<T> {
+        T get() throws Exception;
     }
     
     /**
      * Interface for recovery strategies
      */
-    public interface RecoveryStrategy {
-        boolean canHandle(GhostVaultException exception, String context);
-        RecoveryAction getRecoveryAction(GhostVaultException exception, String context);
+    @FunctionalInterface
+    public interface RecoveryStrategy<T> {
+        RecoveryResult<T> recover(Exception originalException, int attemptNumber) throws Exception;
     }
     
     /**
-     * Interface for error listeners
+     * Result of a recovery attempt
      */
-    public interface ErrorListener {
-        void onError(GhostVaultException exception, String context, RecoveryAction action);
+    public static class RecoveryResult<T> {
+        private final boolean successful;
+        private final T result;
+        private final String message;
+        
+        private RecoveryResult(boolean successful, T result, String message) {
+            this.successful = successful;
+            this.result = result;
+            this.message = message;
+        }
+        
+        public static <T> RecoveryResult<T> success(T result) {
+            return new RecoveryResult<>(true, result, "Recovery successful");
+        }
+        
+        public static <T> RecoveryResult<T> success(T result, String message) {
+            return new RecoveryResult<>(true, result, message);
+        }
+        
+        public static <T> RecoveryResult<T> failure(String message) {
+            return new RecoveryResult<>(false, null, message);
+        }
+        
+        public boolean isSuccessful() { return successful; }
+        public T getResult() { return result; }
+        public String getMessage() { return message; }
+    }
+    
+    /**
+     * Error statistics for monitoring
+     */
+    public static class ErrorStatistics {
+        private final ConcurrentHashMap<String, AtomicInteger> errorCounts;
+        private final ConcurrentHashMap<String, LocalDateTime> lastErrorTimes;
+        
+        public ErrorStatistics(ConcurrentHashMap<String, AtomicInteger> errorCounts, 
+                             ConcurrentHashMap<String, LocalDateTime> lastErrorTimes) {
+            this.errorCounts = new ConcurrentHashMap<>(errorCounts);
+            this.lastErrorTimes = new ConcurrentHashMap<>(lastErrorTimes);
+        }
+        
+        public int getTotalErrorCount() {
+            return errorCounts.values().stream().mapToInt(AtomicInteger::get).sum();
+        }
+        
+        public int getErrorCount(String operation) {
+            AtomicInteger count = errorCounts.get(operation);
+            return count != null ? count.get() : 0;
+        }
+        
+        public LocalDateTime getLastErrorTime(String operation) {
+            return lastErrorTimes.get(operation);
+        }
+        
+        public int getUniqueErrorTypes() {
+            return errorCounts.size();
+        }
     }
 }
