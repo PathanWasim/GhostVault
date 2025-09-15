@@ -81,7 +81,15 @@ public class GhostVault extends Application {
         // Set up session timeout callback
         sessionManager.setTimeoutCallback(() -> {
             Platform.runLater(() -> {
-                showAlert("Session expired
+                showAlert("Session expired", Alert.AlertType.WARNING);
+                showLoginScreen();
+            });
+        });
+    }
+    
+    private void initializeVault() {
+        File vaultDir = new File(VAULT_DIR);
+        if (!vaultDir.exists()) {
             vaultDir.mkdirs();
             new File(VAULT_DIR + "/files").mkdirs();
             new File(VAULT_DIR + "/decoys").mkdirs();
@@ -1184,4 +1192,13 @@ public class GhostVault extends Application {
                        
             case "csv":
                 return "Name,Email,Phone,Department\n" +
-                       "John Smith,john.smith@company.com,555-0101,Engineering\n
+                       "John Smith,john.smith@company.com,555-0101,Engineering\n" +
+                       "Sarah Johnson,sarah.johnson@company.com,555-0102,Marketing\n" +
+                       "Mike Wilson,mike.wilson@company.com,555-0103,Sales\n" +
+                       "Lisa Brown,lisa.brown@company.com,555-0104,HR";
+                       
+            default:
+                return "Sample document content for " + filename + "\n\nThis is a placeholder file created for demonstration purposes.";
+        }
+    }
+}

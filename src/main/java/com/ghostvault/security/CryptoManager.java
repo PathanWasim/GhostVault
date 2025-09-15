@@ -72,8 +72,8 @@ public class CryptoManager {
             
         } finally {
             // Clear the password from memory
-            Arrays.fill(passwordChars, '\0');
-            secureWipe(purposeSalt);
+            MemoryUtils.secureWipe(passwordChars);
+            MemoryUtils.secureWipe(purposeSalt);
         }
     }
     
@@ -207,24 +207,14 @@ public class CryptoManager {
      * Securely wipe sensitive data from memory
      */
     public void secureWipe(byte[] data) {
-        if (data != null) {
-            Arrays.fill(data, (byte) 0);
-        }
+        MemoryUtils.secureWipe(data);
     }
     
     /**
      * Constant-time comparison to prevent timing attacks
      */
     private boolean constantTimeEquals(byte[] a, byte[] b) {
-        if (a.length != b.length) {
-            return false;
-        }
-        
-        int result = 0;
-        for (int i = 0; i < a.length; i++) {
-            result |= a[i] ^ b[i];
-        }
-        return result == 0;
+        return MemoryUtils.constantTimeEquals(a, b);
     }
     
     /**
@@ -233,17 +223,13 @@ public class CryptoManager {
     public void clearKeys() {
         if (masterKey != null) {
             byte[] keyBytes = masterKey.getEncoded();
-            if (keyBytes != null) {
-                secureWipe(keyBytes);
-            }
+            MemoryUtils.secureWipe(keyBytes);
             masterKey = null;
         }
         
         if (hmacKey != null) {
             byte[] hmacKeyBytes = hmacKey.getEncoded();
-            if (hmacKeyBytes != null) {
-                secureWipe(hmacKeyBytes);
-            }
+            MemoryUtils.secureWipe(hmacKeyBytes);
             hmacKey = null;
         }
     }
