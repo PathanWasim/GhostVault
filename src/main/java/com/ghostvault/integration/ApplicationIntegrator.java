@@ -116,19 +116,19 @@ public class ApplicationIntegrator {
     private void initializeCoreComponents() throws Exception {
         // Core security
         cryptoManager = new CryptoManager();
-        passwordManager = new PasswordManager(cryptoManager);
+        passwordManager = new PasswordManager(AppConfig.VAULT_DIR);
         
         // Data management
-        fileManager = new FileManager(cryptoManager);
-        metadataManager = new MetadataManager(cryptoManager);
+        fileManager = new FileManager(AppConfig.VAULT_DIR);
+        metadataManager = new MetadataManager(AppConfig.METADATA_FILE);
         
         // Audit and session management
         auditManager = new AuditManager();
-        sessionManager = new BasicSessionManager();
+        sessionManager = new SessionManager();
         
         // Special modes
         decoyManager = new DecoyManager(cryptoManager, fileManager, metadataManager);
-        panicModeExecutor = new PanicModeExecutor(fileManager, metadataManager, auditManager);
+        panicModeExecutor = new PanicModeExecutor();
         
         // Backup management
         backupManager = new VaultBackupManager(cryptoManager, fileManager, metadataManager, auditManager);
@@ -141,8 +141,8 @@ public class ApplicationIntegrator {
      */
     private void initializeUIComponents() throws Exception {
         uiManager = new UIManager();
-        notificationManager = new NotificationManager();
-        errorDialog = new ErrorDialog();
+        notificationManager = NotificationManager.getInstance();
+        notificationManager.initialize(primaryStage);
         
         // Set up UI manager with primary stage
         uiManager.initialize(primaryStage);
@@ -201,7 +201,7 @@ public class ApplicationIntegrator {
         uiManager.setNotificationManager(notificationManager);
         
         // Error handler integration
-        errorDialog.setErrorHandler(errorHandler);
+        // ErrorDialog is constructed per-use with ErrorHandlingResult; no global handler to set
         
         System.out.println("🔗 Component integrations configured");
     }
@@ -210,7 +210,7 @@ public class ApplicationIntegrator {
      * Determine initial application state
      */
     private void determineInitialState() throws Exception {
-        if (passwordManager.isFirstRun()) {
+        if (!passwordManager.arePasswordsConfigured()) {
             transitionToState(ApplicationState.FIRST_RUN_SETUP);
         } else {
             transitionToState(ApplicationState.LOGIN);
@@ -282,7 +282,7 @@ public class ApplicationIntegrator {
     private void handleMasterPasswordLogin(String password) {
         try {
             // Derive encryption key
-            currentKey = passwordManager.deriveKey(password);
+            currentKey = passwordManager.deriveVaultKey(password);
             
             // Start session
             sessionManager.startSession();
@@ -321,11 +321,7 @@ public class ApplicationIntegrator {
             
             // Execute panic wipe in background
             CompletableFuture.runAsync(() -> {
-                try {
-                    panicModeExecutor.executePanicWipe();
-                } catch (Exception e) {
-                    // Silent failure in panic mode
-                }
+                panicModeExecutor.executePanicMode();
             }, backgroundExecutor).thenRun(() -> {
                 // Shutdown application after panic wipe
                 Platform.runLater(() -> {

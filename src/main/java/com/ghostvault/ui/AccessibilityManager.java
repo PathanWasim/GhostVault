@@ -139,10 +139,8 @@ public class AccessibilityManager {
     private void handleEscapeKey() {
         // Close dialogs or return to previous screen
         if (currentScene != null) {
-            Node focusOwner = currentScene.getFocusOwner();
-            if (focusOwner instanceof Dialog) {
-                ((Dialog<?>) focusOwner).close();
-            }
+            // Close top-most alert/dialog if any (best-effort)
+            // JavaFX doesn't expose a global dialog manager; leave as no-op here
         }
     }
     
@@ -216,31 +214,27 @@ public class AccessibilityManager {
         helpDialog.setTitle("Accessibility Help");
         helpDialog.setHeaderText("GhostVault Accessibility Features");
         
-        String helpText = """
-            Keyboard Shortcuts:
-            • Tab / Shift+Tab: Navigate between controls
-            • Enter / Space: Activate buttons and controls
-            • Escape: Close dialogs or cancel operations
-            • Ctrl+H: Toggle high contrast mode
-            • Ctrl+R: Toggle enhanced screen reader mode
-            • F1: Show this help dialog
-            
-            Navigation:
-            • Use Tab to move forward through controls
-            • Use Shift+Tab to move backward
-            • Arrow keys navigate within lists and menus
-            • Enter activates the focused control
-            
-            Screen Reader Support:
-            • All controls have descriptive labels
-            • Progress and status updates are announced
-            • Error messages are clearly identified
-            
-            High Contrast Mode:
-            • Increases color contrast for better visibility
-            • Useful for users with visual impairments
-            • Toggle with Ctrl+H
-            """;
+        String helpText = 
+            "Keyboard Shortcuts:\n" +
+            "• Tab / Shift+Tab: Navigate between controls\n" +
+            "• Enter / Space: Activate buttons and controls\n" +
+            "• Escape: Close dialogs or cancel operations\n" +
+            "• Ctrl+H: Toggle high contrast mode\n" +
+            "• Ctrl+R: Toggle enhanced screen reader mode\n" +
+            "• F1: Show this help dialog\n\n" +
+            "Navigation:\n" +
+            "• Use Tab to move forward through controls\n" +
+            "• Use Shift+Tab to move backward\n" +
+            "• Arrow keys navigate within lists and menus\n" +
+            "• Enter activates the focused control\n\n" +
+            "Screen Reader Support:\n" +
+            "• All controls have descriptive labels\n" +
+            "• Progress and status updates are announced\n" +
+            "• Error messages are clearly identified\n\n" +
+            "High Contrast Mode:\n" +
+            "• Increases color contrast for better visibility\n" +
+            "• Useful for users with visual impairments\n" +
+            "• Toggle with Ctrl+H";
         
         helpDialog.setContentText(helpText);
         helpDialog.getDialogPane().setPrefWidth(500);

@@ -8,12 +8,12 @@ import com.ghostvault.exception.GhostVaultException;
 public class ErrorHandlingResult {
     
     private final GhostVaultException exception;
-    private final ErrorHandler.RecoveryAction recoveryAction;
+    private final RecoveryAction recoveryAction;
     private final boolean recovered;
     private final String recoveryMessage;
     private final long timestamp;
     
-    public ErrorHandlingResult(GhostVaultException exception, ErrorHandler.RecoveryAction recoveryAction,
+    public ErrorHandlingResult(GhostVaultException exception, RecoveryAction recoveryAction,
                               boolean recovered, String recoveryMessage) {
         this.exception = exception;
         this.recoveryAction = recoveryAction;
@@ -24,7 +24,7 @@ public class ErrorHandlingResult {
     
     // Getters
     public GhostVaultException getException() { return exception; }
-    public ErrorHandler.RecoveryAction getRecoveryAction() { return recoveryAction; }
+    public RecoveryAction getRecoveryAction() { return recoveryAction; }
     public boolean isRecovered() { return recovered; }
     public String getRecoveryMessage() { return recoveryMessage; }
     public long getTimestamp() { return timestamp; }
@@ -33,15 +33,14 @@ public class ErrorHandlingResult {
      * Check if the error was successfully handled
      */
     public boolean isSuccessfullyHandled() {
-        return recovered || recoveryAction == ErrorHandler.RecoveryAction.IGNORE;
+        return recovered || recoveryAction == RecoveryAction.LOG_AND_CONTINUE || recoveryAction == RecoveryAction.IGNORE;
     }
     
     /**
      * Check if user intervention is required
      */
     public boolean requiresUserIntervention() {
-        return recoveryAction == ErrorHandler.RecoveryAction.USER_INTERVENTION ||
-               recoveryAction == ErrorHandler.RecoveryAction.RESTART_APPLICATION;
+        return recoveryAction == RecoveryAction.PROMPT_USER || recoveryAction == RecoveryAction.RESTART;
     }
     
     /**
@@ -59,7 +58,7 @@ public class ErrorHandlingResult {
      */
     public String getRecoverySuggestion() {
         if (exception != null) {
-            return exception.getRecoveryAction();
+            return exception.getUserMessage();
         }
         return recoveryMessage;
     }
@@ -75,7 +74,7 @@ public class ErrorHandlingResult {
      * Get error code
      */
     public int getErrorCode() {
-        return exception != null ? exception.getErrorCodeValue() : 0;
+        return 0;
     }
     
     @Override

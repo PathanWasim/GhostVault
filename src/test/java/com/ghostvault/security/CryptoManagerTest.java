@@ -1,15 +1,16 @@
 package com.ghostvault.security;
 
 import com.ghostvault.config.AppConfig;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.DisplayName;
 
 import javax.crypto.SecretKey;
 import java.security.GeneralSecurityException;
 import java.util.Arrays;
 
-import static org.junit.Assert.*;
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Comprehensive unit tests for CryptoManager
@@ -21,14 +22,14 @@ public class CryptoManagerTest {
     private byte[] testSalt;
     private String testPassword;
     
-    @Before
+    @BeforeEach
     public void setUp() {
         cryptoManager = new CryptoManager();
         testSalt = cryptoManager.generateSalt();
         testPassword = "TestPassword123!";
     }
     
-    @After
+    @AfterEach
     public void tearDown() {
         if (cryptoManager != null) {
             cryptoManager.clearKeys();
@@ -44,11 +45,11 @@ public class CryptoManagerTest {
         SecretKey key1 = cryptoManager.deriveKey(testPassword, testSalt);
         SecretKey key2 = cryptoManager.deriveKey(testPassword, testSalt);
         
-        assertNotNull("Derived key should not be null", key1);
-        assertNotNull("Derived key should not be null", key2);
-        assertEquals("Algorithm should be AES", "AES", key1.getAlgorithm());
-        assertArrayEquals("Same password and salt should produce same key", 
-                         key1.getEncoded(), key2.getEncoded());
+        assertNotNull(key1, "Derived key should not be null");
+        assertNotNull(key2, "Derived key should not be null");
+        assertEquals("AES", key1.getAlgorithm(), "Algorithm should be AES");
+        assertArrayEquals(key1.getEncoded(), key2.getEncoded(), 
+                         "Same password and salt should produce same key");
     }
     
     @Test
@@ -56,8 +57,8 @@ public class CryptoManagerTest {
         SecretKey key1 = cryptoManager.deriveKey("password1", testSalt);
         SecretKey key2 = cryptoManager.deriveKey("password2", testSalt);
         
-        assertFalse("Different passwords should produce different keys",
-                   Arrays.equals(key1.getEncoded(), key2.getEncoded()));
+        assertFalse(Arrays.equals(key1.getEncoded(), key2.getEncoded()),
+                   "Different passwords should produce different keys");
     }
     
     @Test
@@ -68,8 +69,8 @@ public class CryptoManagerTest {
         SecretKey key1 = cryptoManager.deriveKey(testPassword, salt1);
         SecretKey key2 = cryptoManager.deriveKey(testPassword, salt2);
         
-        assertFalse("Different salts should produce different keys",
-                   Arrays.equals(key1.getEncoded(), key2.getEncoded()));
+        assertFalse(Arrays.equals(key1.getEncoded(), key2.getEncoded()),
+                   "Different salts should produce different keys");
     }
     
     @Test
@@ -118,7 +119,8 @@ public class CryptoManagerTest {
         assertArrayEquals("Decryption with valid HMAC should succeed", testData, decrypted);
     }
     
-    @Test(expected = GeneralSecurityException.class)
+    @Test
+    @DisplayName("Test HMAC tamper detection")
     public void testHMACTamperDetection() throws GeneralSecurityException {
         cryptoManager.initializeWithPassword(testPassword, testSalt);
         
@@ -133,7 +135,9 @@ public class CryptoManagerTest {
             tamperedCiphertext, encrypted.getIv(), encrypted.getHmac());
         
         // Should throw exception due to HMAC mismatch
-        cryptoManager.decrypt(tamperedData);
+        assertThrows(GeneralSecurityException.class, () -> {
+            cryptoManager.decrypt(tamperedData);
+        });
     }
     
     @Test

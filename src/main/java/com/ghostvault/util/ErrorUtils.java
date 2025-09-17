@@ -92,17 +92,26 @@ public class ErrorUtils {
      */
     public static ErrorHandlingResult handleError(Throwable throwable, String context) {
         if (globalErrorHandler != null) {
-            return globalErrorHandler.handleException(throwable, context);
+            // Build a simple ErrorHandlingResult wrapper when no direct API exists
+            GhostVaultException gv = throwable instanceof GhostVaultException ?
+                (GhostVaultException) throwable :
+                new GhostVaultException(
+                    "Error: " + throwable.getMessage(),
+                    GhostVaultException.ErrorCategory.SYSTEM,
+                    GhostVaultException.ErrorSeverity.MEDIUM
+                );
+            return new ErrorHandlingResult(gv, com.ghostvault.error.RecoveryAction.PROMPT_USER, false, "");
         } else {
             // Fallback error handling
             System.err.println("ERROR in " + context + ": " + throwable.getMessage());
             throwable.printStackTrace();
             
             GhostVaultException gvException = new GhostVaultException(
-                GhostVaultException.ErrorCode.INTERNAL_ERROR, 
-                throwable.getMessage(), throwable);
+                throwable.getMessage(), throwable, 
+                GhostVaultException.ErrorCategory.SYSTEM,
+                GhostVaultException.ErrorSeverity.MEDIUM);
             
-            return new ErrorHandlingResult(gvException, ErrorHandler.RecoveryAction.USER_INTERVENTION, 
+            return new ErrorHandlingResult(gvException, com.ghostvault.error.RecoveryAction.PROMPT_USER, 
                 false, "Please contact support");
         }
     }

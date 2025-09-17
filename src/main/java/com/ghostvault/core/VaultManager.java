@@ -6,7 +6,7 @@ import com.ghostvault.security.PasswordManager;
 import com.ghostvault.security.SecureDeletion;
 import com.ghostvault.model.VaultFile;
 import com.ghostvault.util.FileUtils;
-import com.ghostvault.audit.AuditLogger;
+import com.ghostvault.audit.AuditManager;
 
 import java.io.File;
 import java.io.IOException;
@@ -25,10 +25,12 @@ public class VaultManager {
     private final String vaultPath;
     private final CryptoManager cryptoManager;
     private final PasswordManager passwordManager;
-    private final AuditLogger auditLogger;
+    private final AuditManager auditManager;
     private final MetadataManager metadataManager;
     private final DecoyManager decoyManager;
+    private final FileManager fileManager;
     
+    private String masterPassword; // Store for backup operations
     private boolean isInitialized = false;
     private boolean isFirstRun = false;
     
@@ -36,9 +38,10 @@ public class VaultManager {
         this.vaultPath = vaultPath;
         this.cryptoManager = new CryptoManager();
         this.passwordManager = new PasswordManager(vaultPath);
-        this.auditLogger = new AuditLogger(AppConfig.LOG_FILE);
+        this.auditManager = new AuditManager();
         this.metadataManager = new MetadataManager(AppConfig.METADATA_FILE);
-        this.decoyManager = new DecoyManager(AppConfig.DECOYS_DIR);
+        this.decoyManager = new DecoyManager();
+        this.fileManager = new FileManager(vaultPath);
         
         initializeVault();
     }
@@ -56,8 +59,8 @@ public class VaultManager {
             isFirstRun = true;
             
             // Generate decoy files
-            decoyManager.generateDecoyFiles();
-            auditLogger.log("Vault directory structure created");
+            decoyManager.generateDecoyFiles(10);
+            auditManager.logSecurityEvent("VAULT_INIT", "Vault directory structure created", AuditManager.AuditSeverity.INFO, null, null);
         } else {
             isFirstRun = !new File(AppConfig.CONFIG_FILE).exists();
         }
@@ -74,15 +77,16 @@ public class VaultManager {
      * Initialize vault with master, panic, and decoy passwords
      */
     public void initializePasswords(String masterPassword, String panicPassword, String decoyPassword) throws Exception {
+        this.masterPassword = masterPassword; // Store for backup operations
         passwordManager.initializePasswords(masterPassword, panicPassword, decoyPassword);
         cryptoManager.initializeWithPassword(masterPassword, passwordManager.getSalt());
-        auditLogger.setEncryptionKey(cryptoManager.getMasterKey());
         metadataManager.setEncryptionKey(cryptoManager.getMasterKey());
+        fileManager.setEncryptionKey(cryptoManager.getMasterKey());
         
         isInitialized = true;
         isFirstRun = false;
         
-        auditLogger.log("Vault initialized with new passwords");
+        auditManager.logSecurityEvent("VAULT_INIT", "Vault initialized with new passwords", AuditManager.AuditSeverity.INFO, null, null);
     }
     
     /**
@@ -93,27 +97,28 @@ public class VaultManager {
         
         switch (type) {
             case MASTER:
+                this.masterPassword = password; // Store for backup operations
                 cryptoManager.initializeWithPassword(password, passwordManager.getSalt());
-                auditLogger.setEncryptionKey(cryptoManager.getMasterKey());
                 metadataManager.setEncryptionKey(cryptoManager.getMasterKey());
+                fileManager.setEncryptionKey(cryptoManager.getMasterKey());
                 metadataManager.loadMetadata();
                 isInitialized = true;
-                auditLogger.log("Master authentication successful");
+                auditManager.logSecurityEvent("LOGIN_SUCCESS", "Master authentication successful", AuditManager.AuditSeverity.INFO, null, null);
                 return new AuthResult(AuthResult.Type.MASTER, true);
                 
             case PANIC:
-                auditLogger.log("PANIC MODE ACTIVATED");
+                auditManager.logSecurityEvent("PANIC_MODE", "Panic mode activated", AuditManager.AuditSeverity.CRITICAL, null, null);
                 executePanicWipe();
                 return new AuthResult(AuthResult.Type.PANIC, true);
                 
             case DECOY:
                 // Initialize with decoy mode (limited functionality)
                 isInitialized = true;
-                auditLogger.log("Decoy mode accessed");
+                auditManager.logSecurityEvent("DECOY_MODE", "Decoy mode accessed", AuditManager.AuditSeverity.INFO, null, null);
                 return new AuthResult(AuthResult.Type.DECOY, true);
                 
             default:
-                auditLogger.log("Authentication failed");
+                auditManager.logSecurityEvent("LOGIN_FAILED", "Authentication failed", AuditManager.AuditSeverity.WARNING, null, null);
                 return new AuthResult(AuthResult.Type.INVALID, false);
         }
     }
@@ -158,7 +163,7 @@ public class VaultManager {
         // Store metadata
         metadataManager.addFile(vaultFile);
         
-        auditLogger.log("File uploaded: " + sourceFile.getName() + " (" + FileUtils.formatFileSize(sourceFile.length()) + ")");
+        auditManager.logSecurityEvent("FILE_UPLOAD", "File uploaded: " + sourceFile.getName(), AuditManager.AuditSeverity.INFO, null, null);
         
         return fileId;
     }
@@ -186,11 +191,11 @@ public class VaultManager {
         // Verify integrity
         String currentHash = FileUtils.calculateSHA256(decrypted);
         if (!currentHash.equals(vaultFile.getHash())) {
-            auditLogger.log("WARNING: File integrity check failed for " + vaultFile.getOriginalName());
+            auditManager.logSecurityEvent("INTEGRITY_FAIL", "File integrity check failed for " + vaultFile.getOriginalName(), AuditManager.AuditSeverity.ERROR, null, null);
             throw new SecurityException("File integrity check failed");
         }
         
-        auditLogger.log("File downloaded: " + vaultFile.getOriginalName());
+        auditManager.logSecurityEvent("FILE_DOWNLOAD", "File downloaded: " + vaultFile.getOriginalName(), AuditManager.AuditSeverity.INFO, null, null);
         
         return decrypted;
     }
@@ -215,7 +220,7 @@ public class VaultManager {
         // Remove from metadata
         metadataManager.removeFile(fileId);
         
-        auditLogger.log("File securely deleted: " + vaultFile.getOriginalName());
+        auditManager.logSecurityEvent("FILE_DELETE", "File securely deleted: " + vaultFile.getOriginalName(), AuditManager.AuditSeverity.INFO, null, null);
     }
     
     /**
@@ -248,10 +253,11 @@ public class VaultManager {
             throw new IllegalStateException("Vault not initialized");
         }
         
-        BackupManager backupManager = new BackupManager(cryptoManager);
-        backupManager.createBackup(vaultPath, backupFile);
+        com.ghostvault.core.BackupManager backupManager = new com.ghostvault.core.BackupManager(fileManager, metadataManager);
+        backupManager.setBackupEncryptionKey(cryptoManager.deriveKey(masterPassword, passwordManager.getSalt()));
+        backupManager.createBackup(backupFile, new BackupOptions());
         
-        auditLogger.log("Backup created: " + backupFile.getName());
+        auditManager.logSecurityEvent("BACKUP_CREATED", "Backup created: " + backupFile.getName(), AuditManager.AuditSeverity.INFO, null, null);
     }
     
     /**
@@ -262,13 +268,14 @@ public class VaultManager {
             throw new IllegalStateException("Vault not initialized");
         }
         
-        BackupManager backupManager = new BackupManager(cryptoManager);
-        backupManager.restoreBackup(backupFile, vaultPath);
+        com.ghostvault.core.BackupManager backupManager = new com.ghostvault.core.BackupManager(fileManager, metadataManager);
+        backupManager.setBackupEncryptionKey(cryptoManager.deriveKey(masterPassword, passwordManager.getSalt()));
+        backupManager.restoreFromBackup(backupFile, new RestoreOptions());
         
         // Reload metadata
         metadataManager.loadMetadata();
         
-        auditLogger.log("Backup restored: " + backupFile.getName());
+        auditManager.logSecurityEvent("BACKUP_RESTORED", "Backup restored: " + backupFile.getName(), AuditManager.AuditSeverity.INFO, null, null);
     }
     
     /**
@@ -276,7 +283,7 @@ public class VaultManager {
      */
     private void executePanicWipe() {
         try {
-            auditLogger.log("PANIC WIPE INITIATED");
+            auditManager.logSecurityEvent("PANIC_WIPE", "Panic wipe initiated", AuditManager.AuditSeverity.CRITICAL, null, null);
             
             // Securely delete all files
             File filesDir = new File(AppConfig.FILES_DIR);
@@ -294,7 +301,7 @@ public class VaultManager {
             SecureDeletion.secureDelete(new File(AppConfig.METADATA_FILE));
             SecureDeletion.secureDelete(new File(AppConfig.SALT_FILE));
             
-            auditLogger.log("PANIC WIPE COMPLETED");
+            auditManager.logSecurityEvent("PANIC_WIPE", "Panic wipe completed", AuditManager.AuditSeverity.CRITICAL, null, null);
             
             // Exit application silently
             System.exit(0);
@@ -309,7 +316,10 @@ public class VaultManager {
      * Get decoy files for decoy mode
      */
     public List<String> getDecoyFiles() {
-        return decoyManager.getDecoyFileList();
+        List<VaultFile> files = decoyManager.getDecoyFiles();
+        List<String> names = new ArrayList<>();
+        for (VaultFile vf : files) names.add(vf.getOriginalName());
+        return names;
     }
     
     /**
@@ -321,7 +331,7 @@ public class VaultManager {
         }
         
         isInitialized = false;
-        auditLogger.log("User logged out");
+        auditManager.logSecurityEvent("LOGOUT", "User logged out", AuditManager.AuditSeverity.INFO, null, null);
     }
     
     /**

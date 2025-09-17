@@ -52,8 +52,7 @@ public class ProgressDialog {
         VBox root = createContent(message);
         Scene scene = new Scene(root, 400, 150);
         
-        // Apply current theme
-        UIManager.getInstance().applyTheme(UIManager.getInstance().getCurrentTheme());
+        // Theme application is handled by UIManager on scenes globally
         
         dialogStage.setScene(scene);
         

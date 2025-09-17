@@ -234,9 +234,7 @@ public class UIManager {
      * Show progress dialog
      */
     public ProgressDialog showProgress(String title, String message) {
-        ProgressDialog progressDialog = new ProgressDialog(primaryStage);
-        progressDialog.setTitle(title);
-        progressDialog.setMessage(message);
+        ProgressDialog progressDialog = new ProgressDialog(primaryStage, title, message);
         progressDialog.show();
         return progressDialog;
     }

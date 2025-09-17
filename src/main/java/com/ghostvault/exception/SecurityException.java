@@ -5,71 +5,64 @@ package com.ghostvault.exception;
  */
 public class SecurityException extends GhostVaultException {
     
-    public SecurityException(ErrorCode errorCode, String message) {
-        super(errorCode, ErrorSeverity.CRITICAL, false, message, null, null);
+    public SecurityException(String message) {
+        super(message, ErrorCategory.SECURITY, ErrorSeverity.CRITICAL);
     }
     
-    public SecurityException(ErrorCode errorCode, String message, String technicalDetails) {
-        super(errorCode, ErrorSeverity.CRITICAL, false, message, technicalDetails, null);
+    public SecurityException(String message, String technicalDetails) {
+        super(message, null, ErrorCategory.SECURITY, ErrorSeverity.CRITICAL);
     }
     
-    public SecurityException(ErrorCode errorCode, ErrorSeverity severity, String message) {
-        super(errorCode, severity, false, message, null, null);
+    public SecurityException(String message, ErrorSeverity severity) {
+        super(message, ErrorCategory.SECURITY, severity);
     }
     
     /**
      * Create exception for authentication failure
      */
     public static SecurityException authenticationFailed(String details) {
-        return new SecurityException(ErrorCode.AUTHENTICATION_FAILED, 
-            "Authentication failed", details);
+        return new SecurityException("Authentication failed", details);
     }
     
     /**
      * Create exception for access denied
      */
     public static SecurityException accessDenied(String resource) {
-        return new SecurityException(ErrorCode.ACCESS_DENIED, 
-            "Access denied to resource: " + resource);
+        return new SecurityException("Access denied to resource: " + resource, ErrorSeverity.HIGH);
     }
     
     /**
      * Create exception for security violation
      */
     public static SecurityException securityViolation(String violation, String details) {
-        return new SecurityException(ErrorCode.SECURITY_VIOLATION, 
-            "Security policy violation: " + violation, details);
+        return new SecurityException("Security policy violation: " + violation + (details != null ? (": " + details) : ""), ErrorSeverity.CRITICAL);
     }
     
     /**
      * Create exception for tampering detection
      */
     public static SecurityException tamperingDetected(String details) {
-        return new SecurityException(ErrorCode.TAMPERING_DETECTED, 
-            "Data tampering has been detected", details);
+        return new SecurityException("Data tampering has been detected" + (details != null ? (": " + details) : ""), ErrorSeverity.CRITICAL);
     }
     
     /**
      * Create exception for intrusion detection
      */
     public static SecurityException intrusionDetected(String source, String details) {
-        return new SecurityException(ErrorCode.INTRUSION_DETECTED, 
-            "Intrusion attempt detected from: " + source, details);
+        return new SecurityException("Intrusion attempt detected from: " + source + (details != null ? (": " + details) : ""), ErrorSeverity.CRITICAL);
     }
     
     /**
      * Create exception for panic mode trigger
      */
     public static SecurityException panicModeTriggered(String reason) {
-        return new SecurityException(ErrorCode.PANIC_MODE_TRIGGERED, 
-            "Panic mode has been triggered: " + reason);
+        return new SecurityException("Panic mode has been triggered: " + reason, ErrorSeverity.CRITICAL);
     }
     
     /**
      * Create exception for session expiry
      */
     public static SecurityException sessionExpired() {
-        return new SecurityException(ErrorCode.SESSION_EXPIRED, ErrorSeverity.MEDIUM,
-            "Your session has expired. Please log in again.");
+        return new SecurityException("Your session has expired. Please log in again.", ErrorSeverity.MEDIUM);
     }
 }

@@ -294,7 +294,7 @@ public class ErrorDialog {
     private boolean canRetry() {
         return errorResult.getException() != null && 
                errorResult.getException().isRecoverable() &&
-               errorResult.getRecoveryAction() != com.ghostvault.error.ErrorHandler.RecoveryAction.PANIC_MODE;
+               errorResult.getRecoveryAction() != com.ghostvault.error.RecoveryAction.ABORT;
     }
     
     /**

@@ -64,6 +64,16 @@ public class MemoryUtils {
         // Also wipe the original char array
         Arrays.fill(data, '\0');
     }
+
+    /**
+     * Convenience overload to wipe multiple char arrays.
+     */
+    public static void secureWipe(char[]... arrays) {
+        if (arrays == null) return;
+        for (char[] arr : arrays) {
+            secureWipe(arr);
+        }
+    }
     
     /**
      * Constant-time comparison of two byte arrays
@@ -112,6 +122,23 @@ public class MemoryUtils {
             result |= a.charAt(i) ^ b.charAt(i);
         }
         
+        return result == 0;
+    }
+
+    /**
+     * Constant-time comparison for char arrays.
+     */
+    public static boolean constantTimeEquals(char[] a, char[] b) {
+        if (a == null || b == null) {
+            return a == b;
+        }
+        if (a.length != b.length) {
+            return false;
+        }
+        int result = 0;
+        for (int i = 0; i < a.length; i++) {
+            result |= a[i] ^ b[i];
+        }
         return result == 0;
     }
     

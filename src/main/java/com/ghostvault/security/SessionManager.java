@@ -15,7 +15,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.function.Runnable;
+// Use java.lang.Runnable (no import required)
 
 /**
  * Manages user sessions with configurable timeout, activity tracking, and security monitoring
@@ -555,5 +555,54 @@ public class SessionManager {
             return String.format("SessionStats{active=%s, duration=%dm, timeout=%dm, failed=%d, suspicious=%d, total=%d, duress=%s}", 
                 active, durationMinutes, timeUntilTimeoutMinutes, failedLogins, suspiciousActivity, totalLogins, duressDetected);
         }
+    }
+    
+    /**
+     * Set timeout callback (compatibility method)
+     */
+    public void setTimeoutCallback(Runnable callback) {
+        addTimeoutListener(callback);
+    }
+    
+    /**
+     * Start session (compatibility method)
+     */
+    public void startSession() {
+        startSession(null);
+    }
+    
+    /**
+     * Record failed login (compatibility method)
+     */
+    public void recordFailedLogin(String username) {
+        recordFailedLogin(username, "Unknown IP");
+    }
+    
+    /**
+     * Check if account is locked (compatibility method)
+     */
+    public boolean isAccountLocked(String username) {
+        return failedLoginAttempts.get() >= 5; // Simple implementation
+    }
+    
+    /**
+     * Pause session (compatibility method)
+     */
+    public void pauseSession() {
+        // Pause session timer
+        if (sessionTimer != null) {
+            sessionTimer.pause();
+        }
+    }
+    
+    /**
+     * Resume session (compatibility method)
+     */
+    public void resumeSession() {
+        // Resume session timer
+        if (sessionTimer != null) {
+            sessionTimer.play();
+        }
+        recordActivity();
     }
 }

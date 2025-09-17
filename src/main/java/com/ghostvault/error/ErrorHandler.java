@@ -227,7 +227,7 @@ public class ErrorHandler {
     /**
      * Generate user-friendly error message
      */
-    private String getUserFriendlyMessage(Exception e) {
+    private String getUserFriendlyMessage(Throwable e) {
         if (e instanceof GhostVaultException) {
             return ((GhostVaultException) e).getUserMessage();
         }
@@ -320,7 +320,7 @@ public class ErrorHandler {
         }
         
         // Default mapping
-        if (e instanceof SecurityException || e instanceof java.security.GeneralSecurityException) {
+        if (e instanceof com.ghostvault.exception.SecurityException || e instanceof java.security.GeneralSecurityException) {
             return AuditManager.AuditSeverity.CRITICAL;
         }
         

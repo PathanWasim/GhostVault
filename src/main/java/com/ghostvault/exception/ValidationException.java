@@ -51,8 +51,7 @@ public class ValidationException extends GhostVaultException {
     }
     
     public ValidationException(String message, ValidationType validationType, String fieldName, Object invalidValue) {
-        super(message, ErrorCategory.VALIDATION, ErrorSeverity.LOW, 
-              generateUserMessage(validationType, fieldName), null, true);
+        super(message, ErrorCategory.VALIDATION, ErrorSeverity.LOW, true);
         this.validationType = validationType;
         this.validationErrors = new ArrayList<>();
         this.fieldName = fieldName;

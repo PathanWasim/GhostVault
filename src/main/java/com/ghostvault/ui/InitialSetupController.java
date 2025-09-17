@@ -104,17 +104,17 @@ public class InitialSetupController implements Initializable {
             return false;
         }
         
-        if (strengthMeter.calculateStrength(master).getScore() < 4) {
+        if (PasswordManager.getPasswordStrength(master) < 4) {
             statusLabel.setText("Master password is too weak. Minimum requirements not met.");
             return false;
         }
         
-        if (strengthMeter.calculateStrength(panic).getScore() < 3) {
+        if (PasswordManager.getPasswordStrength(panic) < 3) {
             statusLabel.setText("Panic password is too weak. Minimum 3/5 strength required.");
             return false;
         }
         
-        if (strengthMeter.calculateStrength(decoy).getScore() < 3) {
+        if (PasswordManager.getPasswordStrength(decoy) < 3) {
             statusLabel.setText("Decoy password is too weak. Minimum 3/5 strength required.");
             return false;
         }
@@ -131,15 +131,15 @@ public class InitialSetupController implements Initializable {
      * Update password strength indicator
      */
     private void updatePasswordStrength(String password, ProgressBar strengthBar, Label strengthLabel) {
-        PasswordStrengthMeter.StrengthResult result = strengthMeter.calculateStrength(password);
-        
-        double progress = result.getScore() / 5.0;
+        int score = PasswordManager.getPasswordStrength(password);
+        double progress = score / 5.0;
         strengthBar.setProgress(progress);
         
-        String strengthText = result.getStrengthText();
-        String color = getStrengthColor(result.getScore());
+        String strengthText = PasswordManager.getPasswordStrengthDescription(score);
+        String color = PasswordManager.getPasswordStrengthColor(score);
         
-        strengthLabel.setText(strengthText + " - " + result.getFeedback());
+        String feedback = PasswordManager.getPasswordStrengthFeedback(password);
+        strengthLabel.setText(strengthText + (feedback.equals("Strong password!") ? "" : " - " + feedback));
         strengthLabel.setStyle("-fx-text-fill: " + color + ";");
         
         // Update progress bar color
@@ -149,17 +149,7 @@ public class InitialSetupController implements Initializable {
     /**
      * Get color for strength level
      */
-    private String getStrengthColor(int score) {
-        switch (score) {
-            case 0:
-            case 1: return "#ff4444"; // Red
-            case 2: return "#ff8800"; // Orange
-            case 3: return "#ffaa00"; // Yellow
-            case 4: return "#88cc00"; // Light Green
-            case 5: return "#44cc44"; // Green
-            default: return "#666666"; // Gray
-        }
-    }
+    private String getStrengthColor(int score) { return PasswordManager.getPasswordStrengthColor(score); }
     
     /**
      * Show help dialog

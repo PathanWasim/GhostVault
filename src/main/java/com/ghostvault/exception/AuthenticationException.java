@@ -47,8 +47,7 @@ public class AuthenticationException extends GhostVaultException {
     }
     
     public AuthenticationException(String message, AuthErrorType errorType, String username) {
-        super(message, ErrorCategory.AUTHENTICATION, determineSeverity(errorType), 
-              generateUserMessage(errorType), null, isRecoverable(errorType));
+        super(message, ErrorCategory.AUTHENTICATION, determineSeverity(errorType), isRecoverable(errorType));
         this.authErrorType = errorType;
         this.attemptCount = 0;
         this.username = username;

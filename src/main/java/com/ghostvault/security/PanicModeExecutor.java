@@ -323,7 +323,8 @@ public class PanicModeExecutor {
             // Force garbage collection multiple times
             for (int i = 0; i < 5; i++) {
                 System.gc();
-                System.runFinalization();
+                // Note: System.runFinalization() is deprecated in JDK 18+
+                // GC will handle finalization automatically
                 Thread.sleep(100);
             }
             
