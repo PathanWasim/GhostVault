@@ -3,165 +3,194 @@ package com.ghostvault.security;
 import com.ghostvault.config.AppConfig;
 
 import javax.crypto.*;
-import javax.crypto.spec.IvParameterSpec;
-import javax.crypto.spec.PBEKeySpec;
+import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
-import java.security.spec.KeySpec;
 import java.util.Arrays;
 
 /**
- * Handles all cryptographic operations for the vault
- * Uses AES-256-CBC with PBKDF2 key derivation and HMAC-SHA256 authentication
+ * Handles all cryptographic operations for the vault using AEAD (AES-GCM)
+ * 
+ * SECURITY IMPROVEMENTS:
+ * - Uses AES-GCM (Authenticated Encryption with Associated Data) instead of AES-CBC+HMAC
+ * - Eliminates padding oracle vulnerabilities
+ * - Provides built-in authentication without separate HMAC
+ * - Simpler and more secure API
+ * 
+ * @version 2.0.0 - AEAD Implementation
  */
 public class CryptoManager {
     
-    private SecretKey masterKey;
-    private SecretKey hmacKey;
-    private final SecureRandom secureRandom;
+    // AES-GCM configuration
+    private static final String AEAD_ALGORITHM = "AES";
+    private static final String AEAD_TRANSFORMATION = "AES/GCM/NoPadding";
+    private static final int GCM_IV_LENGTH = 12; // 96 bits (recommended for GCM)
+    private static final int GCM_TAG_LENGTH = 128; // 128 bits authentication tag
     
-    // HMAC algorithm for message authentication
-    private static final String HMAC_ALGORITHM = "HmacSHA256";
-    private static final int HMAC_SIZE = 32; // SHA-256 output size
+    private SecretKey masterKey;
+    private final SecureRandom secureRandom;
     
     public CryptoManager() {
         this.secureRandom = new SecureRandom();
     }
     
     /**
-     * Initialize crypto manager with password and salt
+     * Initialize crypto manager with a key
      */
-    public void initializeWithPassword(String password, byte[] salt) throws GeneralSecurityException {
-        this.masterKey = deriveKey(password, salt, "AES");
-        this.hmacKey = deriveKey(password, salt, "HMAC");
-    }
-    
-    /**
-     * Derive key from password using PBKDF2 with different info for different purposes
-     */
-    public SecretKey deriveKey(String password, byte[] salt) throws GeneralSecurityException {
-        return deriveKey(password, salt, "AES");
-    }
-    
-    /**
-     * Derive encryption key from password using PBKDF2 with purpose-specific salt
-     */
-    private SecretKey deriveKey(String password, byte[] salt, String purpose) throws GeneralSecurityException {
-        // Create purpose-specific salt to derive different keys
-        byte[] purposeSalt = new byte[salt.length + purpose.getBytes().length];
-        System.arraycopy(salt, 0, purposeSalt, 0, salt.length);
-        System.arraycopy(purpose.getBytes(), 0, purposeSalt, salt.length, purpose.getBytes().length);
-        
-        char[] passwordChars = password.toCharArray();
-        try {
-            KeySpec spec = new PBEKeySpec(
-                passwordChars,
-                purposeSalt,
-                AppConfig.PBKDF2_ITERATIONS,
-                AppConfig.KEY_SIZE
-            );
-            
-            SecretKeyFactory factory = SecretKeyFactory.getInstance(AppConfig.KEY_DERIVATION_ALGORITHM);
-            byte[] keyBytes = factory.generateSecret(spec).getEncoded();
-            
-            String algorithm = purpose.equals("HMAC") ? HMAC_ALGORITHM : AppConfig.ENCRYPTION_ALGORITHM;
-            return new SecretKeySpec(keyBytes, algorithm);
-            
-        } finally {
-            // Clear the password from memory
-            MemoryUtils.secureWipe(passwordChars);
-            MemoryUtils.secureWipe(purposeSalt);
+    public void initializeWithKey(SecretKey key) {
+        if (key == null) {
+            throw new IllegalArgumentException("Key cannot be null");
         }
+        this.masterKey = key;
     }
     
     /**
-     * Encrypt data using AES-256-CBC with HMAC authentication
+     * Create a SecretKey from raw key bytes
+     */
+    public SecretKey keyFromBytes(byte[] keyBytes) {
+        if (keyBytes == null || keyBytes.length != 32) { // 256 bits
+            throw new IllegalArgumentException("Key must be 32 bytes (256 bits)");
+        }
+        return new SecretKeySpec(keyBytes, AEAD_ALGORITHM);
+    }
+    
+    /**
+     * Encrypt data using AES-GCM AEAD
+     * 
+     * @param plaintext Data to encrypt
+     * @param key Encryption key
+     * @param aad Additional Authenticated Data (can be null)
+     * @return IV (12 bytes) || ciphertext+tag
+     */
+    public byte[] encrypt(byte[] plaintext, SecretKey key, byte[] aad) throws GeneralSecurityException {
+        if (plaintext == null) {
+            throw new IllegalArgumentException("Plaintext cannot be null");
+        }
+        if (key == null) {
+            throw new IllegalArgumentException("Key cannot be null");
+        }
+        
+        // Generate random IV (12 bytes for GCM)
+        byte[] iv = new byte[GCM_IV_LENGTH];
+        secureRandom.nextBytes(iv);
+        
+        // Initialize cipher
+        Cipher cipher = Cipher.getInstance(AEAD_TRANSFORMATION);
+        GCMParameterSpec gcmSpec = new GCMParameterSpec(GCM_TAG_LENGTH, iv);
+        cipher.init(Cipher.ENCRYPT_MODE, key, gcmSpec);
+        
+        // Add AAD if provided
+        if (aad != null && aad.length > 0) {
+            cipher.updateAAD(aad);
+        }
+        
+        // Encrypt (includes authentication tag)
+        byte[] ciphertextWithTag = cipher.doFinal(plaintext);
+        
+        // Combine IV + ciphertext+tag
+        byte[] result = new byte[GCM_IV_LENGTH + ciphertextWithTag.length];
+        System.arraycopy(iv, 0, result, 0, GCM_IV_LENGTH);
+        System.arraycopy(ciphertextWithTag, 0, result, GCM_IV_LENGTH, ciphertextWithTag.length);
+        
+        return result;
+    }
+    
+    /**
+     * Encrypt data using AES-GCM AEAD (no AAD)
+     */
+    public byte[] encrypt(byte[] plaintext, SecretKey key) throws GeneralSecurityException {
+        return encrypt(plaintext, key, null);
+    }
+    
+    /**
+     * Encrypt data using master key
      */
     public EncryptedData encrypt(byte[] plaintext) throws GeneralSecurityException {
-        if (masterKey == null || hmacKey == null) {
-            throw new IllegalStateException("Crypto manager not initialized");
+        if (masterKey == null) {
+            throw new IllegalStateException("Crypto manager not initialized with master key");
         }
         
-        Cipher cipher = Cipher.getInstance(AppConfig.ENCRYPTION_TRANSFORMATION);
+        byte[] combined = encrypt(plaintext, masterKey, null);
         
-        // Generate random IV
-        byte[] iv = generateSecureRandom(AppConfig.IV_SIZE);
-        IvParameterSpec ivSpec = new IvParameterSpec(iv);
+        // Split into IV and ciphertext for EncryptedData compatibility
+        byte[] iv = Arrays.copyOfRange(combined, 0, GCM_IV_LENGTH);
+        byte[] ciphertextWithTag = Arrays.copyOfRange(combined, GCM_IV_LENGTH, combined.length);
         
-        cipher.init(Cipher.ENCRYPT_MODE, masterKey, ivSpec);
-        byte[] ciphertext = cipher.doFinal(plaintext);
-        
-        // Calculate HMAC over IV + ciphertext
-        byte[] dataToAuthenticate = new byte[iv.length + ciphertext.length];
-        System.arraycopy(iv, 0, dataToAuthenticate, 0, iv.length);
-        System.arraycopy(ciphertext, 0, dataToAuthenticate, iv.length, ciphertext.length);
-        
-        Mac hmac = Mac.getInstance(HMAC_ALGORITHM);
-        hmac.init(hmacKey);
-        byte[] hmacValue = hmac.doFinal(dataToAuthenticate);
-        
-        return new EncryptedData(ciphertext, iv, hmacValue);
+        return new EncryptedData(ciphertextWithTag, iv, null); // No separate HMAC in GCM
     }
     
     /**
-     * Encrypt data with provided key (for password hashing, etc.)
+     * Decrypt data using AES-GCM AEAD
+     * 
+     * @param ivAndCiphertext IV (12 bytes) || ciphertext+tag
+     * @param key Decryption key
+     * @param aad Additional Authenticated Data (must match encryption AAD)
+     * @return Decrypted plaintext
+     * @throws GeneralSecurityException if authentication fails or decryption error
      */
-    public EncryptedData encrypt(byte[] plaintext, SecretKey key) throws GeneralSecurityException {
-        Cipher cipher = Cipher.getInstance(AppConfig.ENCRYPTION_TRANSFORMATION);
+    public byte[] decrypt(byte[] ivAndCiphertext, SecretKey key, byte[] aad) throws GeneralSecurityException {
+        if (ivAndCiphertext == null || ivAndCiphertext.length < GCM_IV_LENGTH + 16) {
+            throw new IllegalArgumentException("Invalid ciphertext format");
+        }
+        if (key == null) {
+            throw new IllegalArgumentException("Key cannot be null");
+        }
         
-        // Generate random IV
-        byte[] iv = generateSecureRandom(AppConfig.IV_SIZE);
-        IvParameterSpec ivSpec = new IvParameterSpec(iv);
+        // Extract IV and ciphertext+tag
+        byte[] iv = Arrays.copyOfRange(ivAndCiphertext, 0, GCM_IV_LENGTH);
+        byte[] ciphertextWithTag = Arrays.copyOfRange(ivAndCiphertext, GCM_IV_LENGTH, ivAndCiphertext.length);
         
-        cipher.init(Cipher.ENCRYPT_MODE, key, ivSpec);
-        byte[] ciphertext = cipher.doFinal(plaintext);
+        // Initialize cipher
+        Cipher cipher = Cipher.getInstance(AEAD_TRANSFORMATION);
+        GCMParameterSpec gcmSpec = new GCMParameterSpec(GCM_TAG_LENGTH, iv);
+        cipher.init(Cipher.DECRYPT_MODE, key, gcmSpec);
         
-        // For external key usage, we don't have HMAC key, so skip authentication
-        return new EncryptedData(ciphertext, iv, null);
+        // Add AAD if provided
+        if (aad != null && aad.length > 0) {
+            cipher.updateAAD(aad);
+        }
+        
+        // Decrypt and verify authentication tag
+        // Will throw AEADBadTagException if authentication fails
+        return cipher.doFinal(ciphertextWithTag);
     }
     
     /**
-     * Decrypt data using AES-256-CBC with HMAC verification
+     * Decrypt data using AES-GCM AEAD (no AAD)
+     */
+    public byte[] decrypt(byte[] ivAndCiphertext, SecretKey key) throws GeneralSecurityException {
+        return decrypt(ivAndCiphertext, key, null);
+    }
+    
+    /**
+     * Decrypt data using master key (EncryptedData format)
      */
     public byte[] decrypt(EncryptedData encryptedData) throws GeneralSecurityException {
-        if (masterKey == null || hmacKey == null) {
-            throw new IllegalStateException("Crypto manager not initialized");
+        if (masterKey == null) {
+            throw new IllegalStateException("Crypto manager not initialized with master key");
         }
         
-        // Verify HMAC if present
-        if (encryptedData.getHmac() != null) {
-            byte[] dataToAuthenticate = new byte[encryptedData.getIv().length + encryptedData.getCiphertext().length];
-            System.arraycopy(encryptedData.getIv(), 0, dataToAuthenticate, 0, encryptedData.getIv().length);
-            System.arraycopy(encryptedData.getCiphertext(), 0, dataToAuthenticate, encryptedData.getIv().length, encryptedData.getCiphertext().length);
-            
-            Mac hmac = Mac.getInstance(HMAC_ALGORITHM);
-            hmac.init(hmacKey);
-            byte[] calculatedHmac = hmac.doFinal(dataToAuthenticate);
-            
-            if (!constantTimeEquals(calculatedHmac, encryptedData.getHmac())) {
-                throw new GeneralSecurityException("HMAC verification failed - data may be corrupted or tampered");
-            }
-        }
+        // Combine IV and ciphertext
+        byte[] combined = new byte[encryptedData.getIv().length + encryptedData.getCiphertext().length];
+        System.arraycopy(encryptedData.getIv(), 0, combined, 0, encryptedData.getIv().length);
+        System.arraycopy(encryptedData.getCiphertext(), 0, combined, encryptedData.getIv().length, encryptedData.getCiphertext().length);
         
-        Cipher cipher = Cipher.getInstance(AppConfig.ENCRYPTION_TRANSFORMATION);
-        IvParameterSpec ivSpec = new IvParameterSpec(encryptedData.getIv());
-        cipher.init(Cipher.DECRYPT_MODE, masterKey, ivSpec);
-        
-        return cipher.doFinal(encryptedData.getCiphertext());
+        return decrypt(combined, masterKey, null);
     }
     
     /**
-     * Decrypt data with provided key (for password verification, etc.)
+     * Decrypt data with provided key (EncryptedData format)
      */
     public byte[] decrypt(EncryptedData encryptedData, SecretKey key) throws GeneralSecurityException {
-        Cipher cipher = Cipher.getInstance(AppConfig.ENCRYPTION_TRANSFORMATION);
-        IvParameterSpec ivSpec = new IvParameterSpec(encryptedData.getIv());
-        cipher.init(Cipher.DECRYPT_MODE, key, ivSpec);
+        // Combine IV and ciphertext
+        byte[] combined = new byte[encryptedData.getIv().length + encryptedData.getCiphertext().length];
+        System.arraycopy(encryptedData.getIv(), 0, combined, 0, encryptedData.getIv().length);
+        System.arraycopy(encryptedData.getCiphertext(), 0, combined, encryptedData.getIv().length, encryptedData.getCiphertext().length);
         
-        return cipher.doFinal(encryptedData.getCiphertext());
+        return decrypt(combined, key, null);
     }
     
     /**
@@ -204,17 +233,12 @@ public class CryptoManager {
     }
     
     /**
-     * Securely wipe sensitive data from memory
+     * Securely wipe sensitive data from memory (zeroize)
      */
-    public void secureWipe(byte[] data) {
-        MemoryUtils.secureWipe(data);
-    }
-    
-    /**
-     * Constant-time comparison to prevent timing attacks
-     */
-    private boolean constantTimeEquals(byte[] a, byte[] b) {
-        return MemoryUtils.constantTimeEquals(a, b);
+    public void zeroize(byte[] data) {
+        if (data != null) {
+            MemoryUtils.secureWipe(data);
+        }
     }
     
     /**
@@ -223,31 +247,26 @@ public class CryptoManager {
     public void clearKeys() {
         if (masterKey != null) {
             byte[] keyBytes = masterKey.getEncoded();
-            MemoryUtils.secureWipe(keyBytes);
+            zeroize(keyBytes);
             masterKey = null;
-        }
-        
-        if (hmacKey != null) {
-            byte[] hmacKeyBytes = hmacKey.getEncoded();
-            MemoryUtils.secureWipe(hmacKeyBytes);
-            hmacKey = null;
         }
     }
     
     /**
-     * Get master key for other components (audit logging, metadata)
+     * Get master key for other components (use with caution)
      */
     public SecretKey getMasterKey() {
         return masterKey;
     }
     
     /**
-     * Container for encrypted data with IV and HMAC authentication
+     * Container for encrypted data (backward compatibility)
+     * Note: HMAC field is deprecated and unused in GCM mode
      */
     public static class EncryptedData {
         private final byte[] ciphertext;
         private final byte[] iv;
-        private final byte[] hmac;
+        private final byte[] hmac; // Deprecated - kept for compatibility
         
         public EncryptedData(byte[] ciphertext, byte[] iv) {
             this(ciphertext, iv, null);
@@ -267,59 +286,33 @@ public class CryptoManager {
             return iv.clone();
         }
         
+        @Deprecated
         public byte[] getHmac() {
             return hmac != null ? hmac.clone() : null;
         }
         
         /**
-         * Get combined data (IV + ciphertext + HMAC) for storage
+         * Get combined data (IV + ciphertext) for storage
          */
         public byte[] getCombinedData() {
-            int totalLength = iv.length + ciphertext.length;
-            if (hmac != null) {
-                totalLength += hmac.length;
-            }
-            
-            byte[] combined = new byte[totalLength];
-            int offset = 0;
-            
-            System.arraycopy(iv, 0, combined, offset, iv.length);
-            offset += iv.length;
-            
-            System.arraycopy(ciphertext, 0, combined, offset, ciphertext.length);
-            offset += ciphertext.length;
-            
-            if (hmac != null) {
-                System.arraycopy(hmac, 0, combined, offset, hmac.length);
-            }
-            
+            byte[] combined = new byte[iv.length + ciphertext.length];
+            System.arraycopy(iv, 0, combined, 0, iv.length);
+            System.arraycopy(ciphertext, 0, combined, iv.length, ciphertext.length);
             return combined;
         }
         
         /**
-         * Create EncryptedData from combined data (IV + ciphertext + optional HMAC)
+         * Create EncryptedData from combined data (IV + ciphertext)
          */
         public static EncryptedData fromCombinedData(byte[] combinedData) {
-            if (combinedData.length < AppConfig.IV_SIZE) {
+            if (combinedData == null || combinedData.length < GCM_IV_LENGTH + 16) {
                 throw new IllegalArgumentException("Invalid encrypted data format");
             }
             
-            byte[] iv = Arrays.copyOfRange(combinedData, 0, AppConfig.IV_SIZE);
+            byte[] iv = Arrays.copyOfRange(combinedData, 0, GCM_IV_LENGTH);
+            byte[] ciphertext = Arrays.copyOfRange(combinedData, GCM_IV_LENGTH, combinedData.length);
             
-            // Check if HMAC is present (data length indicates this)
-            boolean hasHmac = combinedData.length >= AppConfig.IV_SIZE + HMAC_SIZE + 16; // minimum ciphertext size
-            
-            if (hasHmac && combinedData.length >= AppConfig.IV_SIZE + HMAC_SIZE) {
-                int ciphertextLength = combinedData.length - AppConfig.IV_SIZE - HMAC_SIZE;
-                byte[] ciphertext = Arrays.copyOfRange(combinedData, AppConfig.IV_SIZE, AppConfig.IV_SIZE + ciphertextLength);
-                byte[] hmac = Arrays.copyOfRange(combinedData, AppConfig.IV_SIZE + ciphertextLength, combinedData.length);
-                
-                return new EncryptedData(ciphertext, iv, hmac);
-            } else {
-                // Legacy format without HMAC
-                byte[] ciphertext = Arrays.copyOfRange(combinedData, AppConfig.IV_SIZE, combinedData.length);
-                return new EncryptedData(ciphertext, iv);
-            }
+            return new EncryptedData(ciphertext, iv, null);
         }
     }
 }
