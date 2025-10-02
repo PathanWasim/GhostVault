@@ -187,7 +187,8 @@ public class MetadataManager {
             serializedData = baos.toByteArray();
             
             // Encrypt metadata
-            CryptoManager.EncryptedData encrypted = cryptoManager.encrypt(serializedData, encryptionKey);
+            byte[] encryptedBytes = cryptoManager.encrypt(serializedData, encryptionKey);
+            CryptoManager.EncryptedData encrypted = CryptoManager.EncryptedData.fromCombinedData(encryptedBytes);
             
             // Write to file
             FileUtils.writeEncryptedFile(Paths.get(metadataFilePath), encrypted);

@@ -248,23 +248,15 @@ public class ApplicationIntegrator {
     public void handleAuthentication(String password) {
         CompletableFuture.supplyAsync(() -> {
             return errorHandler.handleWithRecovery("password_validation", 
-                () -> passwordManager.validatePassword(password), 
+                () -> passwordManager.detectPassword(password.toCharArray()), 
                 null);
         }, backgroundExecutor).thenAccept(passwordType -> {
             Platform.runLater(() -> {
                 switch (passwordType) {
-                    case MASTER:
-                        handleMasterPasswordLogin(password);
-                        break;
-                    case PANIC:
-                        handlePanicPasswordLogin();
-                        break;
-                    case DECOY:
-                        handleDecoyPasswordLogin(password);
-                        break;
-                    case INVALID:
-                        handleInvalidPassword();
-                        break;
+                    case MASTER -> handleMasterPasswordLogin(password);
+                    case PANIC -> handlePanicPasswordLogin();
+                    case DECOY -> handleDecoyPasswordLogin(password);
+                    case INVALID -> handleInvalidPassword();
                 }
             });
         }).exceptionally(throwable -> {
@@ -281,8 +273,8 @@ public class ApplicationIntegrator {
      */
     private void handleMasterPasswordLogin(String password) {
         try {
-            // Derive encryption key
-            currentKey = passwordManager.deriveVaultKey(password);
+            // Unwrap Vault Master Key
+            currentKey = passwordManager.unwrapVMK(password.toCharArray());
             
             // Start session
             sessionManager.startSession();
@@ -321,7 +313,7 @@ public class ApplicationIntegrator {
             
             // Execute panic wipe in background
             CompletableFuture.runAsync(() -> {
-                panicModeExecutor.executePanicMode();
+                panicModeExecutor.executePanic(java.nio.file.Paths.get(AppConfig.VAULT_DIR), false);
             }, backgroundExecutor).thenRun(() -> {
                 // Shutdown application after panic wipe
                 Platform.runLater(() -> {

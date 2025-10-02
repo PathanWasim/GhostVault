@@ -321,7 +321,8 @@ public class VaultBackupManager {
             }
             
             byte[] archiveData = Files.readAllBytes(tempArchive);
-            CryptoManager.EncryptedData encryptedArchive = cryptoManager.encrypt(archiveData, key);
+            byte[] encryptedBytes = cryptoManager.encrypt(archiveData, key);
+            CryptoManager.EncryptedData encryptedArchive = CryptoManager.EncryptedData.fromCombinedData(encryptedBytes);
             
             // Write encrypted archive to target file
             try (FileOutputStream fos = new FileOutputStream(targetFile)) {
@@ -334,7 +335,7 @@ public class VaultBackupManager {
             }
             
             // Clear sensitive data
-            cryptoManager.secureWipe(archiveData);
+            cryptoManager.zeroize(archiveData);
             
         } finally {
             // Clean up temporary archive
@@ -397,7 +398,7 @@ public class VaultBackupManager {
                 
             } finally {
                 // Clean up
-                cryptoManager.secureWipe(archiveData);
+                cryptoManager.zeroize(archiveData);
                 Files.deleteIfExists(tempArchive);
             }
         }
