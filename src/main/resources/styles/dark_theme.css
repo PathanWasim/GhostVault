@@ -1,120 +1,155 @@
-/* Dark Theme for GhostVault */
+/* Professional Dark Theme for GhostVault */
 
 .root {
-    -fx-base: #2b2b2b;
-    -fx-background: #1e1e1e;
-    -fx-control-inner-background: #3c3c3c;
-    -fx-control-inner-background-alt: #404040;
-    -fx-accent: #0078d4;
-    -fx-default-button: #0078d4;
-    -fx-focus-color: #0078d4;
-    -fx-faint-focus-color: #0078d422;
-    -fx-text-fill: #ffffff;
-    -fx-text-base-color: #ffffff;
+    -fx-base: #1a1a1a;
+    -fx-background: #0d0d0d;
+    -fx-control-inner-background: #1e1e1e;
+    -fx-control-inner-background-alt: #252525;
+    -fx-accent: #00d4aa;
+    -fx-default-button: #00d4aa;
+    -fx-focus-color: #00d4aa;
+    -fx-faint-focus-color: #00d4aa33;
+    -fx-text-fill: #e0e0e0;
+    -fx-text-base-color: #e0e0e0;
+    -fx-font-family: "Segoe UI", "SF Pro Display", -apple-system, system-ui, sans-serif;
 }
 
 /* Window and containers */
-.scene {
-    -fx-background-color: #1e1e1e;
+.scroll-pane {
+    -fx-background-color: #0d0d0d;
+    -fx-background: #0d0d0d;
+}
+
+.scroll-pane > .viewport {
+    -fx-background-color: #0d0d0d;
+}
+
+.scroll-pane .content {
+    -fx-background-color: #0d0d0d;
+}
+
+/* Main container styling */
+VBox {
+    -fx-background-color: #0d0d0d;
+    -fx-alignment: center;
 }
 
 .split-pane {
-    -fx-background-color: #2b2b2b;
+    -fx-background-color: #1a1a1a;
 }
 
 .tab-pane {
-    -fx-background-color: #2b2b2b;
+    -fx-background-color: #1a1a1a;
 }
 
 .tab-pane .tab-header-area .tab-header-background {
-    -fx-background-color: #2b2b2b;
+    -fx-background-color: #1a1a1a;
 }
 
 .tab {
-    -fx-background-color: #3c3c3c;
-    -fx-text-fill: #ffffff;
+    -fx-background-color: #252525;
+    -fx-text-fill: #e0e0e0;
 }
 
 .tab:selected {
-    -fx-background-color: #0078d4;
+    -fx-background-color: #00d4aa;
+    -fx-text-fill: #0d0d0d;
 }
 
 /* Buttons */
 .button {
-    -fx-background-color: #404040;
-    -fx-text-fill: #ffffff;
-    -fx-border-color: #555555;
+    -fx-background-color: linear-gradient(to bottom, #2a2a2a, #1e1e1e);
+    -fx-text-fill: #e0e0e0;
+    -fx-border-color: #333333;
     -fx-border-width: 1px;
-    -fx-background-radius: 3px;
-    -fx-border-radius: 3px;
-    -fx-padding: 8px 16px;
-    -fx-font-size: 13px;
+    -fx-background-radius: 6px;
+    -fx-border-radius: 6px;
+    -fx-padding: 10px 20px;
+    -fx-font-size: 14px;
+    -fx-font-weight: 500;
+    -fx-cursor: hand;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.3), 4, 0, 0, 2);
 }
 
 .button:hover {
-    -fx-background-color: #4a4a4a;
-    -fx-border-color: #666666;
+    -fx-background-color: linear-gradient(to bottom, #333333, #252525);
+    -fx-border-color: #00d4aa;
+    -fx-effect: dropshadow(gaussian, rgba(0, 212, 170, 0.3), 8, 0, 0, 3);
 }
 
 .button:pressed {
-    -fx-background-color: #333333;
+    -fx-background-color: linear-gradient(to bottom, #1a1a1a, #151515);
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.5), 2, 0, 0, 1);
 }
 
 .button:focused {
-    -fx-border-color: #0078d4;
+    -fx-border-color: #00d4aa;
     -fx-border-width: 2px;
+    -fx-effect: dropshadow(gaussian, rgba(0, 212, 170, 0.5), 12, 0, 0, 0);
 }
 
 /* Primary buttons */
 .primary-button {
-    -fx-background-color: #0078d4;
-    -fx-text-fill: white;
+    -fx-background-color: linear-gradient(to bottom, #00d4aa, #00b894);
+    -fx-text-fill: #0d0d0d;
+    -fx-font-weight: bold;
+    -fx-font-size: 15px;
+    -fx-padding: 12px 30px;
 }
 
 .primary-button:hover {
-    -fx-background-color: #106ebe;
+    -fx-background-color: linear-gradient(to bottom, #00e5b8, #00c49f);
+    -fx-effect: dropshadow(gaussian, rgba(0, 212, 170, 0.5), 12, 0, 0, 4);
 }
 
 .primary-button:pressed {
-    -fx-background-color: #005a9e;
+    -fx-background-color: linear-gradient(to bottom, #00a380, #008e6d);
 }
 
 /* Secondary buttons */
 .secondary-button {
-    -fx-background-color: #6c757d;
-    -fx-text-fill: white;
+    -fx-background-color: transparent;
+    -fx-text-fill: #00d4aa;
+    -fx-border-color: #00d4aa;
+    -fx-border-width: 2px;
 }
 
 .secondary-button:hover {
-    -fx-background-color: #5a6268;
+    -fx-background-color: rgba(0, 212, 170, 0.1);
+    -fx-effect: dropshadow(gaussian, rgba(0, 212, 170, 0.3), 8, 0, 0, 2);
 }
 
 /* Danger buttons */
 .danger-button {
-    -fx-background-color: #dc3545;
+    -fx-background-color: linear-gradient(to bottom, #ff4757, #ee3f51);
     -fx-text-fill: white;
 }
 
 .danger-button:hover {
-    -fx-background-color: #c82333;
+    -fx-background-color: linear-gradient(to bottom, #ff5e6e, #ff3445);
 }
 
 /* Text fields and areas */
 .text-field,
 .password-field {
-    -fx-background-color: #3c3c3c;
-    -fx-text-fill: #ffffff;
-    -fx-border-color: #555555;
-    -fx-border-width: 1px;
-    -fx-background-radius: 3px;
-    -fx-border-radius: 3px;
-    -fx-padding: 8px;
+    -fx-background-color: #1a1a1a;
+    -fx-text-fill: #e0e0e0;
+    -fx-border-color: #333333;
+    -fx-border-width: 2px;
+    -fx-background-radius: 6px;
+    -fx-border-radius: 6px;
+    -fx-padding: 12px;
+    -fx-font-size: 14px;
+    -fx-prompt-text-fill: #666666;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.2), 3, 0, 0, 1);
 }
 
 .text-field:focused,
 .password-field:focused {
-    -fx-border-color: #0078d4;
+    -fx-border-color: #00d4aa;
     -fx-border-width: 2px;
+    -fx-background-color: #1e1e1e;
+    -fx-effect: dropshadow(gaussian, rgba(0, 212, 170, 0.4), 8, 0, 0, 0);
 }
 
 .text-area {
@@ -156,45 +191,81 @@
 
 /* Progress bars */
 .progress-bar {
-    -fx-background-color: #555555;
-    -fx-border-color: #666666;
+    -fx-background-color: #1a1a1a;
+    -fx-border-color: #333333;
     -fx-border-width: 1px;
-    -fx-background-radius: 3px;
-    -fx-border-radius: 3px;
+    -fx-background-radius: 10px;
+    -fx-border-radius: 10px;
+    -fx-pref-height: 8px;
 }
 
 .progress-bar .bar {
-    -fx-background-color: #0078d4;
-    -fx-background-radius: 2px;
+    -fx-background-color: linear-gradient(to right, #00d4aa, #00ffd5);
+    -fx-background-radius: 10px;
+    -fx-effect: dropshadow(gaussian, rgba(0, 212, 170, 0.4), 6, 0, 0, 0);
+}
+
+.progress-bar .track {
+    -fx-background-color: #1a1a1a;
+    -fx-background-radius: 10px;
 }
 
 /* Labels */
 .label {
-    -fx-text-fill: #ffffff;
+    -fx-text-fill: #e0e0e0;
+    -fx-font-size: 13px;
 }
 
 .title-label {
-    -fx-font-size: 24px;
-    -fx-font-weight: bold;
+    -fx-font-size: 32px;
+    -fx-font-weight: 700;
     -fx-text-fill: #ffffff;
+    -fx-effect: dropshadow(gaussian, rgba(0, 212, 170, 0.3), 8, 0, 0, 2);
+    -fx-padding: 0 0 10 0;
 }
 
-.section-label {
-    -fx-font-size: 16px;
-    -fx-font-weight: bold;
-    -fx-text-fill: #ffffff;
+.instruction-label {
+    -fx-font-size: 15px;
+    -fx-text-fill: #999999;
+    -fx-wrap-text: true;
+    -fx-text-alignment: center;
+    -fx-padding: 0 0 20 0;
+}
+
+.password-title {
+    -fx-font-size: 18px;
+    -fx-font-weight: 600;
+    -fx-text-fill: #00d4aa;
+    -fx-padding: 0 0 5 0;
+}
+
+.description-label {
+    -fx-font-size: 12px;
+    -fx-text-fill: #666666;
+    -fx-padding: 2 0 0 0;
+}
+
+.strength-label {
+    -fx-font-size: 11px;
+    -fx-font-weight: 500;
+    -fx-padding: 2 0 0 0;
+}
+
+.status-label {
+    -fx-font-size: 13px;
+    -fx-padding: 10 0;
 }
 
 .error-label {
-    -fx-text-fill: #ff6b6b;
+    -fx-text-fill: #ff4757;
 }
 
 .success-label {
-    -fx-text-fill: #51cf66;
+    -fx-text-fill: #00d4aa;
 }
 
 .warning-label {
-    -fx-text-fill: #ffd43b;
+    -fx-text-fill: #ffa502;
 }
 
 /* Toolbar */
@@ -308,6 +379,30 @@
 
 .dialog-pane .content {
     -fx-background-color: #2b2b2b;
+}
+
+/* Password section styling */
+.password-section {
+    -fx-background-color: #1a1a1a;
+    -fx-padding: 20;
+    -fx-background-radius: 12px;
+    -fx-border-radius: 12px;
+    -fx-border-color: #252525;
+    -fx-border-width: 1px;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.3), 8, 0, 0, 3);
+    -fx-max-width: 500px;
+    -fx-alignment: center-left;
+}
+
+.password-section:hover {
+    -fx-border-color: #333333;
+    -fx-effect: dropshadow(gaussian, rgba(0, 212, 170, 0.1), 12, 0, 0, 4);
+}
+
+/* Center alignment for main container */
+ScrollPane VBox {
+    -fx-alignment: center;
+    -fx-max-width: 600px;
 }
 
 /* Animations */
