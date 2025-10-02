@@ -162,16 +162,18 @@ public class KDF {
             // Create Argon2 instance (Argon2id variant)
             argon2 = Argon2Factory.create(Argon2Factory.Argon2Types.ARGON2id);
             
-            // Derive key using hash method (returns raw bytes)
-            String passwordStr = new String(password);
-            byte[] hash = argon2.hash(
+            // Derive key using hash method (returns encoded hash string)
+            String hashString = argon2.hash(
                 params.getIterations(),
                 params.getMemory(),
                 params.getParallelism(),
-                passwordStr,
-                StandardCharsets.UTF_8,
-                KEY_LENGTH
-            ).getBytes(StandardCharsets.UTF_8);
+                password
+            );
+            
+            // Extract raw hash bytes from encoded string
+            // Argon2 encoded format: $argon2id$v=19$m=memory,t=iterations,p=parallelism$salt$hash
+            // We need to decode the hash part
+            byte[] hash = extractHashFromEncoded(hashString);
             
             // Take first KEY_LENGTH bytes
             byte[] result = new byte[KEY_LENGTH];
@@ -264,8 +266,7 @@ public class KDF {
             
             // Benchmark
             long startTime = System.currentTimeMillis();
-            String passwordStr = new String(testPassword);
-            argon2.hash(iterations, memory, parallelism, passwordStr, StandardCharsets.UTF_8, KEY_LENGTH);
+            argon2.hash(iterations, memory, parallelism, testPassword);
             long duration = System.currentTimeMillis() - startTime;
             
             // Adjust parameters if too fast (target ~500ms)
@@ -275,7 +276,7 @@ public class KDF {
                 
                 // Re-benchmark
                 startTime = System.currentTimeMillis();
-                argon2.hash(iterations, memory, parallelism, passwordStr, StandardCharsets.UTF_8, KEY_LENGTH);
+                argon2.hash(iterations, memory, parallelism, testPassword);
                 duration = System.currentTimeMillis() - startTime;
             }
             
@@ -352,5 +353,24 @@ public class KDF {
         Arrays.fill(byteBuffer.array(), (byte) 0);
         
         return bytes;
+    }
+    
+    /**
+     * Extract raw hash bytes from Argon2 encoded string
+     * Argon2 format: $argon2id$v=19$m=memory,t=iterations,p=parallelism$salt$hash
+     */
+    private static byte[] extractHashFromEncoded(String encoded) {
+        // Split by $ delimiter
+        String[] parts = encoded.split("\\$");
+        
+        // The hash is the last part (Base64 encoded)
+        if (parts.length < 6) {
+            throw new IllegalArgumentException("Invalid Argon2 encoded string");
+        }
+        
+        String hashBase64 = parts[parts.length - 1];
+        
+        // Decode from Base64 (Argon2 uses Base64 without padding)
+        return java.util.Base64.getDecoder().decode(hashBase64);
     }
 }
