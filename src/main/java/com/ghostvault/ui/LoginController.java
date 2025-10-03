@@ -85,28 +85,30 @@ public class LoginController implements Initializable {
         
         // Authenticate asynchronously to avoid blocking UI
         if (applicationIntegrator != null) {
-            // Run authentication in background thread
+            // Delegate to ApplicationIntegrator - it will handle all outcomes
+            applicationIntegrator.handleAuthentication(passwordCopy);
+            
+            // Note: The ApplicationIntegrator will:
+            // - Show success and navigate to vault on valid password
+            // - Show error notification on invalid password
+            // - Handle panic/decoy passwords appropriately
+            
+            // Reset form after a delay to allow retry
+            // (ApplicationIntegrator will handle navigation on success)
             new Thread(() -> {
                 try {
-                    // Add small delay for better UX
-                    Thread.sleep(500);
-                    
-                    // Authenticate
-                    applicationIntegrator.handleAuthentication(passwordCopy);
-                    
-                    // If we reach here, authentication was successful
+                    Thread.sleep(2000); // Wait for authentication to complete
                     Platform.runLater(() -> {
-                        statusLabel.setText("✓ Access granted!");
-                        statusLabel.setStyle("-fx-text-fill: #4CAF50; -fx-font-weight: bold;");
+                        // Only reset if we're still on login screen
+                        // (if successful, we'll have navigated away)
+                        if (loginButton.isDisabled()) {
+                            resetLoginForm();
+                        }
                     });
-                    
-                } catch (Exception e) {
-                    Platform.runLater(() -> {
-                        showError("Authentication failed: " + e.getMessage());
-                        resetLoginForm();
-                    });
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
                 }
-            }, "GhostVault-Login").start();
+            }, "GhostVault-LoginReset").start();
         } else {
             showError("Application not properly initialized.");
             resetLoginForm();
