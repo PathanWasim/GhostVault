@@ -157,6 +157,11 @@ public class PasswordManager {
         
         System.out.println("🔧 Initializing passwords...");
         System.out.println("📝 Master password length: " + masterPassword.length);
+        System.out.print("📝 Master password (first 3 chars): ");
+        for (int i = 0; i < Math.min(3, masterPassword.length); i++) {
+            System.out.print(masterPassword[i]);
+        }
+        System.out.println("...");
         System.out.println("📝 Panic password length: " + panicPassword.length);
         System.out.println("📝 Decoy password length: " + decoyPassword.length);
         
@@ -226,6 +231,15 @@ public class PasswordManager {
                 
                 System.out.println("🎉 Password initialization complete!");
                 
+                // Verify by testing password detection
+                System.out.println("🧪 Testing password detection...");
+                PasswordType testResult = detectPassword(masterPassword);
+                System.out.println("🧪 Test result: " + testResult);
+                if (testResult != PasswordType.MASTER) {
+                    throw new Exception("Password verification failed! Expected MASTER, got " + testResult);
+                }
+                System.out.println("✅ Password verification successful!");
+                
             } finally {
                 // Zeroize KEKs
                 cryptoManager.zeroize(masterKEK);
@@ -263,8 +277,32 @@ public class PasswordManager {
         try {
             // Derive KEK from password
             System.out.println("🔑 Deriving KEK from password...");
+            System.out.println("🔑 Using KDF params: " + kdfParams);
+            System.out.println("🔑 Password length: " + password.length);
+            System.out.print("🔑 Password (first 3 chars): ");
+            for (int i = 0; i < Math.min(3, password.length); i++) {
+                System.out.print(password[i]);
+            }
+            System.out.println("...");
+            
             kek = KDF.deriveKey(password, kdfParams);
+            System.out.println("🔑 KEK derived, length: " + kek.length);
+            
             verifier = createVerifier(kek);
+            System.out.println("🔑 Verifier created, length: " + verifier.length);
+            
+            // Print first few bytes for debugging (safe since it's a hash)
+            System.out.print("🔑 Generated verifier (first 8 bytes): ");
+            for (int i = 0; i < Math.min(8, verifier.length); i++) {
+                System.out.printf("%02x ", verifier[i]);
+            }
+            System.out.println();
+            
+            System.out.print("🔑 Stored master verifier (first 8 bytes): ");
+            for (int i = 0; i < Math.min(8, masterVerifier.length); i++) {
+                System.out.printf("%02x ", masterVerifier[i]);
+            }
+            System.out.println();
             
             // CRITICAL: Always perform ALL comparisons (constant-time)
             boolean isMaster = MessageDigest.isEqual(verifier, masterVerifier);
@@ -496,6 +534,14 @@ public class PasswordManager {
      * Serialize KDF parameters
      */
     private byte[] serializeKdfParams(KDF.KdfParams params) throws IOException {
+        System.out.println("💾 Serializing KDF params...");
+        System.out.print("💾 Salt (first 8 bytes): ");
+        byte[] salt = params.getSalt();
+        for (int i = 0; i < Math.min(8, salt.length); i++) {
+            System.out.printf("%02x ", salt[i]);
+        }
+        System.out.println();
+        
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         try (DataOutputStream dos = new DataOutputStream(baos)) {
             dos.writeUTF(params.getAlgorithm().name());
@@ -510,6 +556,8 @@ public class PasswordManager {
                 dos.writeInt(params.getPbkdf2Iterations());
             }
         }
+        
+        System.out.println("💾 KDF params serialized, size: " + baos.toByteArray().length + " bytes");
         return baos.toByteArray();
     }
     
@@ -517,6 +565,8 @@ public class PasswordManager {
      * Deserialize KDF parameters
      */
     private KDF.KdfParams deserializeKdfParams(byte[] data) throws IOException {
+        System.out.println("📂 Deserializing KDF params from " + data.length + " bytes...");
+        
         ByteArrayInputStream bais = new ByteArrayInputStream(data);
         try (DataInputStream dis = new DataInputStream(bais)) {
             String algorithmName = dis.readUTF();
@@ -526,14 +576,24 @@ public class PasswordManager {
             byte[] salt = new byte[saltLength];
             dis.readFully(salt);
             
+            System.out.print("📂 Loaded salt (first 8 bytes): ");
+            for (int i = 0; i < Math.min(8, salt.length); i++) {
+                System.out.printf("%02x ", salt[i]);
+            }
+            System.out.println();
+            
             if (algorithm == KDF.Algorithm.ARGON2ID) {
                 int memory = dis.readInt();
                 int iterations = dis.readInt();
                 int parallelism = dis.readInt();
-                return new KDF.KdfParams(algorithm, salt, memory, iterations, parallelism);
+                KDF.KdfParams params = new KDF.KdfParams(algorithm, salt, memory, iterations, parallelism);
+                System.out.println("📂 Deserialized: " + params);
+                return params;
             } else {
                 int iterations = dis.readInt();
-                return new KDF.KdfParams(algorithm, salt, iterations);
+                KDF.KdfParams params = new KDF.KdfParams(algorithm, salt, iterations);
+                System.out.println("📂 Deserialized: " + params);
+                return params;
             }
         }
     }
