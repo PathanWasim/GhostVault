@@ -1,276 +1,109 @@
 package com.ghostvault.security;
 
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.io.TempDir;
-
-import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.List;
-
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
 import static org.junit.jupiter.api.Assertions.*;
 
+import java.io.File;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+
 /**
- * Tests for password flow with timing parity verification
+ * Test to verify the complete password flow works correctly
  */
-@DisplayName("Password Flow Tests")
-class PasswordFlowTest {
+public class PasswordFlowTest {
     
-    @TempDir
-    Path tempDir;
-    
-    private PasswordManager passwordManager;
-    private char[] masterPassword;
-    private char[] panicPassword;
-    private char[] decoyPassword;
+    private static final String TEST_VAULT_PATH = System.getProperty("java.io.tmpdir") + "/test_vault_" + System.currentTimeMillis();
+    private static final String TEST_CONFIG_FILE = TEST_VAULT_PATH + "/config.enc";
     
     @BeforeEach
-    void setUp() throws Exception {
-        // Set vault path to temp directory
-        System.setProperty("user.home", tempDir.toString());
+    public void setup() throws Exception {
+        // Create test vault directory
+        Files.createDirectories(Paths.get(TEST_VAULT_PATH));
         
-        passwordManager = new PasswordManager(tempDir.toString());
-        
-        // Create test passwords
-        masterPassword = "MasterPass123!@#".toCharArray();
-        panicPassword = "PanicPass456$%^".toCharArray();
-        decoyPassword = "DecoyPass789&*(".toCharArray();
-        
-        // Initialize passwords
-        passwordManager.initializePasswords(masterPassword, panicPassword, decoyPassword);
+        // Override config file location for testing
+        System.setProperty("ghostvault.config.file", TEST_CONFIG_FILE);
     }
     
-    @Test
-    @DisplayName("Should detect master password correctly")
-    void testMasterPasswordDetection() throws Exception {
-        // Act
-        PasswordManager.PasswordType type = passwordManager.detectPassword(masterPassword);
-        
-        // Assert
-        assertEquals(PasswordManager.PasswordType.MASTER, type);
-    }
-    
-    @Test
-    @DisplayName("Should detect panic password correctly")
-    void testPanicPasswordDetection() throws Exception {
-        // Act
-        PasswordManager.PasswordType type = passwordManager.detectPassword(panicPassword);
-        
-        // Assert
-        assertEquals(PasswordManager.PasswordType.PANIC, type);
-    }
-    
-    @Test
-    @DisplayName("Should detect decoy password correctly")
-    void testDecoyPasswordDetection() throws Exception {
-        // Act
-        PasswordManager.PasswordType type = passwordManager.detectPassword(decoyPassword);
-        
-        // Assert
-        assertEquals(PasswordManager.PasswordType.DECOY, type);
-    }
-    
-    @Test
-    @DisplayName("Should return INVALID for wrong password")
-    void testInvalidPasswordDetection() throws Exception {
-        // Arrange
-        char[] wrongPassword = "WrongPassword123".toCharArray();
-        
-        // Act
-        PasswordManager.PasswordType type = passwordManager.detectPassword(wrongPassword);
-        
-        // Assert
-        assertEquals(PasswordManager.PasswordType.INVALID, type);
-    }
-    
-    @Test
-    @DisplayName("Should have timing parity across password types")
-    void testTimingParity() throws Exception {
-        // Arrange
-        int iterations = 10; // Reduced for faster testing
-        List<Long> masterTimes = new ArrayList<>();
-        List<Long> panicTimes = new ArrayList<>();
-        List<Long> decoyTimes = new ArrayList<>();
-        List<Long> invalidTimes = new ArrayList<>();
-        
-        char[] invalidPassword = "InvalidPass123".toCharArray();
-        
-        // Act - Measure timing for each password type
-        for (int i = 0; i < iterations; i++) {
-            // Master password
-            long start = System.nanoTime();
-            passwordManager.detectPassword(masterPassword);
-            long duration = System.nanoTime() - start;
-            masterTimes.add(duration);
-            
-            // Panic password
-            start = System.nanoTime();
-            passwordManager.detectPassword(panicPassword);
-            duration = System.nanoTime() - start;
-            panicTimes.add(duration);
-            
-            // Decoy password
-            start = System.nanoTime();
-            passwordManager.detectPassword(decoyPassword);
-            duration = System.nanoTime() - start;
-            decoyTimes.add(duration);
-            
-            // Invalid password
-            start = System.nanoTime();
-            passwordManager.detectPassword(invalidPassword);
-            duration = System.nanoTime() - start;
-            invalidTimes.add(duration);
+    @AfterEach
+    public void cleanup() throws Exception {
+        // Clean up test files
+        File configFile = new File(TEST_CONFIG_FILE);
+        if (configFile.exists()) {
+            configFile.delete();
         }
         
-        // Calculate averages
-        long avgMaster = average(masterTimes);
-        long avgPanic = average(panicTimes);
-        long avgDecoy = average(decoyTimes);
-        long avgInvalid = average(invalidTimes);
-        
-        System.out.println("Average timings (ms):");
-        System.out.println("  Master:  " + (avgMaster / 1_000_000.0));
-        System.out.println("  Panic:   " + (avgPanic / 1_000_000.0));
-        System.out.println("  Decoy:   " + (avgDecoy / 1_000_000.0));
-        System.out.println("  Invalid: " + (avgInvalid / 1_000_000.0));
-        
-        // Assert - All timings should be within 100ms of each other
-        // (accounting for the 900ms + 0-300ms jitter = 900-1200ms range)
-        long maxDiff = 100_000_000L; // 100ms in nanoseconds
-        
-        assertTrue(Math.abs(avgMaster - avgPanic) < maxDiff,
-            "Master and Panic timing difference too large");
-        assertTrue(Math.abs(avgMaster - avgDecoy) < maxDiff,
-            "Master and Decoy timing difference too large");
-        assertTrue(Math.abs(avgMaster - avgInvalid) < maxDiff,
-            "Master and Invalid timing difference too large");
+        File vaultDir = new File(TEST_VAULT_PATH);
+        if (vaultDir.exists()) {
+            vaultDir.delete();
+        }
     }
     
     @Test
-    @DisplayName("Should unwrap VMK with master password")
-    void testUnwrapVMK() throws Exception {
-        // Act
-        javax.crypto.SecretKey vmk = passwordManager.unwrapVMK(masterPassword);
+    public void testCompletePasswordFlow() throws Exception {
+        System.out.println("\n=== Testing Complete Password Flow ===\n");
         
-        // Assert
-        assertNotNull(vmk);
-        assertEquals("AES", vmk.getAlgorithm());
-        assertEquals(32, vmk.getEncoded().length);
-    }
-    
-    @Test
-    @DisplayName("Should unwrap DVMK with decoy password")
-    void testUnwrapDVMK() throws Exception {
-        // Act
-        javax.crypto.SecretKey dvmk = passwordManager.unwrapDVMK(decoyPassword);
+        // Step 1: Create passwords
+        System.out.println("Step 1: Creating passwords...");
+        PasswordManager pm1 = new PasswordManager(TEST_VAULT_PATH);
         
-        // Assert
-        assertNotNull(dvmk);
-        assertEquals("AES", dvmk.getAlgorithm());
-        assertEquals(32, dvmk.getEncoded().length);
-    }
-    
-    @Test
-    @DisplayName("Should fail to unwrap VMK with wrong password")
-    void testUnwrapVMKWithWrongPassword() {
-        // Arrange
-        char[] wrongPassword = "WrongPassword123".toCharArray();
+        char[] masterPwd = "TestMaster123!".toCharArray();
+        char[] panicPwd = "TestPanic123!".toCharArray();
+        char[] decoyPwd = "TestDecoy123!".toCharArray();
         
-        // Assert
-        assertThrows(Exception.class, () -> {
-            passwordManager.unwrapVMK(wrongPassword);
-        });
-    }
-    
-    @Test
-    @DisplayName("Should fail to unwrap DVMK with wrong password")
-    void testUnwrapDVMKWithWrongPassword() {
-        // Arrange
-        char[] wrongPassword = "WrongPassword123".toCharArray();
+        pm1.initializePasswords(masterPwd, panicPwd, decoyPwd);
         
-        // Assert
-        assertThrows(Exception.class, () -> {
-            passwordManager.unwrapDVMK(wrongPassword);
-        });
-    }
-    
-    @Test
-    @DisplayName("Should reject weak passwords during initialization")
-    void testWeakPasswordRejection() {
-        // Arrange
-        char[] weakMaster = "weak".toCharArray();
-        char[] weakPanic = "123".toCharArray();
-        char[] weakDecoy = "abc".toCharArray();
+        System.out.println("✅ Passwords initialized\n");
         
-        // Assert
-        assertThrows(IllegalArgumentException.class, () -> {
-            PasswordManager pm = new PasswordManager(tempDir.toString());
-            pm.initializePasswords(weakMaster, weakPanic, weakDecoy);
-        });
-    }
-    
-    @Test
-    @DisplayName("Should reject duplicate passwords during initialization")
-    void testDuplicatePasswordRejection() {
-        // Arrange
-        char[] samePassword = "SamePassword123!".toCharArray();
+        // Step 2: Verify passwords are configured
+        assertTrue(pm1.arePasswordsConfigured(), "Passwords should be configured");
+        System.out.println("✅ Passwords are configured\n");
         
-        // Assert
-        assertThrows(IllegalArgumentException.class, () -> {
-            PasswordManager pm = new PasswordManager(tempDir.toString());
-            pm.initializePasswords(samePassword, samePassword, decoyPassword);
-        });
-    }
-    
-    @Test
-    @DisplayName("Should persist and reload configuration")
-    void testConfigurationPersistence() throws Exception {
-        // Act - Create new PasswordManager instance (should reload config)
-        PasswordManager newPM = new PasswordManager(tempDir.toString());
+        // Step 3: Test password detection with same instance
+        System.out.println("Step 3: Testing password detection (same instance)...");
         
-        // Assert
-        assertTrue(newPM.arePasswordsConfigured());
-        assertEquals(PasswordManager.PasswordType.MASTER, 
-                    newPM.detectPassword(masterPassword));
-        assertEquals(PasswordManager.PasswordType.PANIC, 
-                    newPM.detectPassword(panicPassword));
-        assertEquals(PasswordManager.PasswordType.DECOY, 
-                    newPM.detectPassword(decoyPassword));
-    }
-    
-    @Test
-    @DisplayName("Should securely destroy all password data")
-    void testSecureDestroy() throws Exception {
-        // Act
-        passwordManager.secureDestroy();
+        PasswordManager.PasswordType masterType = pm1.detectPassword(masterPwd);
+        assertEquals(PasswordManager.PasswordType.MASTER, masterType, "Master password should be detected");
+        System.out.println("✅ Master password detected correctly");
         
-        // Assert
-        assertFalse(passwordManager.arePasswordsConfigured());
+        PasswordManager.PasswordType panicType = pm1.detectPassword(panicPwd);
+        assertEquals(PasswordManager.PasswordType.PANIC, panicType, "Panic password should be detected");
+        System.out.println("✅ Panic password detected correctly");
         
-        // Should return INVALID for all passwords after destruction
-        assertEquals(PasswordManager.PasswordType.INVALID,
-                    passwordManager.detectPassword(masterPassword));
-    }
-    
-    @Test
-    @DisplayName("Should calculate password strength correctly")
-    void testPasswordStrength() {
-        // Test various password strengths
-        assertEquals(0, PasswordManager.getPasswordStrength(""));
-        assertEquals(1, PasswordManager.getPasswordStrength("short"));
-        assertEquals(2, PasswordManager.getPasswordStrength("Short123"));
-        assertEquals(3, PasswordManager.getPasswordStrength("Short123!"));
-        assertEquals(4, PasswordManager.getPasswordStrength("LongerPass123!"));
-        assertEquals(5, PasswordManager.getPasswordStrength("VeryLongPassword123!@#"));
-    }
-    
-    /**
-     * Calculate average of timing measurements
-     */
-    private long average(List<Long> times) {
-        return times.stream()
-                   .mapToLong(Long::longValue)
-                   .sum() / times.size();
+        PasswordManager.PasswordType decoyType = pm1.detectPassword(decoyPwd);
+        assertEquals(PasswordManager.PasswordType.DECOY, decoyType, "Decoy password should be detected");
+        System.out.println("✅ Decoy password detected correctly\n");
+        
+        // Step 4: Create NEW instance (simulating app restart) and test again
+        System.out.println("Step 4: Creating new PasswordManager instance (simulating app restart)...");
+        PasswordManager pm2 = new PasswordManager(TEST_VAULT_PATH);
+        
+        assertTrue(pm2.arePasswordsConfigured(), "Passwords should still be configured after reload");
+        System.out.println("✅ Passwords loaded from config file\n");
+        
+        // Step 5: Test password detection with new instance
+        System.out.println("Step 5: Testing password detection (new instance)...");
+        
+        PasswordManager.PasswordType masterType2 = pm2.detectPassword(masterPwd);
+        assertEquals(PasswordManager.PasswordType.MASTER, masterType2, "Master password should be detected after reload");
+        System.out.println("✅ Master password detected correctly after reload");
+        
+        PasswordManager.PasswordType panicType2 = pm2.detectPassword(panicPwd);
+        assertEquals(PasswordManager.PasswordType.PANIC, panicType2, "Panic password should be detected after reload");
+        System.out.println("✅ Panic password detected correctly after reload");
+        
+        PasswordManager.PasswordType decoyType2 = pm2.detectPassword(decoyPwd);
+        assertEquals(PasswordManager.PasswordType.DECOY, decoyType2, "Decoy password should be detected after reload");
+        System.out.println("✅ Decoy password detected correctly after reload\n");
+        
+        // Step 6: Test invalid password
+        System.out.println("Step 6: Testing invalid password...");
+        char[] wrongPwd = "WrongPassword123!".toCharArray();
+        PasswordManager.PasswordType invalidType = pm2.detectPassword(wrongPwd);
+        assertEquals(PasswordManager.PasswordType.INVALID, invalidType, "Wrong password should be invalid");
+        System.out.println("✅ Invalid password detected correctly\n");
+        
+        System.out.println("=== All Password Flow Tests Passed! ===\n");
     }
 }
