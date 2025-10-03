@@ -3,9 +3,9 @@ package com.ghostvault.integration;
 import com.ghostvault.audit.AuditManager;
 import com.ghostvault.backup.VaultBackupManager;
 import com.ghostvault.config.AppConfig;
+import com.ghostvault.core.DecoyManager;
 import com.ghostvault.core.FileManager;
 import com.ghostvault.core.MetadataManager;
-import com.ghostvault.decoy.DecoyManager;
 import com.ghostvault.error.ErrorHandler;
 import com.ghostvault.security.*;
 import com.ghostvault.ui.*;
@@ -127,7 +127,7 @@ public class ApplicationIntegrator {
         sessionManager = new SessionManager();
         
         // Special modes
-        decoyManager = new DecoyManager(cryptoManager, fileManager, metadataManager);
+        decoyManager = new DecoyManager();
         panicModeExecutor = new PanicModeExecutor();
         
         // Backup management
@@ -335,8 +335,8 @@ public class ApplicationIntegrator {
      */
     private void handleDecoyPasswordLogin(String password) {
         try {
-            // Initialize decoy vault
-            decoyManager.initializeDecoyVault(password);
+            // Initialize decoy vault with minimum files
+            decoyManager.ensureMinimumDecoyFiles(8);
             
             // Create decoy security context
             securityContext = new SecurityContext(null, PasswordManager.PasswordType.DECOY);

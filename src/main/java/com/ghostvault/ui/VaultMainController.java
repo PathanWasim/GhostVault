@@ -1,9 +1,9 @@
 package com.ghostvault.ui;
 
 import com.ghostvault.backup.VaultBackupManager;
+import com.ghostvault.core.DecoyManager;
 import com.ghostvault.core.FileManager;
 import com.ghostvault.core.MetadataManager;
-import com.ghostvault.decoy.DecoyManager;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.scene.control.*;
