@@ -27,6 +27,7 @@ public class UIManager {
     private AccessibilityManager accessibilityManager;
     private boolean isDarkTheme = true; // Default to dark theme
     private Map<String, Scene> sceneCache = new HashMap<>();
+    private com.ghostvault.integration.ApplicationIntegrator applicationIntegrator;
     
     // Scene identifiers
     public static final String FIRST_RUN_SETUP_SCENE = "first_run_setup";
@@ -67,13 +68,17 @@ public class UIManager {
     }
     
     /**
+     * Set application integrator
+     */
+    public void setApplicationIntegrator(com.ghostvault.integration.ApplicationIntegrator integrator) {
+        this.applicationIntegrator = integrator;
+    }
+    
+    /**
      * Create first run setup scene
      */
-    public Scene createFirstRunSetupScene() throws IOException {
-        if (sceneCache.containsKey(FIRST_RUN_SETUP_SCENE)) {
-            return sceneCache.get(FIRST_RUN_SETUP_SCENE);
-        }
-        
+    public Scene createFirstRunSetupScene(com.ghostvault.security.PasswordManager passwordManager) throws IOException {
+        // Don't cache this scene as it should only be shown once
         FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/initial_setup.fxml"));
         Parent root = loader.load();
         
@@ -84,9 +89,9 @@ public class UIManager {
         InitialSetupController controller = loader.getController();
         if (controller != null) {
             controller.setUIManager(this);
+            controller.setPasswordManager(passwordManager);
         }
         
-        sceneCache.put(FIRST_RUN_SETUP_SCENE, scene);
         return scene;
     }
     
@@ -94,10 +99,7 @@ public class UIManager {
      * Create login scene
      */
     public Scene createLoginScene() throws IOException {
-        if (sceneCache.containsKey(LOGIN_SCENE)) {
-            return sceneCache.get(LOGIN_SCENE);
-        }
-        
+        // Don't cache login scene to ensure fresh state
         FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/login.fxml"));
         Parent root = loader.load();
         
@@ -108,10 +110,24 @@ public class UIManager {
         LoginController controller = loader.getController();
         if (controller != null) {
             controller.setUIManager(this);
+            controller.setApplicationIntegrator(applicationIntegrator);
         }
         
-        sceneCache.put(LOGIN_SCENE, scene);
         return scene;
+    }
+    
+    /**
+     * Show login scene (navigate to login)
+     */
+    public void showLoginScene() {
+        try {
+            Scene loginScene = createLoginScene();
+            primaryStage.setScene(loginScene);
+            primaryStage.setTitle("GhostVault - Login");
+        } catch (Exception e) {
+            System.err.println("Error showing login scene: " + e.getMessage());
+            e.printStackTrace();
+        }
     }
     
     /**

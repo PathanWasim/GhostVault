@@ -1,130 +1,164 @@
-/* Setup Dialog Styles */
+/* Setup Dialog Styles - Enhanced Professional Design */
 
-.root {
-    -fx-background-color: #f8f9fa;
-    -fx-font-family: "Segoe UI", Arial, sans-serif;
+.root-pane {
+    -fx-background-color: linear-gradient(to bottom, #f5f7fa 0%, #e8ecf1 100%);
+    -fx-font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+}
+
+.header-section {
+    -fx-background-color: linear-gradient(to bottom, #ffffff 0%, #f8f9fa 100%);
+    -fx-border-color: transparent transparent #e1e8ed transparent;
+    -fx-border-width: 0 0 2 0;
+}
+
+.content-section {
+    -fx-background-color: transparent;
+}
+
+.footer-section {
+    -fx-background-color: linear-gradient(to top, #ffffff 0%, #f8f9fa 100%);
+    -fx-border-color: #e1e8ed transparent transparent transparent;
+    -fx-border-width: 2 0 0 0;
 }
 
 /* Title and subtitle */
 .title-label {
-    -fx-font-size: 28px;
+    -fx-font-size: 32px;
     -fx-font-weight: bold;
-    -fx-text-fill: #2c3e50;
-    -fx-padding: 0 0 10 0;
+    -fx-text-fill: linear-gradient(to right, #2c3e50, #3498db);
+    -fx-padding: 0;
 }
 
-.subtitle-label {
-    -fx-font-size: 14px;
-    -fx-text-fill: #7f8c8d;
-    -fx-padding: 0 0 20 0;
+.instruction-label {
+    -fx-font-size: 15px;
+    -fx-text-fill: #5a6c7d;
+    -fx-padding: 5 0 0 0;
 }
 
-.instructions-label {
-    -fx-font-size: 13px;
-    -fx-text-fill: #34495e;
-    -fx-background-color: #ecf0f1;
-    -fx-padding: 15;
-    -fx-background-radius: 8;
-    -fx-border-radius: 8;
-    -fx-border-color: #bdc3c7;
+/* Password sections */
+.password-section {
+    -fx-background-color: #ffffff;
+    -fx-padding: 18 20;
+    -fx-background-radius: 10;
+    -fx-border-radius: 10;
+    -fx-border-color: #d1d9e0;
     -fx-border-width: 1;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.08), 8, 0, 0, 2);
 }
 
-/* Password groups */
-.password-group {
-    -fx-background-color: white;
-    -fx-padding: 15;
-    -fx-background-radius: 8;
-    -fx-border-radius: 8;
-    -fx-border-color: #e1e8ed;
-    -fx-border-width: 1;
-    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.1), 4, 0, 0, 2);
+.password-section:hover {
+    -fx-border-color: #3498db;
+    -fx-effect: dropshadow(gaussian, rgba(52, 152, 219, 0.15), 10, 0, 0, 3);
 }
 
 .password-title {
-    -fx-font-size: 16px;
+    -fx-font-size: 17px;
     -fx-font-weight: bold;
     -fx-text-fill: #2c3e50;
 }
 
-.password-description {
-    -fx-font-size: 12px;
+.description-label {
+    -fx-font-size: 13px;
     -fx-text-fill: #7f8c8d;
-    -fx-padding: 0 0 8 0;
+    -fx-font-style: italic;
 }
 
 /* Password fields */
 .password-field {
-    -fx-font-size: 14px;
-    -fx-padding: 10;
-    -fx-background-radius: 6;
-    -fx-border-radius: 6;
-    -fx-border-color: #d1d9e0;
-    -fx-border-width: 1;
-    -fx-background-color: white;
+    -fx-font-size: 15px;
+    -fx-font-family: "Consolas", "Courier New", monospace;
+    -fx-padding: 12 15;
+    -fx-background-radius: 8;
+    -fx-border-radius: 8;
+    -fx-border-color: #cbd5e0;
+    -fx-border-width: 2;
+    -fx-background-color: #f7fafc;
 }
 
 .password-field:focused {
     -fx-border-color: #3498db;
-    -fx-border-width: 2;
-    -fx-effect: dropshadow(gaussian, rgba(52, 152, 219, 0.3), 4, 0, 0, 0);
+    -fx-background-color: #ffffff;
+    -fx-effect: dropshadow(gaussian, rgba(52, 152, 219, 0.25), 6, 0, 0, 0);
+}
+
+/* Strength bar */
+.strength-bar {
+    -fx-pref-height: 8;
+}
+
+.strength-bar .bar {
+    -fx-background-radius: 4;
+    -fx-border-radius: 4;
+}
+
+.strength-bar .track {
+    -fx-background-color: #e2e8f0;
+    -fx-background-radius: 4;
+    -fx-border-radius: 4;
 }
 
 /* Strength labels */
 .strength-label {
-    -fx-font-size: 12px;
+    -fx-font-size: 13px;
+    -fx-font-weight: 600;
+    -fx-padding: 0;
+}
+
+/* Primary button */
+.primary-button {
+    -fx-font-size: 17px;
     -fx-font-weight: bold;
-    -fx-padding: 5 0 0 0;
-}
-
-.strength-label.weak {
-    -fx-text-fill: #e74c3c;
-}
-
-.strength-label.fair {
-    -fx-text-fill: #f39c12;
-}
-
-.strength-label.good {
-    -fx-text-fill: #f1c40f;
-}
-
-.strength-label.strong {
-    -fx-text-fill: #27ae60;
-}
-
-.strength-label.very-strong {
-    -fx-text-fill: #2ecc71;
-}
-
-/* Setup button */
-.setup-button {
-    -fx-font-size: 16px;
-    -fx-font-weight: bold;
-    -fx-padding: 12 30;
-    -fx-background-color: #3498db;
+    -fx-padding: 14 40;
+    -fx-background-color: linear-gradient(to bottom, #3498db 0%, #2980b9 100%);
     -fx-text-fill: white;
-    -fx-background-radius: 6;
-    -fx-border-radius: 6;
+    -fx-background-radius: 8;
+    -fx-border-radius: 8;
     -fx-cursor: hand;
-    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.2), 4, 0, 0, 2);
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.25), 8, 0, 0, 3);
 }
 
-.setup-button:hover {
-    -fx-background-color: #2980b9;
-    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.3), 6, 0, 0, 3);
+.primary-button:hover {
+    -fx-background-color: linear-gradient(to bottom, #2980b9 0%, #21618c 100%);
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.35), 10, 0, 0, 4);
+    -fx-scale-y: 1.02;
+    -fx-scale-x: 1.02;
 }
 
-.setup-button:pressed {
-    -fx-background-color: #21618c;
-    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.4), 2, 0, 0, 1);
+.primary-button:pressed {
+    -fx-background-color: #1a4d6d;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.4), 4, 0, 0, 1);
+    -fx-translate-y: 1;
 }
 
-.setup-button:disabled {
+.primary-button:disabled {
     -fx-background-color: #bdc3c7;
-    -fx-text-fill: #7f8c8d;
+    -fx-text-fill: #95a5a6;
     -fx-cursor: default;
     -fx-effect: none;
+    -fx-opacity: 0.6;
+}
+
+/* Secondary button */
+.secondary-button {
+    -fx-font-size: 14px;
+    -fx-font-weight: 600;
+    -fx-padding: 10 20;
+    -fx-background-color: #ecf0f1;
+    -fx-text-fill: #2c3e50;
+    -fx-background-radius: 6;
+    -fx-border-radius: 6;
+    -fx-border-color: #bdc3c7;
+    -fx-border-width: 1;
+    -fx-cursor: hand;
+}
+
+.secondary-button:hover {
+    -fx-background-color: #d5dbdb;
+    -fx-border-color: #95a5a6;
+}
+
+.secondary-button:pressed {
+    -fx-background-color: #bdc3c7;
 }
 
 /* Progress bar */
@@ -148,18 +182,13 @@
 
 /* Status labels */
 .status-label {
-    -fx-font-size: 13px;
-    -fx-padding: 10 0;
+    -fx-font-size: 14px;
+    -fx-font-weight: 600;
+    -fx-padding: 8 15;
     -fx-text-alignment: center;
     -fx-wrap-text: true;
-}
-
-.status-label.success {
-    -fx-text-fill: #27ae60;
-}
-
-.status-label.error {
-    -fx-text-fill: #e74c3c;
+    -fx-background-radius: 6;
+    -fx-border-radius: 6;
 }
 
 /* Separator */

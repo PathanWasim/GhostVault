@@ -37,6 +37,7 @@ public class InitialSetupController implements Initializable {
     
     private UIManager uiManager;
     private PasswordStrengthMeter strengthMeter;
+    private PasswordManager passwordManager;
     
     @Override
     public void initialize(URL location, ResourceBundle resources) {
@@ -62,6 +63,13 @@ public class InitialSetupController implements Initializable {
     }
     
     /**
+     * Set the password manager reference
+     */
+    public void setPasswordManager(PasswordManager passwordManager) {
+        this.passwordManager = passwordManager;
+    }
+    
+    /**
      * Handle create vault button click
      */
     @FXML
@@ -71,24 +79,55 @@ public class InitialSetupController implements Initializable {
         String decoyPassword = decoyPasswordField.getText();
         
         if (validatePasswords(masterPassword, panicPassword, decoyPassword)) {
-            // Clear status
-            statusLabel.setText("");
-            
-            // Show success animation
-            if (uiManager != null) {
-                uiManager.showSuccessAnimation(createVaultButton);
+            try {
+                // Clear status
+                statusLabel.setText("Creating vault...");
+                statusLabel.setStyle("-fx-text-fill: #2196F3;");
+                
+                // Disable form during creation
+                createVaultButton.setDisable(true);
+                masterPasswordField.setDisable(true);
+                panicPasswordField.setDisable(true);
+                decoyPasswordField.setDisable(true);
+                
+                // Create passwords in password manager
+                if (passwordManager != null) {
+                    passwordManager.initializePasswords(
+                        masterPassword.toCharArray(),
+                        panicPassword.toCharArray(),
+                        decoyPassword.toCharArray()
+                    );
+                }
+                
+                // Show success message
+                statusLabel.setText("✓ Vault created successfully! Redirecting to login...");
+                statusLabel.setStyle("-fx-text-fill: #4CAF50;");
+                
+                // Navigate to login after short delay
+                Platform.runLater(() -> {
+                    try {
+                        Thread.sleep(1500);
+                        if (uiManager != null) {
+                            uiManager.showLoginScene();
+                        }
+                    } catch (Exception e) {
+                        statusLabel.setText("Error: " + e.getMessage());
+                        statusLabel.setStyle("-fx-text-fill: #f44336;");
+                        createVaultButton.setDisable(false);
+                        masterPasswordField.setDisable(false);
+                        panicPasswordField.setDisable(false);
+                        decoyPasswordField.setDisable(false);
+                    }
+                });
+                
+            } catch (Exception e) {
+                statusLabel.setText("Error creating vault: " + e.getMessage());
+                statusLabel.setStyle("-fx-text-fill: #f44336;");
+                createVaultButton.setDisable(false);
+                masterPasswordField.setDisable(false);
+                panicPasswordField.setDisable(false);
+                decoyPasswordField.setDisable(false);
             }
-            
-            // TODO: Integrate with ApplicationIntegrator to create vault
-            // For now, show success message
-            statusLabel.setText("Vault created successfully!");
-            statusLabel.setStyle("-fx-text-fill: green;");
-            
-            // Disable form
-            masterPasswordField.setDisable(true);
-            panicPasswordField.setDisable(true);
-            decoyPasswordField.setDisable(true);
-            createVaultButton.setDisable(true);
         }
     }
     

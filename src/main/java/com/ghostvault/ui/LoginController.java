@@ -24,6 +24,7 @@ public class LoginController implements Initializable {
     @FXML private Button exitButton;
     
     private UIManager uiManager;
+    private com.ghostvault.integration.ApplicationIntegrator applicationIntegrator;
     
     @Override
     public void initialize(URL location, ResourceBundle resources) {
@@ -52,6 +53,13 @@ public class LoginController implements Initializable {
     }
     
     /**
+     * Set the application integrator reference
+     */
+    public void setApplicationIntegrator(com.ghostvault.integration.ApplicationIntegrator integrator) {
+        this.applicationIntegrator = integrator;
+    }
+    
+    /**
      * Handle login button click
      */
     @FXML
@@ -63,31 +71,55 @@ public class LoginController implements Initializable {
             return;
         }
         
-        // Clear password field for security
+        // Disable login button during authentication
+        loginButton.setDisable(true);
+        passwordField.setDisable(true);
+        
+        // Show professional authenticating status
+        statusLabel.setText("🔐 Authenticating...");
+        statusLabel.setStyle("-fx-text-fill: #2196F3; -fx-font-weight: bold;");
+        
+        // Clear password field for security immediately
+        String passwordCopy = password;
         passwordField.clear();
         
-        // Show loading animation
-        if (uiManager != null) {
-            uiManager.showLoadingAnimation(loginButton);
+        // Authenticate asynchronously to avoid blocking UI
+        if (applicationIntegrator != null) {
+            // Run authentication in background thread
+            new Thread(() -> {
+                try {
+                    // Add small delay for better UX
+                    Thread.sleep(500);
+                    
+                    // Authenticate
+                    applicationIntegrator.handleAuthentication(passwordCopy);
+                    
+                    // If we reach here, authentication was successful
+                    Platform.runLater(() -> {
+                        statusLabel.setText("✓ Access granted!");
+                        statusLabel.setStyle("-fx-text-fill: #4CAF50; -fx-font-weight: bold;");
+                    });
+                    
+                } catch (Exception e) {
+                    Platform.runLater(() -> {
+                        showError("Authentication failed: " + e.getMessage());
+                        resetLoginForm();
+                    });
+                }
+            }, "GhostVault-Login").start();
+        } else {
+            showError("Application not properly initialized.");
+            resetLoginForm();
         }
-        
-        // TODO: Integrate with ApplicationIntegrator for authentication
-        // For now, show placeholder message
-        statusLabel.setText("Authenticating...");
-        statusLabel.setStyle("-fx-text-fill: blue;");
-        
-        // Simulate authentication delay
-        new Thread(() -> {
-            try {
-                Thread.sleep(1000);
-                Platform.runLater(() -> {
-                    statusLabel.setText("Authentication successful!");
-                    statusLabel.setStyle("-fx-text-fill: green;");
-                });
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
-        }).start();
+    }
+    
+    /**
+     * Reset login form to initial state
+     */
+    private void resetLoginForm() {
+        loginButton.setDisable(false);
+        passwordField.setDisable(false);
+        passwordField.requestFocus();
     }
     
     /**
