@@ -298,11 +298,13 @@ public class NotificationManager {
                 double x = primaryStage.getX() + primaryStage.getWidth() - 370;
                 double y = primaryStage.getY() + 50 + (i * 80);
                 
-                // Animate to new position
-                TranslateTransition reposition = new TranslateTransition(Duration.millis(200), 
-                    (StackPane) notification.popup.getContent().get(0));
-                reposition.setToY(y - notification.popup.getY());
-                reposition.play();
+                // Animate to new position if content exists
+                if (!notification.popup.getContent().isEmpty()) {
+                    TranslateTransition reposition = new TranslateTransition(Duration.millis(200), 
+                        notification.popup.getContent().get(0));
+                    reposition.setToY(y - notification.popup.getY());
+                    reposition.play();
+                }
             }
         });
     }
