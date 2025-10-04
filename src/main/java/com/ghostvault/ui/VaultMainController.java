@@ -92,6 +92,12 @@ public class VaultMainController implements Initializable {
         this.encryptionKey = encryptionKey;
         this.isDecoyMode = false;
         
+        // Set encryption key on FileManager
+        if (fileManager != null && encryptionKey != null) {
+            fileManager.setEncryptionKey(encryptionKey);
+            logArea.appendText("🔐 Encryption key initialized for file operations\n");
+        }
+        
         refreshFileList();
         updateStatus();
     }
