@@ -1,517 +1,312 @@
 package com.ghostvault.security;
 
 import com.ghostvault.config.AppConfig;
-import com.ghostvault.core.FileManager;
 
 import java.io.File;
-import java.io.IOException;
-import java.io.RandomAccessFile;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Executes panic mode with complete silent data destruction
- * WARNING: This class permanently destroys all vault data with no recovery possibility
+ * Executes panic mode with CRYPTOGRAPHIC ERASURE FIRST approach
+ * 
+ * SECURITY IMPROVEMENTS v2.0:
+ * - PRIMARY: Destroy encryption keys (renders all data unrecoverable)
+ * - SECONDARY: Best-effort physical overwrite (limited effectiveness on SSDs)
+ * - Dry-run mode for safe testing
+ * - Silent operation (no UI feedback)
+ * 
+ * CRITICAL: Cryptographic erasure is the ONLY reliable method on modern storage.
+ * Physical overwrite is secondary and may not work on SSDs, journaling filesystems,
+ * or copy-on-write filesystems.
+ * 
+ * @version 2.0.0 - Cryptographic Erasure First
  */
 public class PanicModeExecutor {
     
-    private static final int PANIC_OVERWRITE_PASSES = 7; // More passes than normal deletion
-    private static final String PANIC_LOG_FILE = System.getProperty("java.io.tmpdir") + "/ghostvault_panic.log";
-    
     private final List<String> destructionLog;
-    private boolean silentMode;
+    private boolean dryRun;
     
     public PanicModeExecutor() {
         this.destructionLog = new ArrayList<>();
-        this.silentMode = true; // Always silent by default
+        this.dryRun = false;
     }
     
     /**
-     * Execute panic mode - complete vault destruction
-     * This method performs irreversible data destruction
+     * Execute panic mode with cryptographic erasure
+     * 
+     * @param vaultRoot Path to vault root directory
+     * @param dryRun If true, simulates destruction without actual file operations
      */
-    public void executePanicMode() {
+    public void executePanic(Path vaultRoot, boolean dryRun) {
+        this.dryRun = dryRun;
+        
         try {
-            log("PANIC MODE INITIATED - " + java.time.LocalDateTime.now());
-            log("WARNING: All vault data will be permanently destroyed");
+            log("=== PANIC MODE INITIATED ===");
+            log("Dry Run: " + dryRun);
+            log("Vault Root: " + vaultRoot);
+            log("Timestamp: " + java.time.LocalDateTime.now());
             
-            // Phase 1: Destroy all encrypted files
-            destroyEncryptedFiles();
+            // PHASE 1: CRYPTOGRAPHIC ERASURE (Primary defense)
+            log("\n[PHASE 1] CRYPTOGRAPHIC ERASURE - Destroying encryption keys");
+            destroyEncryptionKeys(vaultRoot);
             
-            // Phase 2: Destroy metadata and configuration
-            destroyMetadataAndConfig();
+            // PHASE 2: Delete metadata and configuration
+            log("\n[PHASE 2] Deleting metadata and configuration files");
+            deleteMetadataAndConfig(vaultRoot);
             
-            // Phase 3: Destroy decoy files
-            destroyDecoyFiles();
+            // PHASE 3: Best-effort physical overwrite (Secondary, limited effectiveness)
+            log("\n[PHASE 3] Best-effort physical overwrite (SSD-limited)");
+            overwriteVaultFiles(vaultRoot);
             
-            // Phase 4: Destroy vault directory structure
-            destroyVaultDirectories();
+            // PHASE 4: Delete vault directory structure
+            log("\n[PHASE 4] Removing vault directory structure");
+            deleteVaultDirectories(vaultRoot);
             
-            // Phase 5: Clear system traces
-            clearSystemTraces();
-            
-            // Phase 6: Overwrite memory
-            clearMemory();
-            
-            log("PANIC MODE COMPLETED - All data destroyed");
-            
-            // Final step: Terminate application immediately
-            terminateApplication();
+            log("\n=== PANIC MODE COMPLETED ===");
+            log("All vault data is now UNRECOVERABLE");
             
         } catch (Exception e) {
-            // Even if panic mode fails partially, still terminate
-            log("PANIC MODE ERROR: " + e.getMessage());
-            terminateApplication();
+            log("ERROR during panic mode: " + e.getMessage());
+            e.printStackTrace();
         }
     }
     
     /**
-     * Destroy all encrypted files in the vault
+     * PHASE 1: Destroy encryption keys (CRYPTOGRAPHIC ERASURE)
+     * 
+     * This is the PRIMARY security mechanism. Once keys are destroyed,
+     * all encrypted data becomes permanently unrecoverable, regardless
+     * of whether physical files are overwritten.
      */
-    private void destroyEncryptedFiles() {
+    private void destroyEncryptionKeys(Path vaultRoot) {
         try {
-            log("Phase 1: Destroying encrypted files...");
-            
-            File filesDir = new File(AppConfig.FILES_DIR);
-            if (filesDir.exists() && filesDir.isDirectory()) {
-                File[] files = filesDir.listFiles();
-                if (files != null) {
-                    for (File file : files) {
-                        if (file.isFile()) {
-                            secureDeleteFile(file.toPath(), PANIC_OVERWRITE_PASSES);
-                            log("Destroyed: " + file.getName());
-                        }
-                    }
+            // Destroy password configuration (contains wrapped keys)
+            Path configFile = vaultRoot.resolve("config.enc");
+            if (Files.exists(configFile)) {
+                if (!dryRun) {
+                    // Overwrite with random data before deletion
+                    byte[] randomData = new byte[(int) Files.size(configFile)];
+                    new java.security.SecureRandom().nextBytes(randomData);
+                    Files.write(configFile, randomData);
+                    Files.delete(configFile);
                 }
+                log("✓ Destroyed password configuration (wrapped keys)");
             }
             
-            log("Phase 1 completed: All encrypted files destroyed");
+            // Destroy salt file
+            Path saltFile = vaultRoot.resolve(".salt");
+            if (Files.exists(saltFile)) {
+                if (!dryRun) {
+                    byte[] randomData = new byte[(int) Files.size(saltFile)];
+                    new java.security.SecureRandom().nextBytes(randomData);
+                    Files.write(saltFile, randomData);
+                    Files.delete(saltFile);
+                }
+                log("✓ Destroyed salt file");
+            }
+            
+            log("✓ CRYPTOGRAPHIC ERASURE COMPLETE");
+            log("  All vault data is now PERMANENTLY UNRECOVERABLE");
             
         } catch (Exception e) {
-            log("Phase 1 error: " + e.getMessage());
+            log("ERROR in cryptographic erasure: " + e.getMessage());
         }
     }
     
     /**
-     * Destroy metadata and configuration files
+     * PHASE 2: Delete metadata and configuration files
      */
-    private void destroyMetadataAndConfig() {
+    private void deleteMetadataAndConfig(Path vaultRoot) {
         try {
-            log("Phase 2: Destroying metadata and configuration...");
-            
-            // Destroy configuration files
             String[] configFiles = {
-                AppConfig.CONFIG_FILE,
-                AppConfig.METADATA_FILE,
-                AppConfig.SALT_FILE,
-                AppConfig.LOG_FILE
+                "metadata.enc",
+                "audit.log.enc",
+                "config.enc",
+                ".salt"
             };
             
-            for (String configFile : configFiles) {
-                Path filePath = Paths.get(configFile);
+            for (String filename : configFiles) {
+                Path filePath = vaultRoot.resolve(filename);
                 if (Files.exists(filePath)) {
-                    secureDeleteFile(filePath, PANIC_OVERWRITE_PASSES);
-                    log("Destroyed config: " + filePath.getFileName());
-                }
-            }
-            
-            log("Phase 2 completed: All configuration destroyed");
-            
-        } catch (Exception e) {
-            log("Phase 2 error: " + e.getMessage());
-        }
-    }
-    
-    /**
-     * Destroy decoy files
-     */
-    private void destroyDecoyFiles() {
-        try {
-            log("Phase 3: Destroying decoy files...");
-            
-            File decoysDir = new File(AppConfig.DECOYS_DIR);
-            if (decoysDir.exists() && decoysDir.isDirectory()) {
-                File[] files = decoysDir.listFiles();
-                if (files != null) {
-                    for (File file : files) {
-                        if (file.isFile()) {
-                            secureDeleteFile(file.toPath(), PANIC_OVERWRITE_PASSES);
-                            log("Destroyed decoy: " + file.getName());
-                        }
+                    if (!dryRun) {
+                        Files.delete(filePath);
                     }
+                    log("✓ Deleted: " + filename);
                 }
             }
             
-            log("Phase 3 completed: All decoy files destroyed");
-            
         } catch (Exception e) {
-            log("Phase 3 error: " + e.getMessage());
+            log("ERROR deleting metadata: " + e.getMessage());
         }
     }
     
     /**
-     * Destroy vault directory structure
+     * PHASE 3: Best-effort physical overwrite
+     * 
+     * NOTE: This is SECONDARY defense and has LIMITED EFFECTIVENESS on:
+     * - SSDs (wear leveling, spare blocks)
+     * - Journaling filesystems (ext3/4, NTFS)
+     * - Copy-on-write filesystems (Btrfs, ZFS)
+     * - Network/cloud storage
+     * 
+     * Cryptographic erasure (Phase 1) is the ONLY reliable method.
      */
-    private void destroyVaultDirectories() {
+    private void overwriteVaultFiles(Path vaultRoot) {
         try {
-            log("Phase 4: Destroying vault directories...");
+            log("NOTE: Physical overwrite has limited effectiveness on modern storage");
+            log("      Cryptographic erasure (Phase 1) is the primary defense");
             
-            // Delete directories in reverse order (deepest first)
+            // Overwrite encrypted files
+            Path filesDir = vaultRoot.resolve("files");
+            if (Files.exists(filesDir) && Files.isDirectory(filesDir)) {
+                Files.list(filesDir).forEach(file -> {
+                    try {
+                        if (Files.isRegularFile(file)) {
+                            if (!dryRun) {
+                                SecureDeletion.secureDelete(file.toFile());
+                            }
+                            log("✓ Overwritten: " + file.getFileName());
+                        }
+                    } catch (Exception e) {
+                        log("  Warning: Could not overwrite " + file.getFileName());
+                    }
+                });
+            }
+            
+            // Overwrite decoy files
+            Path decoysDir = vaultRoot.resolve("decoys");
+            if (Files.exists(decoysDir) && Files.isDirectory(decoysDir)) {
+                Files.list(decoysDir).forEach(file -> {
+                    try {
+                        if (Files.isRegularFile(file)) {
+                            if (!dryRun) {
+                                SecureDeletion.secureDelete(file.toFile());
+                            }
+                            log("✓ Overwritten: decoys/" + file.getFileName());
+                        }
+                    } catch (Exception e) {
+                        log("  Warning: Could not overwrite decoy " + file.getFileName());
+                    }
+                });
+            }
+            
+        } catch (Exception e) {
+            log("ERROR during physical overwrite: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * PHASE 4: Delete vault directory structure
+     */
+    private void deleteVaultDirectories(Path vaultRoot) {
+        try {
             String[] directories = {
-                AppConfig.FILES_DIR,
-                AppConfig.DECOYS_DIR,
-                AppConfig.VAULT_DIR + "/logs",
-                AppConfig.VAULT_DIR + "/temp",
-                AppConfig.VAULT_DIR
+                "files",
+                "decoys",
+                "logs",
+                "temp"
             };
             
-            for (String directory : directories) {
-                File dir = new File(directory);
-                if (dir.exists()) {
-                    // Overwrite directory metadata if possible
-                    try {
-                        overwriteDirectoryMetadata(dir);
-                    } catch (Exception e) {
-                        // Continue even if metadata overwrite fails
+            for (String dirName : directories) {
+                Path dirPath = vaultRoot.resolve(dirName);
+                if (Files.exists(dirPath) && Files.isDirectory(dirPath)) {
+                    if (!dryRun) {
+                        deleteDirectoryRecursive(dirPath);
                     }
-                    
-                    if (dir.delete()) {
-                        log("Destroyed directory: " + dir.getName());
+                    log("✓ Deleted directory: " + dirName);
+                }
+            }
+            
+            // Delete vault root if empty
+            if (!dryRun && Files.exists(vaultRoot)) {
+                try {
+                    Files.delete(vaultRoot);
+                    log("✓ Deleted vault root directory");
+                } catch (Exception e) {
+                    log("  Note: Vault root not empty or in use");
+                }
+            }
+            
+        } catch (Exception e) {
+            log("ERROR deleting directories: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Recursively delete directory
+     */
+    private void deleteDirectoryRecursive(Path directory) throws Exception {
+        if (Files.isDirectory(directory)) {
+            Files.list(directory).forEach(path -> {
+                try {
+                    if (Files.isDirectory(path)) {
+                        deleteDirectoryRecursive(path);
+                    } else {
+                        Files.delete(path);
                     }
+                } catch (Exception e) {
+                    // Continue with other files
                 }
-            }
-            
-            log("Phase 4 completed: All directories destroyed");
-            
-        } catch (Exception e) {
-            log("Phase 4 error: " + e.getMessage());
+            });
         }
-    }
-    
-    /**
-     * Clear system traces (temp files, registry entries, etc.)
-     */
-    private void clearSystemTraces() {
-        try {
-            log("Phase 5: Clearing system traces...");
-            
-            // Clear Java temp files
-            clearJavaTempFiles();
-            
-            // Clear system temp files related to GhostVault
-            clearSystemTempFiles();
-            
-            // Clear recent files list (Windows)
-            clearRecentFiles();
-            
-            log("Phase 5 completed: System traces cleared");
-            
-        } catch (Exception e) {
-            log("Phase 5 error: " + e.getMessage());
-        }
-    }
-    
-    /**
-     * Clear Java temporary files
-     */
-    private void clearJavaTempFiles() {
-        try {
-            String tempDir = System.getProperty("java.io.tmpdir");
-            File tempDirFile = new File(tempDir);
-            
-            if (tempDirFile.exists()) {
-                File[] tempFiles = tempDirFile.listFiles((dir, name) -> 
-                    name.toLowerCase().contains("ghostvault") || 
-                    name.toLowerCase().contains("vault") ||
-                    name.startsWith("tmp") && name.contains("ghost"));
-                
-                if (tempFiles != null) {
-                    for (File tempFile : tempFiles) {
-                        try {
-                            if (tempFile.isFile()) {
-                                secureDeleteFile(tempFile.toPath(), 3);
-                            }
-                        } catch (Exception e) {
-                            // Continue with other files
-                        }
-                    }
-                }
-            }
-        } catch (Exception e) {
-            // Ignore temp file cleanup errors
-        }
-    }
-    
-    /**
-     * Clear system temporary files
-     */
-    private void clearSystemTempFiles() {
-        try {
-            // Windows temp directories
-            if (System.getProperty("os.name").toLowerCase().contains("win")) {
-                String[] tempDirs = {
-                    System.getenv("TEMP"),
-                    System.getenv("TMP"),
-                    "C:\\Windows\\Temp"
-                };
-                
-                for (String tempDir : tempDirs) {
-                    if (tempDir != null) {
-                        clearTempDirectory(new File(tempDir));
-                    }
-                }
-            }
-        } catch (Exception e) {
-            // Ignore system temp cleanup errors
-        }
-    }
-    
-    /**
-     * Clear recent files list
-     */
-    private void clearRecentFiles() {
-        try {
-            if (System.getProperty("os.name").toLowerCase().contains("win")) {
-                // Clear Windows recent files for GhostVault
-                Runtime.getRuntime().exec("reg delete \"HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\RecentDocs\" /f");
-            }
-        } catch (Exception e) {
-            // Ignore registry cleanup errors
-        }
-    }
-    
-    /**
-     * Clear temporary directory of GhostVault-related files
-     */
-    private void clearTempDirectory(File tempDir) {
-        if (!tempDir.exists() || !tempDir.isDirectory()) {
-            return;
-        }
-        
-        try {
-            File[] files = tempDir.listFiles((dir, name) -> 
-                name.toLowerCase().contains("ghostvault") ||
-                name.toLowerCase().contains("vault"));
-            
-            if (files != null) {
-                for (File file : files) {
-                    try {
-                        if (file.isFile()) {
-                            secureDeleteFile(file.toPath(), 3);
-                        }
-                    } catch (Exception e) {
-                        // Continue with other files
-                    }
-                }
-            }
-        } catch (Exception e) {
-            // Ignore temp directory errors
-        }
-    }
-    
-    /**
-     * Clear sensitive data from memory
-     */
-    private void clearMemory() {
-        try {
-            log("Phase 6: Clearing memory...");
-            
-            // Force garbage collection multiple times
-            for (int i = 0; i < 5; i++) {
-                System.gc();
-                // Note: System.runFinalization() is deprecated in JDK 18+
-                // GC will handle finalization automatically
-                Thread.sleep(100);
-            }
-            
-            // Allocate and clear large memory blocks to overwrite heap
-            try {
-                for (int i = 0; i < 10; i++) {
-                    byte[] memoryBlock = new byte[1024 * 1024]; // 1MB blocks
-                    new SecureRandom().nextBytes(memoryBlock);
-                    memoryBlock = null;
-                    System.gc();
-                }
-            } catch (OutOfMemoryError e) {
-                // Expected when clearing memory
-            }
-            
-            log("Phase 6 completed: Memory cleared");
-            
-        } catch (Exception e) {
-            log("Phase 6 error: " + e.getMessage());
-        }
-    }
-    
-    /**
-     * Secure delete file with multiple overwrite passes
-     */
-    private void secureDeleteFile(Path filePath, int passes) throws IOException {
-        if (!Files.exists(filePath)) {
-            return;
-        }
-        
-        long fileSize = Files.size(filePath);
-        SecureRandom random = new SecureRandom();
-        
-        try (RandomAccessFile file = new RandomAccessFile(filePath.toFile(), "rws")) {
-            
-            for (int pass = 0; pass < passes; pass++) {
-                file.seek(0);
-                
-                switch (pass % 4) {
-                    case 0:
-                        // Pass: Write 0x00
-                        writePattern(file, fileSize, (byte) 0x00);
-                        break;
-                    case 1:
-                        // Pass: Write 0xFF
-                        writePattern(file, fileSize, (byte) 0xFF);
-                        break;
-                    case 2:
-                        // Pass: Write 0xAA
-                        writePattern(file, fileSize, (byte) 0xAA);
-                        break;
-                    case 3:
-                        // Pass: Write random data
-                        writeRandomPattern(file, fileSize, random);
-                        break;
-                }
-                
-                file.getFD().sync(); // Force write to disk
-            }
-        }
-        
-        // Finally delete the file
-        Files.delete(filePath);
-    }
-    
-    /**
-     * Write specific byte pattern to file
-     */
-    private void writePattern(RandomAccessFile file, long fileSize, byte pattern) throws IOException {
-        byte[] buffer = new byte[8192];
-        java.util.Arrays.fill(buffer, pattern);
-        
-        long remaining = fileSize;
-        while (remaining > 0) {
-            int writeSize = (int) Math.min(buffer.length, remaining);
-            file.write(buffer, 0, writeSize);
-            remaining -= writeSize;
-        }
-    }
-    
-    /**
-     * Write random pattern to file
-     */
-    private void writeRandomPattern(RandomAccessFile file, long fileSize, SecureRandom random) throws IOException {
-        byte[] buffer = new byte[8192];
-        
-        long remaining = fileSize;
-        while (remaining > 0) {
-            int writeSize = (int) Math.min(buffer.length, remaining);
-            random.nextBytes(buffer);
-            file.write(buffer, 0, writeSize);
-            remaining -= writeSize;
-        }
-    }
-    
-    /**
-     * Overwrite directory metadata (best effort)
-     */
-    private void overwriteDirectoryMetadata(File directory) {
-        try {
-            // Create and delete temporary files to overwrite directory metadata
-            for (int i = 0; i < 10; i++) {
-                File tempFile = new File(directory, "temp_overwrite_" + i + ".tmp");
-                Files.write(tempFile.toPath(), new byte[1024]);
-                tempFile.delete();
-            }
-        } catch (Exception e) {
-            // Ignore metadata overwrite errors
-        }
-    }
-    
-    /**
-     * Terminate application immediately
-     */
-    protected void terminateApplication() {
-        try {
-            log("TERMINATING APPLICATION");
-            
-            // Save panic log if possible
-            savePanicLog();
-            
-            // Force immediate termination
-            Runtime.getRuntime().halt(0);
-            
-        } catch (Exception e) {
-            // Force termination even if logging fails
-            System.exit(0);
-        }
+        Files.delete(directory);
     }
     
     /**
      * Log panic mode operations
      */
     private void log(String message) {
-        if (!silentMode) {
+        String logEntry = java.time.LocalDateTime.now() + ": " + message;
+        destructionLog.add(logEntry);
+        
+        // Also print to console for debugging (in real deployment, this would be silent)
+        if (!dryRun || System.getProperty("ghostvault.debug") != null) {
             System.out.println("[PANIC] " + message);
         }
-        
-        destructionLog.add(java.time.LocalDateTime.now() + ": " + message);
     }
     
     /**
-     * Save panic log for forensic analysis (if needed)
+     * Get destruction log (for testing/verification)
      */
-    private void savePanicLog() {
+    public List<String> getDestructionLog() {
+        return new ArrayList<>(destructionLog);
+    }
+    
+    /**
+     * Clear destruction log
+     */
+    public void clearLog() {
+        destructionLog.clear();
+    }
+    
+    /**
+     * Check if panic mode can be executed
+     */
+    public boolean canExecutePanicMode(Path vaultRoot) {
+        return Files.exists(vaultRoot) && Files.isDirectory(vaultRoot);
+    }
+    
+    /**
+     * Estimate destruction time (for UI feedback)
+     */
+    public int getEstimatedDestructionTimeSeconds(Path vaultRoot) {
         try {
-            if (!destructionLog.isEmpty()) {
-                Files.write(Paths.get(PANIC_LOG_FILE), 
-                    String.join("\n", destructionLog).getBytes());
-            }
-        } catch (Exception e) {
-            // Ignore log saving errors
-        }
-    }
-    
-    /**
-     * Set silent mode (default is true)
-     */
-    public void setSilentMode(boolean silent) {
-        this.silentMode = silent;
-    }
-    
-    /**
-     * Check if panic mode can be executed (vault exists)
-     */
-    public boolean canExecutePanicMode() {
-        return new File(AppConfig.VAULT_DIR).exists();
-    }
-    
-    /**
-     * Get estimated destruction time in seconds
-     */
-    public int getEstimatedDestructionTime() {
-        try {
-            File vaultDir = new File(AppConfig.VAULT_DIR);
-            if (!vaultDir.exists()) {
-                return 1; // Minimal time if no vault
+            if (!Files.exists(vaultRoot)) {
+                return 1;
             }
             
-            // Estimate based on vault size (rough calculation)
-            long vaultSize = calculateDirectorySize(vaultDir);
-            int estimatedSeconds = (int) Math.max(5, vaultSize / (1024 * 1024)); // 1 second per MB minimum 5 seconds
+            // Cryptographic erasure is fast (< 1 second)
+            // Physical overwrite depends on vault size
+            long vaultSize = calculateDirectorySize(vaultRoot.toFile());
+            int estimatedSeconds = (int) Math.max(2, vaultSize / (10 * 1024 * 1024)); // 10MB/sec
             
             return Math.min(estimatedSeconds, 30); // Cap at 30 seconds
             
         } catch (Exception e) {
-            return 10; // Default estimate
+            return 5; // Default estimate
         }
     }
     

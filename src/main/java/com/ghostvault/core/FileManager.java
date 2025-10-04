@@ -63,7 +63,8 @@ public class FileManager {
             String originalHash = FileUtils.calculateSHA256(fileData);
             
             // Encrypt file data
-            CryptoManager.EncryptedData encryptedData = cryptoManager.encrypt(fileData, encryptionKey);
+            byte[] encryptedBytes = cryptoManager.encrypt(fileData, encryptionKey);
+            CryptoManager.EncryptedData encryptedData = CryptoManager.EncryptedData.fromCombinedData(encryptedBytes);
             
             // Write encrypted file to vault
             Path encryptedFilePath = Paths.get(AppConfig.FILES_DIR, encryptedFileName);

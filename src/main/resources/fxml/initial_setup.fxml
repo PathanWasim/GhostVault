@@ -4,53 +4,103 @@
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
 
-<ScrollPane xmlns="http://javafx.com/javafx/11.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.ghostvault.ui.InitialSetupController">
-   <content>
-      <VBox alignment="CENTER" spacing="20.0">
+<BorderPane xmlns="http://javafx.com/javafx/11.0.1" xmlns:fx="http://javafx.com/fxml/1" 
+            fx:controller="com.ghostvault.ui.InitialSetupController"
+            prefWidth="900.0" prefHeight="700.0"
+            styleClass="root-pane">
+   
+   <!-- Top Section - Title -->
+   <top>
+      <VBox alignment="CENTER" spacing="10.0" styleClass="header-section">
          <padding>
-            <Insets bottom="40.0" left="40.0" right="40.0" top="40.0" />
+            <Insets top="30.0" bottom="20.0" left="40.0" right="40.0" />
+         </padding>
+         <Label fx:id="titleLabel" styleClass="title-label" text="🔐 GhostVault - Initial Setup" />
+         <Label fx:id="instructionLabel" styleClass="instruction-label" 
+                text="Create three unique passwords for maximum security" 
+                wrapText="true" textAlignment="CENTER" maxWidth="600.0" />
+      </VBox>
+   </top>
+   
+   <!-- Center Section - Password Fields -->
+   <center>
+      <VBox alignment="CENTER" spacing="20.0" styleClass="content-section">
+         <padding>
+            <Insets top="10.0" bottom="10.0" left="60.0" right="60.0" />
          </padding>
          
-         <!-- Title Section -->
-         <Label fx:id="titleLabel" styleClass="title-label" text="GhostVault - Initial Setup" />
-         <Label fx:id="instructionLabel" styleClass="instruction-label" text="Set up your vault passwords. All three are required for security." wrapText="true" />
-         
          <!-- Master Password Section -->
-         <VBox spacing="8.0" styleClass="password-section">
-            <Label styleClass="password-title" text="Master Password" />
-            <PasswordField fx:id="masterPasswordField" promptText="Enter master password" styleClass="password-field" />
-            <ProgressBar fx:id="masterStrengthBar" prefWidth="400.0" styleClass="strength-bar" />
-            <Label fx:id="masterStrengthLabel" styleClass="strength-label" />
-            <Label styleClass="description-label" text="Full access to your vault" />
+         <VBox spacing="8.0" styleClass="password-section" prefWidth="600.0" maxWidth="600.0">
+            <HBox spacing="10.0" alignment="CENTER_LEFT">
+               <Label styleClass="password-title" text="1. Master Password" />
+               <Label styleClass="description-label" text="(Full vault access)" />
+            </HBox>
+            <PasswordField fx:id="masterPasswordField" 
+                          promptText="Min 12 chars, uppercase, lowercase, number, special char" 
+                          styleClass="password-field" 
+                          prefHeight="40.0" />
+            <HBox spacing="10.0" alignment="CENTER_LEFT">
+               <ProgressBar fx:id="masterStrengthBar" prefWidth="150.0" styleClass="strength-bar" />
+               <Label fx:id="masterStrengthLabel" styleClass="strength-label" text="" />
+            </HBox>
          </VBox>
          
          <!-- Panic Password Section -->
-         <VBox spacing="8.0" styleClass="password-section">
-            <Label styleClass="password-title" text="Panic Password" />
-            <PasswordField fx:id="panicPasswordField" promptText="Enter panic password" styleClass="password-field" />
-            <ProgressBar fx:id="panicStrengthBar" prefWidth="400.0" styleClass="strength-bar" />
-            <Label fx:id="panicStrengthLabel" styleClass="strength-label" />
-            <Label styleClass="description-label" text="Emergency destruction of all data" />
+         <VBox spacing="8.0" styleClass="password-section" prefWidth="600.0" maxWidth="600.0">
+            <HBox spacing="10.0" alignment="CENTER_LEFT">
+               <Label styleClass="password-title" text="2. Panic Password" />
+               <Label styleClass="description-label" text="(Emergency data destruction)" />
+            </HBox>
+            <PasswordField fx:id="panicPasswordField" 
+                          promptText="Different from master password" 
+                          styleClass="password-field" 
+                          prefHeight="40.0" />
+            <HBox spacing="10.0" alignment="CENTER_LEFT">
+               <ProgressBar fx:id="panicStrengthBar" prefWidth="150.0" styleClass="strength-bar" />
+               <Label fx:id="panicStrengthLabel" styleClass="strength-label" text="" />
+            </HBox>
          </VBox>
          
          <!-- Decoy Password Section -->
-         <VBox spacing="8.0" styleClass="password-section">
-            <Label styleClass="password-title" text="Decoy Password" />
-            <PasswordField fx:id="decoyPasswordField" promptText="Enter decoy password" styleClass="password-field" />
-            <ProgressBar fx:id="decoyStrengthBar" prefWidth="400.0" styleClass="strength-bar" />
-            <Label fx:id="decoyStrengthLabel" styleClass="strength-label" />
-            <Label styleClass="description-label" text="Shows fake files to mislead attackers" />
+         <VBox spacing="8.0" styleClass="password-section" prefWidth="600.0" maxWidth="600.0">
+            <HBox spacing="10.0" alignment="CENTER_LEFT">
+               <Label styleClass="password-title" text="3. Decoy Password" />
+               <Label styleClass="description-label" text="(Shows fake files)" />
+            </HBox>
+            <PasswordField fx:id="decoyPasswordField" 
+                          promptText="Different from both passwords above" 
+                          styleClass="password-field" 
+                          prefHeight="40.0" />
+            <HBox spacing="10.0" alignment="CENTER_LEFT">
+               <ProgressBar fx:id="decoyStrengthBar" prefWidth="150.0" styleClass="strength-bar" />
+               <Label fx:id="decoyStrengthLabel" styleClass="strength-label" text="" />
+            </HBox>
          </VBox>
+      </VBox>
+   </center>
+   
+   <!-- Bottom Section - Actions -->
+   <bottom>
+      <VBox alignment="CENTER" spacing="15.0" styleClass="footer-section">
+         <padding>
+            <Insets top="20.0" bottom="30.0" left="40.0" right="40.0" />
+         </padding>
          
-         <!-- Action Section -->
-         <Button fx:id="createVaultButton" onAction="#handleCreateVault" prefWidth="150.0" styleClass="primary-button" text="Create Vault" />
-         <Label fx:id="statusLabel" styleClass="status-label" />
+         <Label fx:id="statusLabel" styleClass="status-label" wrapText="true" 
+                maxWidth="600.0" textAlignment="CENTER" minHeight="30.0" />
          
-         <!-- Help Section -->
-         <HBox alignment="CENTER" spacing="10.0">
-            <Button fx:id="helpButton" onAction="#showHelp" styleClass="secondary-button" text="Help" />
-            <Button fx:id="exitButton" onAction="#handleExit" styleClass="secondary-button" text="Exit" />
+         <Button fx:id="createVaultButton" onAction="#handleCreateVault" 
+                 prefWidth="250.0" prefHeight="45.0" 
+                 styleClass="primary-button" text="Create Vault" />
+         
+         <HBox alignment="CENTER" spacing="15.0">
+            <Button fx:id="helpButton" onAction="#showHelp" 
+                    styleClass="secondary-button" text="❓ Help" 
+                    prefWidth="120.0" prefHeight="35.0" />
+            <Button fx:id="exitButton" onAction="#handleExit" 
+                    styleClass="secondary-button" text="✕ Exit" 
+                    prefWidth="120.0" prefHeight="35.0" />
          </HBox>
       </VBox>
-   </content>
-</ScrollPane>
+   </bottom>
+</BorderPane>

@@ -8,3 +8,18 @@
 .DS_Store
 .idea/
 *.swp
+
+# Kiro IDE files
+.kiro/
+
+# Project audit files
+project-audit/
+
+# Unnecessary documentation
+**/IMPLEMENTATION_SUMMARY.md
+**/COMPLETION_REPORT.md
+**/BUG_FIXES.md
+**/FEATURE_IMPLEMENTATION.md
+**/PROJECT_STATUS.md
+**/CURRENT_STATUS.md
+**/IMPLEMENTATION_PLAN.md

@@ -317,7 +317,8 @@ public class AuditManager {
         
         try {
             // Encrypt audit entry
-            CryptoManager.EncryptedData encryptedEntry = cryptoManager.encrypt(entryData, auditEncryptionKey);
+            byte[] encryptedBytes = cryptoManager.encrypt(entryData, auditEncryptionKey);
+            CryptoManager.EncryptedData encryptedEntry = CryptoManager.EncryptedData.fromCombinedData(encryptedBytes);
             
             // Append to log file
             appendToLogFile(encryptedEntry);

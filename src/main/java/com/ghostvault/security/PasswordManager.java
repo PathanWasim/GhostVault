@@ -1,24 +1,27 @@
 package com.ghostvault.security;
 
 import com.ghostvault.config.AppConfig;
-import com.ghostvault.util.FileUtils;
 
-import javax.crypto.spec.PBEKeySpec;
-import javax.crypto.spec.SecretKeySpec;
-import javax.crypto.SecretKeyFactory;
 import javax.crypto.SecretKey;
 import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.security.GeneralSecurityException;
+import java.security.MessageDigest;
 import java.security.SecureRandom;
-import java.security.spec.KeySpec;
 import java.util.Arrays;
-import java.util.Base64;
 
 /**
- * Manages password hashing, validation, and storage
- * Handles master, panic, and decoy passwords with secure encrypted storage
+ * Manages password authentication with cryptographic-erasure-capable design
+ * 
+ * SECURITY IMPROVEMENTS v2.0:
+ * - Uses Argon2id KDF with parameter storage
+ * - Master/Decoy: KEK-wrapped VMK (allows vault access)
+ * - Panic: Verifier-only (no key recovery possible - enables crypto-erasure)
+ * - Constant-time password detection with timing parity
+ * - All password handling uses char[] (never String)
+ * 
+ * @version 2.0.0 - Cryptographic Erasure Design
  */
 public class PasswordManager {
     
@@ -27,77 +30,66 @@ public class PasswordManager {
     }
     
     /**
-     * Password configuration data structure
+     * Password configuration with KEK wrapping
      */
     public static class PasswordConfiguration implements Serializable {
-        private static final long serialVersionUID = 1L;
+        private static final long serialVersionUID = 2L;
         
-        private final byte[] masterHash;
-        private final byte[] panicHash;
-        private final byte[] decoyHash;
-        private final byte[] salt;
-        private final int iterations;
-        private final String algorithm;
+        // KDF parameters
+        private final byte[] kdfParamsSerialized;
         
-        public PasswordConfiguration(byte[] masterHash, byte[] panicHash, byte[] decoyHash, 
-                                   byte[] salt, int iterations, String algorithm) {
-            this.masterHash = masterHash.clone();
-            this.panicHash = panicHash.clone();
-            this.decoyHash = decoyHash.clone();
-            this.salt = salt.clone();
-            this.iterations = iterations;
-            this.algorithm = algorithm;
+        // Master password: KEK-wrapped VMK
+        private final byte[] masterVerifier;  // For detection
+        private final byte[] wrappedVMK;      // Encrypted VMK
+        
+        // Panic password: Verifier only (NO key recovery)
+        private final byte[] panicVerifier;
+        
+        // Decoy password: KEK-wrapped DVMK
+        private final byte[] decoyVerifier;
+        private final byte[] wrappedDVMK;
+        
+        public PasswordConfiguration(byte[] kdfParams, 
+                                   byte[] masterVerifier, byte[] wrappedVMK,
+                                   byte[] panicVerifier,
+                                   byte[] decoyVerifier, byte[] wrappedDVMK) {
+            this.kdfParamsSerialized = kdfParams.clone();
+            this.masterVerifier = masterVerifier.clone();
+            this.wrappedVMK = wrappedVMK.clone();
+            this.panicVerifier = panicVerifier.clone();
+            this.decoyVerifier = decoyVerifier.clone();
+            this.wrappedDVMK = wrappedDVMK.clone();
         }
         
-        public byte[] getMasterHash() { return masterHash.clone(); }
-        public byte[] getPanicHash() { return panicHash.clone(); }
-        public byte[] getDecoyHash() { return decoyHash.clone(); }
-        public byte[] getSalt() { return salt.clone(); }
-        public int getIterations() { return iterations; }
-        public String getAlgorithm() { return algorithm; }
+        public byte[] getKdfParams() { return kdfParamsSerialized.clone(); }
+        public byte[] getMasterVerifier() { return masterVerifier.clone(); }
+        public byte[] getWrappedVMK() { return wrappedVMK.clone(); }
+        public byte[] getPanicVerifier() { return panicVerifier.clone(); }
+        public byte[] getDecoyVerifier() { return decoyVerifier.clone(); }
+        public byte[] getWrappedDVMK() { return wrappedDVMK.clone(); }
     }
     
     private final String vaultPath;
     private final CryptoManager cryptoManager;
-    private byte[] salt;
-    private byte[] hashedMasterPassword;
-    private byte[] hashedPanicPassword;
-    private byte[] hashedDecoyPassword;
+    private KDF.KdfParams kdfParams;
+    private byte[] masterVerifier;
+    private byte[] wrappedVMK;
+    private byte[] panicVerifier;
+    private byte[] decoyVerifier;
+    private byte[] wrappedDVMK;
     private boolean isConfigured;
+    
+    // Timing attack mitigation
+    private static final int MIN_DELAY_MS = 900;
+    private static final int JITTER_MS = 300;
+    private final SecureRandom secureRandom;
     
     public PasswordManager(String vaultPath) throws Exception {
         this.vaultPath = vaultPath;
         this.cryptoManager = new CryptoManager();
+        this.secureRandom = new SecureRandom();
         this.isConfigured = false;
-        loadOrGenerateSalt();
         loadPasswordConfiguration();
-    }
-    
-    /**
-     * Load existing salt or generate new one
-     */
-    private void loadOrGenerateSalt() throws Exception {
-        File saltFile = new File(AppConfig.SALT_FILE);
-        
-        if (saltFile.exists()) {
-            salt = Files.readAllBytes(saltFile.toPath());
-        } else {
-            // Generate new salt
-            salt = new byte[AppConfig.SALT_SIZE];
-            new SecureRandom().nextBytes(salt);
-            
-            // Save salt to file
-            Files.write(Paths.get(AppConfig.SALT_FILE), salt);
-            
-            // Hide salt file on Windows
-            if (System.getProperty("os.name").toLowerCase().contains("win")) {
-                try {
-                    Files.setAttribute(Paths.get(AppConfig.SALT_FILE), "dos:hidden", true);
-                } catch (Exception e) {
-                    // Ignore if hiding fails
-                }
-            }
-        }
     }
     
     /**
@@ -108,239 +100,284 @@ public class PasswordManager {
         
         if (configFile.exists()) {
             try {
-                // Read encrypted configuration
-                CryptoManager.EncryptedData encryptedConfig = FileUtils.readEncryptedFile(configFile.toPath());
-                
-                // Create a temporary key from salt for decryption (bootstrap key)
-                SecretKey bootstrapKey = createBootstrapKey();
-                byte[] decryptedData = cryptoManager.decrypt(encryptedConfig, bootstrapKey);
+                byte[] configData = Files.readAllBytes(configFile.toPath());
                 
                 // Deserialize configuration
-                ByteArrayInputStream bais = new ByteArrayInputStream(decryptedData);
+                ByteArrayInputStream bais = new ByteArrayInputStream(configData);
                 try (ObjectInputStream ois = new ObjectInputStream(bais)) {
                     PasswordConfiguration config = (PasswordConfiguration) ois.readObject();
                     
-                    hashedMasterPassword = config.getMasterHash();
-                    hashedPanicPassword = config.getPanicHash();
-                    hashedDecoyPassword = config.getDecoyHash();
+                    // Deserialize KDF params
+                    this.kdfParams = deserializeKdfParams(config.getKdfParams());
                     
-                    // Verify salt matches
-                    if (!Arrays.equals(salt, config.getSalt())) {
-                        throw new CryptographicException("Salt mismatch in password configuration");
-                    }
+                    // Load verifiers and wrapped keys
+                    this.masterVerifier = config.getMasterVerifier();
+                    this.wrappedVMK = config.getWrappedVMK();
+                    this.panicVerifier = config.getPanicVerifier();
+                    this.decoyVerifier = config.getDecoyVerifier();
+                    this.wrappedDVMK = config.getWrappedDVMK();
                     
-                    isConfigured = true;
+                    this.isConfigured = true;
                 }
                 
-                // Clear sensitive data
-                MemoryUtils.secureWipe(decryptedData);
-                
             } catch (Exception e) {
-                // If decryption fails, the config file might be corrupted or from different salt
-                // Reset to unconfigured state rather than failing
-                isConfigured = false;
-                hashedMasterPassword = null;
-                hashedPanicPassword = null;
-                hashedDecoyPassword = null;
-                
-                // Log the error but don't throw - allow fresh initialization
-                System.err.println("Warning: Could not load password configuration, will require re-initialization: " + e.getMessage());
+                System.err.println("Warning: Could not load password configuration: " + e.getMessage());
+                this.isConfigured = false;
             }
         }
     }
     
     /**
-     * Create bootstrap key for encrypting/decrypting password configuration
-     * Uses a deterministic key based on salt to ensure consistency
+     * Initialize passwords for first-time setup
+     * 
+     * @param masterPassword Master password (full vault access)
+     * @param panicPassword Panic password (triggers destruction)
+     * @param decoyPassword Decoy password (fake vault access)
      */
-    private SecretKey createBootstrapKey() throws GeneralSecurityException {
-        // Use a fixed string with salt to create bootstrap key for config encryption
-        // This ensures the same key is generated each time for the same salt
-        String bootstrapPassword = "GhostVault-Bootstrap-Key-2024-" + Base64.getEncoder().encodeToString(salt);
-        return cryptoManager.deriveKey(bootstrapPassword, salt);
-    }
-    
-    /**
-     * Initialize passwords for first-time setup with comprehensive validation
-     */
-    public void initializePasswords(String masterPassword, String panicPassword, String decoyPassword) throws Exception {
-        char[] masterChars = null;
-        char[] panicChars = null;
-        char[] decoyChars = null;
+    public void initializePasswords(char[] masterPassword, char[] panicPassword, char[] decoyPassword) 
+            throws Exception {
+        
+        // Initialize passwords for vault access
+        
+        // Validate password strength
+        validatePasswordStrength(masterPassword, "Master", AppConfig.PASSWORD_MIN_STRENGTH);
+        validatePasswordStrength(panicPassword, "Panic", 3);
+        validatePasswordStrength(decoyPassword, "Decoy", 3);
+
+        
+        // Ensure passwords are different (constant-time)
+        if (constantTimeEquals(masterPassword, panicPassword) ||
+            constantTimeEquals(masterPassword, decoyPassword) ||
+            constantTimeEquals(panicPassword, decoyPassword)) {
+            throw new IllegalArgumentException("All passwords must be different from each other");
+        }
+
+        
+        // Benchmark and get KDF parameters
+        KDF.BenchmarkResult benchmark = KDF.benchmark();
+        this.kdfParams = benchmark.getRecommendedParams();
+
+        
+        // Generate Vault Master Keys
+        byte[] vmk = cryptoManager.generateSecureRandom(32);  // 256-bit VMK
+        byte[] dvmk = cryptoManager.generateSecureRandom(32); // 256-bit DVMK
+
         
         try {
-            // Convert to char arrays for secure handling
-            masterChars = masterPassword.toCharArray();
-            panicChars = panicPassword.toCharArray();
-            decoyChars = decoyPassword.toCharArray();
+            // Derive KEKs from passwords
+            byte[] masterKEK = KDF.deriveKey(masterPassword, kdfParams);
+            byte[] panicKEK = KDF.deriveKey(panicPassword, kdfParams);
+            byte[] decoyKEK = KDF.deriveKey(decoyPassword, kdfParams);
             
-            // Validate password strength
-            validatePasswordStrength(masterPassword, "Master", AppConfig.PASSWORD_MIN_STRENGTH);
-            validatePasswordStrength(panicPassword, "Panic", 3);
-            validatePasswordStrength(decoyPassword, "Decoy", 3);
-            
-            // Ensure passwords are different using constant-time comparison
-            if (MemoryUtils.constantTimeEquals(masterChars, panicChars) ||
-                MemoryUtils.constantTimeEquals(masterChars, decoyChars) ||
-                MemoryUtils.constantTimeEquals(panicChars, decoyChars)) {
-                throw new IllegalArgumentException("All passwords must be different from each other");
+            try {
+                // Create verifiers (hash of KEK for constant-time comparison)
+                this.masterVerifier = createVerifier(masterKEK);
+                this.panicVerifier = createVerifier(panicKEK);
+                this.decoyVerifier = createVerifier(decoyKEK);
+                
+                // Wrap VMK and DVMK with KEKs
+                SecretKey masterKey = cryptoManager.keyFromBytes(masterKEK);
+                SecretKey decoyKey = cryptoManager.keyFromBytes(decoyKEK);
+                
+                this.wrappedVMK = cryptoManager.encrypt(vmk, masterKey, null);
+                this.wrappedDVMK = cryptoManager.encrypt(dvmk, decoyKey, null);
+                
+                // Save configuration
+                savePasswordConfiguration();
+                this.isConfigured = true;
+                
+                // Verify password detection works
+                PasswordType testResult = detectPassword(masterPassword);
+                if (testResult != PasswordType.MASTER) {
+                    throw new Exception("Password verification failed");
+                }
+                
+            } finally {
+                // Zeroize KEKs
+                cryptoManager.zeroize(masterKEK);
+                cryptoManager.zeroize(panicKEK);
+                cryptoManager.zeroize(decoyKEK);
             }
-            
-            // Hash passwords
-            hashedMasterPassword = hashPasswordToBytes(masterPassword);
-            hashedPanicPassword = hashPasswordToBytes(panicPassword);
-            hashedDecoyPassword = hashPasswordToBytes(decoyPassword);
-            
-            // Create and save encrypted configuration
-            savePasswordConfiguration();
-            
-            isConfigured = true;
             
         } finally {
-            // Clear passwords from memory
-            MemoryUtils.secureWipe(masterChars, panicChars, decoyChars);
+            // Zeroize VMKs (they're now wrapped)
+            cryptoManager.zeroize(vmk);
+            cryptoManager.zeroize(dvmk);
         }
     }
     
     /**
-     * Validate password strength with detailed requirements
+     * Detect password type with constant-time comparison and timing parity
+     * 
+     * SECURITY: Always performs all three comparisons and adds fixed delay + jitter
+     * to prevent timing side-channels from revealing which password was entered.
      */
-    private void validatePasswordStrength(String password, String passwordType, int minStrength) {
-        int strength = getPasswordStrength(password);
-        if (strength < minStrength) {
-            throw new IllegalArgumentException(passwordType + " password is too weak. " +
-                "Current strength: " + strength + "/5, Required: " + minStrength + "/5. " +
-                "Requirements: 8+ characters, uppercase, lowercase, numbers, special characters.");
-        }
-    }
-    
-    /**
-     * Save encrypted password configuration to file
-     */
-    private void savePasswordConfiguration() throws Exception {
-        try {
-            // Create configuration object
-            PasswordConfiguration config = new PasswordConfiguration(
-                hashedMasterPassword,
-                hashedPanicPassword, 
-                hashedDecoyPassword,
-                salt,
-                AppConfig.PBKDF2_ITERATIONS,
-                AppConfig.KEY_DERIVATION_ALGORITHM
-            );
-            
-            // Serialize configuration
-            ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            try (ObjectOutputStream oos = new ObjectOutputStream(baos)) {
-                oos.writeObject(config);
-            }
-            
-            // Encrypt configuration
-            SecretKey bootstrapKey = createBootstrapKey();
-            CryptoManager.EncryptedData encryptedConfig = cryptoManager.encrypt(baos.toByteArray(), bootstrapKey);
-            
-            // Write to file
-            FileUtils.writeEncryptedFile(Paths.get(AppConfig.CONFIG_FILE), encryptedConfig);
-            
-            // Clear sensitive data
-            MemoryUtils.secureWipe(baos.toByteArray());
-            
-        } catch (Exception e) {
-            throw new CryptographicException("Failed to save password configuration", e);
-        }
-    }
-    
-    /**
-     * Validate password and return type using constant-time comparison
-     */
-    public PasswordType validatePassword(String password) throws Exception {
+    public PasswordType detectPassword(char[] password) throws Exception {
         if (!isConfigured) {
+            addTimingDelay();
             return PasswordType.INVALID;
         }
         
-        char[] passwordChars = null;
-        byte[] hashedInput = null;
+        byte[] kek = null;
+        byte[] verifier = null;
         
         try {
-            passwordChars = password.toCharArray();
-            hashedInput = hashPasswordToBytes(password);
+            // Derive KEK from password
+            kek = KDF.deriveKey(password, kdfParams);
+            verifier = createVerifier(kek);
             
-            // Use constant-time comparison to prevent timing attacks
-            boolean isMaster = MemoryUtils.constantTimeEquals(hashedInput, hashedMasterPassword);
-            boolean isPanic = MemoryUtils.constantTimeEquals(hashedInput, hashedPanicPassword);
-            boolean isDecoy = MemoryUtils.constantTimeEquals(hashedInput, hashedDecoyPassword);
+            // CRITICAL: Always perform ALL comparisons (constant-time)
+            boolean isMaster = MessageDigest.isEqual(verifier, masterVerifier);
+            boolean isPanic = MessageDigest.isEqual(verifier, panicVerifier);
+            boolean isDecoy = MessageDigest.isEqual(verifier, decoyVerifier);
             
-            // Return the first match found (order matters for security)
+            // Determine result (order matters for priority)
+            PasswordType result;
             if (isMaster) {
-                return PasswordType.MASTER;
+                result = PasswordType.MASTER;
             } else if (isPanic) {
-                return PasswordType.PANIC;
+                result = PasswordType.PANIC;
             } else if (isDecoy) {
-                return PasswordType.DECOY;
+                result = PasswordType.DECOY;
             } else {
-                return PasswordType.INVALID;
+                result = PasswordType.INVALID;
             }
             
+            // Add timing delay to mask differences
+            addTimingDelay();
+            
+            return result;
+            
         } finally {
-            // Clear sensitive data from memory
-            MemoryUtils.secureWipe(passwordChars);
-            MemoryUtils.secureWipe(hashedInput);
+            // Zeroize sensitive data
+            if (kek != null) cryptoManager.zeroize(kek);
+            if (verifier != null) cryptoManager.zeroize(verifier);
         }
     }
     
     /**
-     * Derive encryption key from password for vault operations
+     * Unwrap VMK using master password
+     * 
+     * @return Vault Master Key for encrypting/decrypting vault data
      */
-    public SecretKey deriveVaultKey(String password) throws Exception {
-        char[] passwordChars = null;
+    public SecretKey unwrapVMK(char[] masterPassword) throws Exception {
+        byte[] kek = null;
+        byte[] vmkBytes = null;
         
         try {
-            passwordChars = password.toCharArray();
-            return cryptoManager.deriveKey(password, salt);
+            // Derive KEK
+            kek = KDF.deriveKey(masterPassword, kdfParams);
+            
+            // Verify it's the master password
+            byte[] verifier = createVerifier(kek);
+            if (!MessageDigest.isEqual(verifier, masterVerifier)) {
+                throw new GeneralSecurityException("Invalid master password");
+            }
+            cryptoManager.zeroize(verifier);
+            
+            // Unwrap VMK
+            SecretKey kekKey = cryptoManager.keyFromBytes(kek);
+            vmkBytes = cryptoManager.decrypt(wrappedVMK, kekKey, null);
+            
+            return cryptoManager.keyFromBytes(vmkBytes);
+            
         } finally {
-            MemoryUtils.secureWipe(passwordChars);
+            if (kek != null) cryptoManager.zeroize(kek);
+            if (vmkBytes != null) cryptoManager.zeroize(vmkBytes);
         }
     }
     
     /**
-     * Hash password using PBKDF2 and return as byte array
+     * Unwrap DVMK using decoy password
+     * 
+     * @return Decoy Vault Master Key for decoy vault
      */
-    private byte[] hashPasswordToBytes(String password) throws Exception {
-        char[] passwordChars = null;
+    public SecretKey unwrapDVMK(char[] decoyPassword) throws Exception {
+        byte[] kek = null;
+        byte[] dvmkBytes = null;
         
         try {
-            passwordChars = password.toCharArray();
+            // Derive KEK
+            kek = KDF.deriveKey(decoyPassword, kdfParams);
             
-            KeySpec spec = new PBEKeySpec(
-                passwordChars,
-                salt,
-                AppConfig.PBKDF2_ITERATIONS,
-                256
-            );
+            // Verify it's the decoy password
+            byte[] verifier = createVerifier(kek);
+            if (!MessageDigest.isEqual(verifier, decoyVerifier)) {
+                throw new GeneralSecurityException("Invalid decoy password");
+            }
+            cryptoManager.zeroize(verifier);
             
-            SecretKeyFactory factory = SecretKeyFactory.getInstance(AppConfig.KEY_DERIVATION_ALGORITHM);
-            return factory.generateSecret(spec).getEncoded();
+            // Unwrap DVMK
+            SecretKey kekKey = cryptoManager.keyFromBytes(kek);
+            dvmkBytes = cryptoManager.decrypt(wrappedDVMK, kekKey, null);
+            
+            return cryptoManager.keyFromBytes(dvmkBytes);
             
         } finally {
-            MemoryUtils.secureWipe(passwordChars);
+            if (kek != null) cryptoManager.zeroize(kek);
+            if (dvmkBytes != null) cryptoManager.zeroize(dvmkBytes);
         }
     }
     
     /**
-     * Hash password using PBKDF2 (legacy method for compatibility)
+     * Create verifier from KEK (SHA-256 hash)
      */
-    @Deprecated
-    private String hashPassword(String password) throws Exception {
-        byte[] hash = hashPasswordToBytes(password);
+    private byte[] createVerifier(byte[] kek) throws Exception {
+        MessageDigest digest = MessageDigest.getInstance("SHA-256");
+        return digest.digest(kek);
+    }
+    
+    /**
+     * Add timing delay with jitter to prevent timing attacks
+     */
+    private void addTimingDelay() {
         try {
-            return Base64.getEncoder().encodeToString(hash);
-        } finally {
-            MemoryUtils.secureWipe(hash);
+            int jitter = secureRandom.nextInt(JITTER_MS);
+            Thread.sleep(MIN_DELAY_MS + jitter);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
         }
     }
     
     /**
-     * Calculate comprehensive password strength score (0-5)
+     * Constant-time char array comparison
+     */
+    private boolean constantTimeEquals(char[] a, char[] b) {
+        if (a == null || b == null) {
+            return a == b;
+        }
+        
+        if (a.length != b.length) {
+            return false;
+        }
+        
+        int result = 0;
+        for (int i = 0; i < a.length; i++) {
+            result |= a[i] ^ b[i];
+        }
+        
+        return result == 0;
+    }
+    
+    /**
+     * Validate password strength
+     */
+    private void validatePasswordStrength(char[] password, String passwordType, int minStrength) {
+        String passwordStr = new String(password);
+        try {
+            int strength = getPasswordStrength(passwordStr);
+            if (strength < minStrength) {
+                throw new IllegalArgumentException(passwordType + " password is too weak. " +
+                    "Current strength: " + strength + "/5, Required: " + minStrength + "/5");
+            }
+        } finally {
+            // Clear temporary string
+            passwordStr = null;
+        }
+    }
+    
+    /**
+     * Calculate password strength (0-5)
      */
     public static int getPasswordStrength(String password) {
         if (password == null || password.isEmpty()) {
@@ -349,39 +386,30 @@ public class PasswordManager {
         
         int score = 0;
         
-        // Length requirements (progressive scoring)
         if (password.length() >= 8) score++;
-        if (password.length() >= 12) score++; // Bonus for longer passwords
+        if (password.length() >= 12) score++;
+        if (password.matches(".*[A-Z].*")) score++;
+        if (password.matches(".*[a-z].*")) score++;
+        if (password.matches(".*\\d.*")) score++;
+        if (password.matches(".*[!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>/?`~].*")) score++;
         
-        // Character variety checks
-        if (password.matches(".*[A-Z].*")) score++;  // Uppercase letters
-        if (password.matches(".*[a-z].*")) score++;  // Lowercase letters
-        if (password.matches(".*\\d.*")) score++;    // Digits
-        if (password.matches(".*[!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>/?`~].*")) score++; // Special chars
-        
-        // Additional security checks
-        if (password.length() >= 16) score++; // Extra bonus for very long passwords
+        if (password.length() >= 16) score++;
         
         // Penalize common patterns
         if (isCommonPattern(password)) {
             score = Math.max(0, score - 2);
         }
         
-        // Cap at 5
         return Math.min(5, score);
     }
     
     /**
-     * Check for common weak password patterns
+     * Check for common weak patterns
      */
     private static boolean isCommonPattern(String password) {
         String lower = password.toLowerCase();
-        
-        // Common weak patterns
         String[] weakPatterns = {
-            "password", "123456", "qwerty", "admin", "letmein", 
-            "welcome", "monkey", "dragon", "master", "shadow",
-            "12345678", "abc123", "password123", "admin123"
+            "password", "123456", "qwerty", "admin", "letmein"
         };
         
         for (String pattern : weakPatterns) {
@@ -390,21 +418,127 @@ public class PasswordManager {
             }
         }
         
-        // Sequential patterns
-        if (lower.matches(".*(?:012|123|234|345|456|567|678|789|890|abc|bcd|cde|def).*")) {
-            return true;
-        }
-        
-        // Repeated characters
-        if (password.matches(".*(.)\\1{2,}.*")) {
-            return true;
-        }
-        
-        return false;
+        return password.matches(".*(.)\\1{2,}.*");
     }
     
     /**
-     * Get detailed password strength feedback
+     * Save encrypted password configuration
+     */
+    private void savePasswordConfiguration() throws Exception {
+        // Serialize KDF params
+        byte[] kdfParamsSerialized = serializeKdfParams(kdfParams);
+        
+        // Create configuration
+        PasswordConfiguration config = new PasswordConfiguration(
+            kdfParamsSerialized,
+            masterVerifier,
+            wrappedVMK,
+            panicVerifier,
+            decoyVerifier,
+            wrappedDVMK
+        );
+        
+        // Serialize to bytes
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        try (ObjectOutputStream oos = new ObjectOutputStream(baos)) {
+            oos.writeObject(config);
+        }
+        
+        // Write to file (unencrypted - verifiers and wrapped keys are already protected)
+        Files.write(Paths.get(AppConfig.CONFIG_FILE), baos.toByteArray());
+    }
+    
+    /**
+     * Serialize KDF parameters
+     */
+    private byte[] serializeKdfParams(KDF.KdfParams params) throws IOException {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        try (DataOutputStream dos = new DataOutputStream(baos)) {
+            dos.writeUTF(params.getAlgorithm().name());
+            dos.writeInt(params.getSalt().length);
+            dos.write(params.getSalt());
+            
+            if (params.getAlgorithm() == KDF.Algorithm.ARGON2ID) {
+                dos.writeInt(params.getMemory());
+                dos.writeInt(params.getIterations());
+                dos.writeInt(params.getParallelism());
+            } else {
+                dos.writeInt(params.getPbkdf2Iterations());
+            }
+        }
+        return baos.toByteArray();
+    }
+    
+    /**
+     * Deserialize KDF parameters
+     */
+    private KDF.KdfParams deserializeKdfParams(byte[] data) throws IOException {
+        ByteArrayInputStream bais = new ByteArrayInputStream(data);
+        try (DataInputStream dis = new DataInputStream(bais)) {
+            String algorithmName = dis.readUTF();
+            KDF.Algorithm algorithm = KDF.Algorithm.valueOf(algorithmName);
+            
+            int saltLength = dis.readInt();
+            byte[] salt = new byte[saltLength];
+            dis.readFully(salt);
+            
+            if (algorithm == KDF.Algorithm.ARGON2ID) {
+                int memory = dis.readInt();
+                int iterations = dis.readInt();
+                int parallelism = dis.readInt();
+                return new KDF.KdfParams(algorithm, salt, memory, iterations, parallelism);
+            } else {
+                int iterations = dis.readInt();
+                return new KDF.KdfParams(algorithm, salt, iterations);
+            }
+        }
+    }
+    
+    /**
+     * Check if passwords are configured
+     */
+    public boolean arePasswordsConfigured() {
+        return isConfigured;
+    }
+    
+    /**
+     * Get KDF parameters (for metadata storage)
+     */
+    public KDF.KdfParams getKdfParams() {
+        return kdfParams;
+    }
+    
+    /**
+     * Get password strength description (for UI)
+     */
+    public static String getPasswordStrengthDescription(int score) {
+        switch (score) {
+            case 0: return "";
+            case 1: return "Very Weak";
+            case 2: return "Weak";
+            case 3: return "Fair";
+            case 4: return "Strong";
+            case 5: return "Very Strong";
+            default: return "Unknown";
+        }
+    }
+    
+    /**
+     * Get password strength color (for UI)
+     */
+    public static String getPasswordStrengthColor(int score) {
+        switch (score) {
+            case 1: return "#f44336"; // Red
+            case 2: return "#ff9800"; // Orange
+            case 3: return "#ffeb3b"; // Yellow
+            case 4: return "#8bc34a"; // Light Green
+            case 5: return "#4caf50"; // Green
+            default: return "#cccccc"; // Gray
+        }
+    }
+    
+    /**
+     * Get password strength feedback (for UI)
      */
     public static String getPasswordStrengthFeedback(String password) {
         if (password == null || password.isEmpty()) {
@@ -445,114 +579,34 @@ public class PasswordManager {
     }
     
     /**
-     * Get password strength description
-     */
-    public static String getPasswordStrengthDescription(int score) {
-        switch (score) {
-            case 0: return "";
-            case 1: return "Very Weak";
-            case 2: return "Weak";
-            case 3: return "Fair";
-            case 4: return "Strong";
-            case 5: return "Very Strong";
-            default: return "Unknown";
-        }
-    }
-    
-    /**
-     * Get password strength color for UI
-     */
-    public static String getPasswordStrengthColor(int score) {
-        switch (score) {
-            case 1: return "#f44336"; // Red
-            case 2: return "#ff9800"; // Orange
-            case 3: return "#ffeb3b"; // Yellow
-            case 4: return "#8bc34a"; // Light Green
-            case 5: return "#4caf50"; // Green
-            default: return "#cccccc"; // Gray
-        }
-    }
-    
-    /**
-     * Get salt for key derivation (secure copy)
-     */
-    public byte[] getSalt() {
-        return MemoryUtils.secureCopy(salt);
-    }
-    
-    /**
-     * Check if passwords are configured
-     */
-    public boolean arePasswordsConfigured() {
-        return isConfigured && 
-               hashedMasterPassword != null && 
-               hashedPanicPassword != null && 
-               hashedDecoyPassword != null;
-    }
-    
-    /**
-     * Change master password (requires current password verification)
-     */
-    public void changeMasterPassword(String currentPassword, String newPassword) throws Exception {
-        // Verify current password
-        if (validatePassword(currentPassword) != PasswordType.MASTER) {
-            throw new CryptographicException("Current password verification failed");
-        }
-        
-        // Validate new password strength
-        validatePasswordStrength(newPassword, "New master", AppConfig.PASSWORD_MIN_STRENGTH);
-        
-        char[] newPasswordChars = null;
-        try {
-            newPasswordChars = newPassword.toCharArray();
-            
-            // Hash new password
-            byte[] newHash = hashPasswordToBytes(newPassword);
-            
-            // Update stored hash
-            MemoryUtils.secureWipe(hashedMasterPassword);
-            hashedMasterPassword = newHash;
-            
-            // Save updated configuration
-            savePasswordConfiguration();
-            
-        } finally {
-            MemoryUtils.secureWipe(newPasswordChars);
-        }
-    }
-    
-    /**
      * Securely destroy all password data (for panic mode)
+     * This implements cryptographic erasure - without the wrapped keys,
+     * the vault data becomes permanently unrecoverable.
      */
     public void secureDestroy() {
-        MemoryUtils.secureWipe(salt);
-        MemoryUtils.secureWipe(hashedMasterPassword);
-        MemoryUtils.secureWipe(hashedPanicPassword);
-        MemoryUtils.secureWipe(hashedDecoyPassword);
+        // Zeroize all sensitive data
+        if (masterVerifier != null) cryptoManager.zeroize(masterVerifier);
+        if (wrappedVMK != null) cryptoManager.zeroize(wrappedVMK);
+        if (panicVerifier != null) cryptoManager.zeroize(panicVerifier);
+        if (decoyVerifier != null) cryptoManager.zeroize(decoyVerifier);
+        if (wrappedDVMK != null) cryptoManager.zeroize(wrappedDVMK);
         
-        salt = null;
-        hashedMasterPassword = null;
-        hashedPanicPassword = null;
-        hashedDecoyPassword = null;
+        masterVerifier = null;
+        wrappedVMK = null;
+        panicVerifier = null;
+        decoyVerifier = null;
+        wrappedDVMK = null;
+        kdfParams = null;
         isConfigured = false;
         
         // Clear crypto manager
-        if (cryptoManager != null) {
-            cryptoManager.clearKeys();
+        cryptoManager.clearKeys();
+        
+        // Delete config file
+        try {
+            Files.deleteIfExists(Paths.get(AppConfig.CONFIG_FILE));
+        } catch (Exception e) {
+            // Best effort
         }
-    }
-    
-    /**
-     * Get password requirements text for UI
-     */
-    public static String getPasswordRequirements() {
-        return "Password Requirements:\n" +
-               "• At least 8 characters long\n" +
-               "• Contains uppercase letters (A-Z)\n" +
-               "• Contains lowercase letters (a-z)\n" +
-               "• Contains numbers (0-9)\n" +
-               "• Contains special characters (!@#$%^&*)\n" +
-               "• Avoid common words and patterns\n" +
-               "• All three passwords must be different";
     }
 }

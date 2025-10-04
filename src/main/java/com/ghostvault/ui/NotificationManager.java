@@ -7,6 +7,7 @@ import javafx.animation.TranslateTransition;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.Label;
 import javafx.scene.layout.HBox;
@@ -248,7 +249,7 @@ public class NotificationManager {
          * Animate notification in
          */
         private void animateIn() {
-            StackPane content = (StackPane) popup.getContent().get(0);
+            Node content = popup.getContent().get(0);
             
             // Slide in from right
             TranslateTransition slideIn = new TranslateTransition(Duration.millis(300), content);
@@ -268,7 +269,7 @@ public class NotificationManager {
          * Animate notification out
          */
         private void animateOut(Runnable onComplete) {
-            StackPane content = (StackPane) popup.getContent().get(0);
+            Node content = popup.getContent().get(0);
             
             // Fade out
             FadeTransition fadeOut = new FadeTransition(Duration.millis(200), content);
@@ -297,11 +298,13 @@ public class NotificationManager {
                 double x = primaryStage.getX() + primaryStage.getWidth() - 370;
                 double y = primaryStage.getY() + 50 + (i * 80);
                 
-                // Animate to new position
-                TranslateTransition reposition = new TranslateTransition(Duration.millis(200), 
-                    (StackPane) notification.popup.getContent().get(0));
-                reposition.setToY(y - notification.popup.getY());
-                reposition.play();
+                // Animate to new position if content exists
+                if (!notification.popup.getContent().isEmpty()) {
+                    TranslateTransition reposition = new TranslateTransition(Duration.millis(200), 
+                        notification.popup.getContent().get(0));
+                    reposition.setToY(y - notification.popup.getY());
+                    reposition.play();
+                }
             }
         });
     }

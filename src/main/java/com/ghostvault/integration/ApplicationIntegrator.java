@@ -3,9 +3,9 @@ package com.ghostvault.integration;
 import com.ghostvault.audit.AuditManager;
 import com.ghostvault.backup.VaultBackupManager;
 import com.ghostvault.config.AppConfig;
+import com.ghostvault.core.DecoyManager;
 import com.ghostvault.core.FileManager;
 import com.ghostvault.core.MetadataManager;
-import com.ghostvault.decoy.DecoyManager;
 import com.ghostvault.error.ErrorHandler;
 import com.ghostvault.security.*;
 import com.ghostvault.ui.*;
@@ -127,7 +127,7 @@ public class ApplicationIntegrator {
         sessionManager = new SessionManager();
         
         // Special modes
-        decoyManager = new DecoyManager(cryptoManager, fileManager, metadataManager);
+        decoyManager = new DecoyManager();
         panicModeExecutor = new PanicModeExecutor();
         
         // Backup management
@@ -147,6 +147,9 @@ public class ApplicationIntegrator {
         // Set up UI manager with primary stage
         uiManager.initialize(primaryStage);
         
+        // Set this integrator reference in UI manager
+        uiManager.setApplicationIntegrator(this);
+        
         System.out.println("🎨 UI components initialized");
     }
     
@@ -156,17 +159,39 @@ public class ApplicationIntegrator {
     private void initializeErrorHandling() {
         errorHandler = new ErrorHandler(auditManager, notificationManager);
         
-        // Set up global exception handler
+        // Set up global exception handler with loop prevention
         Thread.setDefaultUncaughtExceptionHandler((thread, exception) -> {
-            errorHandler.handleError("Uncaught exception in " + thread.getName(), 
-                new RuntimeException(exception));
+            // Print to console for debugging
+            System.err.println("❌ Uncaught exception in " + thread.getName() + ": " + exception.getMessage());
+            exception.printStackTrace();
             
-            // Log critical error
-            if (auditManager != null) {
-                auditManager.logSecurityEvent("CRITICAL_ERROR", 
-                    "Uncaught exception: " + exception.getMessage(), 
-                    AuditManager.AuditSeverity.CRITICAL, null, 
-                    "Thread: " + thread.getName());
+            // Don't try to handle ClassCastException from error handler itself (prevents loops)
+            if (exception instanceof ClassCastException) {
+                System.err.println("⚠️ ClassCastException detected - skipping error handler to prevent loop");
+                return;
+            }
+            
+            try {
+                // Convert Throwable to Exception properly
+                Exception exceptionToHandle;
+                if (exception instanceof Exception) {
+                    exceptionToHandle = (Exception) exception;
+                } else {
+                    exceptionToHandle = new RuntimeException(exception);
+                }
+                
+                errorHandler.handleError("Uncaught exception in " + thread.getName(), exceptionToHandle);
+                
+                // Log critical error
+                if (auditManager != null) {
+                    auditManager.logSecurityEvent("CRITICAL_ERROR", 
+                        "Uncaught exception: " + exception.getMessage(), 
+                        AuditManager.AuditSeverity.CRITICAL, null, 
+                        "Thread: " + thread.getName());
+                }
+            } catch (Exception handlerException) {
+                System.err.println("⚠️ Error in exception handler: " + handlerException.getMessage());
+                handlerException.printStackTrace();
             }
         });
         
@@ -248,23 +273,15 @@ public class ApplicationIntegrator {
     public void handleAuthentication(String password) {
         CompletableFuture.supplyAsync(() -> {
             return errorHandler.handleWithRecovery("password_validation", 
-                () -> passwordManager.validatePassword(password), 
+                () -> passwordManager.detectPassword(password.toCharArray()), 
                 null);
         }, backgroundExecutor).thenAccept(passwordType -> {
             Platform.runLater(() -> {
                 switch (passwordType) {
-                    case MASTER:
-                        handleMasterPasswordLogin(password);
-                        break;
-                    case PANIC:
-                        handlePanicPasswordLogin();
-                        break;
-                    case DECOY:
-                        handleDecoyPasswordLogin(password);
-                        break;
-                    case INVALID:
-                        handleInvalidPassword();
-                        break;
+                    case MASTER -> handleMasterPasswordLogin(password);
+                    case PANIC -> handlePanicPasswordLogin();
+                    case DECOY -> handleDecoyPasswordLogin(password);
+                    case INVALID -> handleInvalidPassword();
                 }
             });
         }).exceptionally(throwable -> {
@@ -281,8 +298,8 @@ public class ApplicationIntegrator {
      */
     private void handleMasterPasswordLogin(String password) {
         try {
-            // Derive encryption key
-            currentKey = passwordManager.deriveVaultKey(password);
+            // Unwrap Vault Master Key
+            currentKey = passwordManager.unwrapVMK(password.toCharArray());
             
             // Start session
             sessionManager.startSession();
@@ -321,7 +338,7 @@ public class ApplicationIntegrator {
             
             // Execute panic wipe in background
             CompletableFuture.runAsync(() -> {
-                panicModeExecutor.executePanicMode();
+                panicModeExecutor.executePanic(java.nio.file.Paths.get(AppConfig.VAULT_DIR), false);
             }, backgroundExecutor).thenRun(() -> {
                 // Shutdown application after panic wipe
                 Platform.runLater(() -> {
@@ -343,8 +360,8 @@ public class ApplicationIntegrator {
      */
     private void handleDecoyPasswordLogin(String password) {
         try {
-            // Initialize decoy vault
-            decoyManager.initializeDecoyVault(password);
+            // Initialize decoy vault with minimum files
+            decoyManager.ensureMinimumDecoyFiles(8);
             
             // Create decoy security context
             securityContext = new SecurityContext(null, PasswordManager.PasswordType.DECOY);
@@ -480,7 +497,7 @@ public class ApplicationIntegrator {
      */
     private void showFirstRunSetup() {
         try {
-            Scene setupScene = uiManager.createFirstRunSetupScene();
+            Scene setupScene = uiManager.createFirstRunSetupScene(passwordManager);
             primaryStage.setScene(setupScene);
             primaryStage.setTitle("GhostVault - Initial Setup");
             primaryStage.show();
@@ -507,22 +524,45 @@ public class ApplicationIntegrator {
      * Show vault interface
      */
     private void showVaultInterface(boolean isDecoyMode) {
-        try {
-            Scene vaultScene;
-            if (isDecoyMode) {
-                vaultScene = uiManager.createDecoyVaultScene(decoyManager);
-            } else {
-                vaultScene = uiManager.createMasterVaultScene(fileManager, metadataManager, 
-                    backupManager, currentKey);
+        Platform.runLater(() -> {
+            try {
+                System.out.println("🚀 Creating vault scene (decoy: " + isDecoyMode + ")");
+                
+                Scene vaultScene;
+                if (isDecoyMode) {
+                    System.out.println("📁 Creating decoy vault scene");
+                    vaultScene = uiManager.createDecoyVaultScene(decoyManager);
+                } else {
+                    System.out.println("🔒 Creating master vault scene");
+                    vaultScene = uiManager.createMasterVaultScene(fileManager, metadataManager, 
+                        backupManager, currentKey);
+                }
+                
+                System.out.println("🎭 Setting vault scene on stage");
+                primaryStage.setScene(vaultScene);
+                primaryStage.setTitle("GhostVault - " + (isDecoyMode ? "Decoy" : "Secure") + " Vault");
+                primaryStage.show();
+                
+                System.out.println("✅ Vault interface displayed successfully");
+                
+            } catch (Exception e) {
+                System.err.println("❌ Error showing vault interface: " + e.getMessage());
+                e.printStackTrace();
+                errorHandler.handleError("Vault interface", e);
+                
+                // Show error to user and return to login
+                Platform.runLater(() -> {
+                    try {
+                        Scene loginScene = uiManager.createLoginScene();
+                        primaryStage.setScene(loginScene);
+                        notificationManager.showError("Vault Error", 
+                            "Failed to load vault interface: " + e.getMessage());
+                    } catch (Exception ex) {
+                        System.err.println("Failed to return to login: " + ex.getMessage());
+                    }
+                });
             }
-            
-            primaryStage.setScene(vaultScene);
-            primaryStage.setTitle("GhostVault - Secure File Vault");
-            primaryStage.show();
-            
-        } catch (Exception e) {
-            errorHandler.handleError("Vault UI", e);
-        }
+        });
     }
     
     /**

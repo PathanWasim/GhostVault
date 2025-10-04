@@ -34,20 +34,7 @@ public class GhostVault extends Application {
             // Initialize application integrator
             applicationIntegrator = new ApplicationIntegrator();
             
-            // Set up global exception handler
-            Thread.setDefaultUncaughtExceptionHandler((thread, exception) -> {
-                System.err.println("Uncaught exception in " + thread.getName() + ": " + exception.getMessage());
-                exception.printStackTrace();
-                
-                Platform.runLater(() -> {
-                    if (applicationIntegrator != null && applicationIntegrator.getErrorHandler() != null) {
-                        applicationIntegrator.getErrorHandler().handleError(
-                            "Uncaught exception in " + thread.getName(), 
-                            new RuntimeException(exception)
-                        );
-                    }
-                });
-            });
+            // Note: Global exception handler is set up in ApplicationIntegrator.initializeErrorHandling()
             
             // Set up stage close handler
             primaryStage.setOnCloseRequest(event -> {
