@@ -98,26 +98,17 @@ public class PasswordManager {
     private void loadPasswordConfiguration() throws Exception {
         File configFile = new File(AppConfig.CONFIG_FILE);
         
-        System.out.println("📂 Loading password configuration from: " + AppConfig.CONFIG_FILE);
-        System.out.println("📂 Config file exists: " + configFile.exists());
-        
         if (configFile.exists()) {
             try {
                 byte[] configData = Files.readAllBytes(configFile.toPath());
-                System.out.println("📂 Config file size: " + configData.length + " bytes");
                 
                 // Deserialize configuration
                 ByteArrayInputStream bais = new ByteArrayInputStream(configData);
                 try (ObjectInputStream ois = new ObjectInputStream(bais)) {
                     PasswordConfiguration config = (PasswordConfiguration) ois.readObject();
                     
-                    System.out.println("📦 Deserialized password configuration");
-                    
                     // Deserialize KDF params
                     this.kdfParams = deserializeKdfParams(config.getKdfParams());
-                    
-                    System.out.println("🔑 Loaded KDF params: " + this.kdfParams);
-                    System.out.println("🔑 Salt length: " + this.kdfParams.getSalt().length);
                     
                     // Load verifiers and wrapped keys
                     this.masterVerifier = config.getMasterVerifier();
@@ -126,22 +117,13 @@ public class PasswordManager {
                     this.decoyVerifier = config.getDecoyVerifier();
                     this.wrappedDVMK = config.getWrappedDVMK();
                     
-                    System.out.println("✅ Master verifier length: " + this.masterVerifier.length);
-                    System.out.println("✅ Panic verifier length: " + this.panicVerifier.length);
-                    System.out.println("✅ Decoy verifier length: " + this.decoyVerifier.length);
-                    
                     this.isConfigured = true;
-                    
-                    System.out.println("✅ Password configuration loaded successfully");
                 }
                 
             } catch (Exception e) {
-                System.err.println("❌ Warning: Could not load password configuration: " + e.getMessage());
-                e.printStackTrace();
+                System.err.println("Warning: Could not load password configuration: " + e.getMessage());
                 this.isConfigured = false;
             }
-        } else {
-            System.out.println("📂 No config file found - passwords not configured");
         }
     }
     
@@ -155,22 +137,13 @@ public class PasswordManager {
     public void initializePasswords(char[] masterPassword, char[] panicPassword, char[] decoyPassword) 
             throws Exception {
         
-        System.out.println("🔧 Initializing passwords...");
-        System.out.println("📝 Master password length: " + masterPassword.length);
-        System.out.print("📝 Master password (first 3 chars): ");
-        for (int i = 0; i < Math.min(3, masterPassword.length); i++) {
-            System.out.print(masterPassword[i]);
-        }
-        System.out.println("...");
-        System.out.println("📝 Panic password length: " + panicPassword.length);
-        System.out.println("📝 Decoy password length: " + decoyPassword.length);
+        // Initialize passwords for vault access
         
         // Validate password strength
         validatePasswordStrength(masterPassword, "Master", AppConfig.PASSWORD_MIN_STRENGTH);
         validatePasswordStrength(panicPassword, "Panic", 3);
         validatePasswordStrength(decoyPassword, "Decoy", 3);
-        
-        System.out.println("✅ Password strength validation passed");
+
         
         // Ensure passwords are different (constant-time)
         if (constantTimeEquals(masterPassword, panicPassword) ||
@@ -178,67 +151,46 @@ public class PasswordManager {
             constantTimeEquals(panicPassword, decoyPassword)) {
             throw new IllegalArgumentException("All passwords must be different from each other");
         }
-        
-        System.out.println("✅ Password uniqueness check passed");
+
         
         // Benchmark and get KDF parameters
         KDF.BenchmarkResult benchmark = KDF.benchmark();
         this.kdfParams = benchmark.getRecommendedParams();
-        
-        System.out.println("🔑 KDF Benchmark: " + kdfParams + " took " + benchmark.getDurationMs() + "ms");
+
         
         // Generate Vault Master Keys
         byte[] vmk = cryptoManager.generateSecureRandom(32);  // 256-bit VMK
         byte[] dvmk = cryptoManager.generateSecureRandom(32); // 256-bit DVMK
-        
-        System.out.println("🔐 Generated VMK and DVMK");
+
         
         try {
             // Derive KEKs from passwords
-            System.out.println("🔑 Deriving KEKs from passwords...");
             byte[] masterKEK = KDF.deriveKey(masterPassword, kdfParams);
             byte[] panicKEK = KDF.deriveKey(panicPassword, kdfParams);
             byte[] decoyKEK = KDF.deriveKey(decoyPassword, kdfParams);
             
-            System.out.println("✅ KEKs derived successfully");
-            
             try {
                 // Create verifiers (hash of KEK for constant-time comparison)
-                System.out.println("🔒 Creating password verifiers...");
                 this.masterVerifier = createVerifier(masterKEK);
                 this.panicVerifier = createVerifier(panicKEK);
                 this.decoyVerifier = createVerifier(decoyKEK);
                 
-                System.out.println("✅ Verifiers created");
-                
                 // Wrap VMK and DVMK with KEKs
-                System.out.println("🔐 Wrapping vault keys...");
                 SecretKey masterKey = cryptoManager.keyFromBytes(masterKEK);
                 SecretKey decoyKey = cryptoManager.keyFromBytes(decoyKEK);
                 
                 this.wrappedVMK = cryptoManager.encrypt(vmk, masterKey, null);
                 this.wrappedDVMK = cryptoManager.encrypt(dvmk, decoyKey, null);
                 
-                System.out.println("✅ Vault keys wrapped");
-                
                 // Save configuration
-                System.out.println("💾 Saving password configuration...");
                 savePasswordConfiguration();
-                
-                System.out.println("✅ Password configuration saved to: " + AppConfig.CONFIG_FILE);
-                
                 this.isConfigured = true;
                 
-                System.out.println("🎉 Password initialization complete!");
-                
-                // Verify by testing password detection
-                System.out.println("🧪 Testing password detection...");
+                // Verify password detection works
                 PasswordType testResult = detectPassword(masterPassword);
-                System.out.println("🧪 Test result: " + testResult);
                 if (testResult != PasswordType.MASTER) {
-                    throw new Exception("Password verification failed! Expected MASTER, got " + testResult);
+                    throw new Exception("Password verification failed");
                 }
-                System.out.println("✅ Password verification successful!");
                 
             } finally {
                 // Zeroize KEKs
@@ -262,54 +214,22 @@ public class PasswordManager {
      */
     public PasswordType detectPassword(char[] password) throws Exception {
         if (!isConfigured) {
-            System.out.println("🔒 Password detection: NOT CONFIGURED");
-            // Add delay even for unconfigured state
             addTimingDelay();
             return PasswordType.INVALID;
         }
-        
-        System.out.println("🔍 Detecting password type...");
-        long startTime = System.nanoTime();
         
         byte[] kek = null;
         byte[] verifier = null;
         
         try {
             // Derive KEK from password
-            System.out.println("🔑 Deriving KEK from password...");
-            System.out.println("🔑 Using KDF params: " + kdfParams);
-            System.out.println("🔑 Password length: " + password.length);
-            System.out.print("🔑 Password (first 3 chars): ");
-            for (int i = 0; i < Math.min(3, password.length); i++) {
-                System.out.print(password[i]);
-            }
-            System.out.println("...");
-            
             kek = KDF.deriveKey(password, kdfParams);
-            System.out.println("🔑 KEK derived, length: " + kek.length);
-            
             verifier = createVerifier(kek);
-            System.out.println("🔑 Verifier created, length: " + verifier.length);
-            
-            // Print first few bytes for debugging (safe since it's a hash)
-            System.out.print("🔑 Generated verifier (first 8 bytes): ");
-            for (int i = 0; i < Math.min(8, verifier.length); i++) {
-                System.out.printf("%02x ", verifier[i]);
-            }
-            System.out.println();
-            
-            System.out.print("🔑 Stored master verifier (first 8 bytes): ");
-            for (int i = 0; i < Math.min(8, masterVerifier.length); i++) {
-                System.out.printf("%02x ", masterVerifier[i]);
-            }
-            System.out.println();
             
             // CRITICAL: Always perform ALL comparisons (constant-time)
             boolean isMaster = MessageDigest.isEqual(verifier, masterVerifier);
             boolean isPanic = MessageDigest.isEqual(verifier, panicVerifier);
             boolean isDecoy = MessageDigest.isEqual(verifier, decoyVerifier);
-            
-            System.out.println("🔐 Password check results: Master=" + isMaster + ", Panic=" + isPanic + ", Decoy=" + isDecoy);
             
             // Determine result (order matters for priority)
             PasswordType result;
@@ -322,8 +242,6 @@ public class PasswordManager {
             } else {
                 result = PasswordType.INVALID;
             }
-            
-            System.out.println("✅ Password type detected: " + result);
             
             // Add timing delay to mask differences
             addTimingDelay();
@@ -534,14 +452,6 @@ public class PasswordManager {
      * Serialize KDF parameters
      */
     private byte[] serializeKdfParams(KDF.KdfParams params) throws IOException {
-        System.out.println("💾 Serializing KDF params...");
-        System.out.print("💾 Salt (first 8 bytes): ");
-        byte[] salt = params.getSalt();
-        for (int i = 0; i < Math.min(8, salt.length); i++) {
-            System.out.printf("%02x ", salt[i]);
-        }
-        System.out.println();
-        
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         try (DataOutputStream dos = new DataOutputStream(baos)) {
             dos.writeUTF(params.getAlgorithm().name());
@@ -556,8 +466,6 @@ public class PasswordManager {
                 dos.writeInt(params.getPbkdf2Iterations());
             }
         }
-        
-        System.out.println("💾 KDF params serialized, size: " + baos.toByteArray().length + " bytes");
         return baos.toByteArray();
     }
     
@@ -565,8 +473,6 @@ public class PasswordManager {
      * Deserialize KDF parameters
      */
     private KDF.KdfParams deserializeKdfParams(byte[] data) throws IOException {
-        System.out.println("📂 Deserializing KDF params from " + data.length + " bytes...");
-        
         ByteArrayInputStream bais = new ByteArrayInputStream(data);
         try (DataInputStream dis = new DataInputStream(bais)) {
             String algorithmName = dis.readUTF();
@@ -576,24 +482,14 @@ public class PasswordManager {
             byte[] salt = new byte[saltLength];
             dis.readFully(salt);
             
-            System.out.print("📂 Loaded salt (first 8 bytes): ");
-            for (int i = 0; i < Math.min(8, salt.length); i++) {
-                System.out.printf("%02x ", salt[i]);
-            }
-            System.out.println();
-            
             if (algorithm == KDF.Algorithm.ARGON2ID) {
                 int memory = dis.readInt();
                 int iterations = dis.readInt();
                 int parallelism = dis.readInt();
-                KDF.KdfParams params = new KDF.KdfParams(algorithm, salt, memory, iterations, parallelism);
-                System.out.println("📂 Deserialized: " + params);
-                return params;
+                return new KDF.KdfParams(algorithm, salt, memory, iterations, parallelism);
             } else {
                 int iterations = dis.readInt();
-                KDF.KdfParams params = new KDF.KdfParams(algorithm, salt, iterations);
-                System.out.println("📂 Deserialized: " + params);
-                return params;
+                return new KDF.KdfParams(algorithm, salt, iterations);
             }
         }
     }
