@@ -487,6 +487,15 @@ public class VaultMainController implements Initializable {
     }
     
     /**
+     * Handle search functionality
+     */
+    @FXML
+    private void handleSearch() {
+        // Search is handled automatically by the text property listener
+        // This method exists for FXML compatibility
+    }
+    
+    /**
      * Handle logout with confirmation
      */
     @FXML
