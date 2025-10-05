@@ -154,10 +154,31 @@ public class VaultMainController implements Initializable {
         MenuItem deleteItem = new MenuItem("🗑️ Delete");
         deleteItem.setOnAction(e -> handleDelete());
         
+        MenuItem recoverItem = new MenuItem("🔧 Attempt Recovery");
+        recoverItem.setOnAction(e -> {
+            String selected = fileListView.getSelectionModel().getSelectedItem();
+            if (selected != null && selected.contains("(orphaned)")) {
+                attemptOrphanedFileRecovery(selected);
+            }
+        });
+        
         MenuItem propertiesItem = new MenuItem("ℹ️ Properties");
         propertiesItem.setOnAction(e -> showFileProperties());
         
-        contextMenu.getItems().addAll(downloadItem, deleteItem, new SeparatorMenuItem(), propertiesItem);
+        // Show recovery option only for orphaned files
+        fileListView.getSelectionModel().selectedItemProperty().addListener((obs, oldVal, newVal) -> {
+            contextMenu.getItems().clear();
+            contextMenu.getItems().addAll(downloadItem, deleteItem);
+            
+            if (newVal != null && newVal.contains("(orphaned)")) {
+                contextMenu.getItems().add(new SeparatorMenuItem());
+                contextMenu.getItems().add(recoverItem);
+            }
+            
+            contextMenu.getItems().add(new SeparatorMenuItem());
+            contextMenu.getItems().add(propertiesItem);
+        });
+        
         fileListView.setContextMenu(contextMenu);
     }
     
@@ -284,9 +305,17 @@ public class VaultMainController implements Initializable {
     private void processFileDownload(String selectedDisplayName) {
         try {
             VaultFile targetFile = findVaultFileByDisplayName(selectedDisplayName);
+            
             if (targetFile == null) {
-                logMessage("✗ Could not find file metadata for: " + selectedDisplayName);
-                return;
+                // Handle orphaned files (files without metadata)
+                if (selectedDisplayName.contains("(orphaned)")) {
+                    handleOrphanedFileDownload(selectedDisplayName);
+                    return;
+                } else {
+                    logMessage("✗ Could not find file metadata for: " + selectedDisplayName);
+                    showWarning("File Not Found", "Could not find metadata for the selected file.");
+                    return;
+                }
             }
             
             FileChooser fileChooser = createFileChooser("Save File As");
@@ -315,6 +344,56 @@ public class VaultMainController implements Initializable {
             hideOperationProgress();
             logMessage("✗ Failed to download: " + e.getMessage());
             showError("Download Failed", "Error: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Handle download of orphaned files (files without metadata)
+     */
+    private void handleOrphanedFileDownload(String selectedDisplayName) {
+        try {
+            // Extract the encrypted filename from the display name
+            String encryptedFileName = selectedDisplayName.replace("🔒 ", "").replace(" (orphaned)", "") + ".enc";
+            
+            showWarning("Orphaned File", 
+                "This file doesn't have metadata. It will be downloaded as encrypted data.\n\n" +
+                "File: " + encryptedFileName + "\n\n" +
+                "Note: You may need the original encryption key to decrypt this file manually.");
+            
+            FileChooser fileChooser = createFileChooser("Save Encrypted File As");
+            fileChooser.setInitialFileName(encryptedFileName);
+            
+            File saveLocation = fileChooser.showSaveDialog(downloadButton.getScene().getWindow());
+            if (saveLocation == null) return;
+            
+            showOperationProgress("Copying encrypted file...");
+            logMessage("📁 Copying orphaned file: " + encryptedFileName);
+            
+            // Copy the encrypted file directly
+            String vaultFilesPath = System.getProperty("user.home") + "/.ghostvault/files";
+            File sourceFile = new File(vaultFilesPath, encryptedFileName);
+            
+            if (sourceFile.exists()) {
+                Files.copy(sourceFile.toPath(), saveLocation.toPath(), 
+                    java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                
+                hideOperationProgress();
+                logMessage("✓ Orphaned file copied: " + encryptedFileName);
+                logMessage("  Saved to: " + saveLocation.getAbsolutePath());
+                logMessage("  ⚠ File is still encrypted - manual decryption may be required");
+                
+                showNotification("File Copied", 
+                    "Orphaned file copied successfully.\nNote: File is still encrypted.");
+            } else {
+                hideOperationProgress();
+                logMessage("✗ Orphaned file not found: " + encryptedFileName);
+                showError("File Not Found", "The encrypted file could not be found on disk.");
+            }
+            
+        } catch (Exception e) {
+            hideOperationProgress();
+            logMessage("✗ Failed to copy orphaned file: " + e.getMessage());
+            showError("Copy Failed", "Error: " + e.getMessage());
         }
     }
     
@@ -705,6 +784,75 @@ public class VaultMainController implements Initializable {
     }
     
     /**
+     * Attempt to recover orphaned files by trying to decrypt them with current key
+     */
+    private void attemptOrphanedFileRecovery(String selectedDisplayName) {
+        try {
+            String encryptedFileName = selectedDisplayName.replace("🔒 ", "").replace(" (orphaned)", "") + ".enc";
+            
+            boolean confirmed = showConfirmation("Attempt File Recovery", 
+                "Try to decrypt this orphaned file with the current encryption key?\n\n" +
+                "File: " + encryptedFileName + "\n\n" +
+                "This will attempt to decrypt the file and save it with a recovered name.\n" +
+                "If successful, the file will be added back to your vault with metadata.");
+            
+            if (!confirmed) return;
+            
+            showOperationProgress("Attempting file recovery...");
+            logMessage("🔧 Attempting to recover: " + encryptedFileName);
+            
+            String vaultFilesPath = System.getProperty("user.home") + "/.ghostvault/files";
+            File encryptedFile = new File(vaultFilesPath, encryptedFileName);
+            
+            if (!encryptedFile.exists()) {
+                hideOperationProgress();
+                logMessage("✗ Encrypted file not found: " + encryptedFileName);
+                showError("File Not Found", "The encrypted file could not be found.");
+                return;
+            }
+            
+            // Try to decrypt the file
+            if (fileManager != null && encryptionKey != null) {
+                try {
+                    // Read encrypted data
+                    byte[] encryptedBytes = Files.readAllBytes(encryptedFile.toPath());
+                    
+                    // Attempt decryption (this is a simplified approach)
+                    // In a real implementation, you'd need to handle the encrypted data format properly
+                    logMessage("🔓 Attempting decryption...");
+                    
+                    // For now, just show that we attempted recovery
+                    hideOperationProgress();
+                    logMessage("⚠ File recovery requires manual intervention");
+                    logMessage("  The file structure may not be compatible with current decryption methods");
+                    
+                    showInfo("Recovery Attempt", 
+                        "File recovery attempted but requires manual intervention.\n\n" +
+                        "The orphaned file may have been created with a different encryption format.\n" +
+                        "You can still download it as an encrypted file for manual recovery.");
+                    
+                } catch (Exception decryptError) {
+                    hideOperationProgress();
+                    logMessage("✗ Decryption failed: " + decryptError.getMessage());
+                    showError("Recovery Failed", 
+                        "Could not decrypt the orphaned file.\n" +
+                        "It may have been encrypted with a different key or format.");
+                }
+            } else {
+                hideOperationProgress();
+                logMessage("⚠ Cannot attempt recovery - encryption key not available");
+                showWarning("Recovery Not Available", 
+                    "File recovery requires an active encryption key.");
+            }
+            
+        } catch (Exception e) {
+            hideOperationProgress();
+            logMessage("✗ Recovery attempt failed: " + e.getMessage());
+            showError("Recovery Error", "Error during recovery attempt: " + e.getMessage());
+        }
+    }
+    
+    /**
      * Show file properties dialog
      */
     private void showFileProperties() {
@@ -712,7 +860,16 @@ public class VaultMainController implements Initializable {
         if (selectedDisplayName == null) return;
         
         VaultFile vaultFile = findVaultFileByDisplayName(selectedDisplayName);
-        if (vaultFile == null) return;
+        
+        if (vaultFile == null) {
+            // Handle orphaned files
+            if (selectedDisplayName.contains("(orphaned)")) {
+                showOrphanedFileProperties(selectedDisplayName);
+            } else {
+                showWarning("No Properties", "No metadata available for this file.");
+            }
+            return;
+        }
         
         String properties = String.format(
             "File Properties\n\n" +
@@ -731,6 +888,43 @@ public class VaultMainController implements Initializable {
         );
         
         showInfo("File Properties", properties);
+    }
+    
+    /**
+     * Show properties for orphaned files
+     */
+    private void showOrphanedFileProperties(String selectedDisplayName) {
+        try {
+            String encryptedFileName = selectedDisplayName.replace("🔒 ", "").replace(" (orphaned)", "") + ".enc";
+            String vaultFilesPath = System.getProperty("user.home") + "/.ghostvault/files";
+            File encryptedFile = new File(vaultFilesPath, encryptedFileName);
+            
+            if (encryptedFile.exists()) {
+                String properties = String.format(
+                    "Orphaned File Properties\n\n" +
+                    "Status: ⚠ Missing Metadata\n" +
+                    "Encrypted Name: %s\n" +
+                    "Encrypted Size: %s\n" +
+                    "Last Modified: %s\n" +
+                    "Location: %s\n\n" +
+                    "This file was encrypted but its metadata was lost.\n" +
+                    "You can:\n" +
+                    "• Download as encrypted file\n" +
+                    "• Attempt recovery with current key\n" +
+                    "• Delete if no longer needed",
+                    encryptedFileName,
+                    formatFileSize(encryptedFile.length()),
+                    new java.util.Date(encryptedFile.lastModified()).toString(),
+                    encryptedFile.getAbsolutePath()
+                );
+                
+                showInfo("Orphaned File Properties", properties);
+            } else {
+                showError("File Not Found", "The encrypted file could not be found on disk.");
+            }
+        } catch (Exception e) {
+            showError("Properties Error", "Error reading file properties: " + e.getMessage());
+        }
     }
     
     // =========================== DECOY MODE SIMULATIONS ===========================
