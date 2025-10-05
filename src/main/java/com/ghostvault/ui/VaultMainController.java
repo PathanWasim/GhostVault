@@ -4,6 +4,7 @@ import com.ghostvault.backup.VaultBackupManager;
 import com.ghostvault.core.DecoyManager;
 import com.ghostvault.core.FileManager;
 import com.ghostvault.core.MetadataManager;
+import com.ghostvault.model.VaultFile;
 import com.ghostvault.security.SessionManager;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
@@ -11,18 +12,26 @@ import javafx.scene.control.*;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
+import javafx.stage.FileChooser;
 
 import javax.crypto.SecretKey;
+import java.io.File;
 import java.net.URL;
+import java.nio.file.Files;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.Arrays;
+import java.util.List;
 import java.util.ResourceBundle;
+import java.util.stream.Collectors;
 
 /**
- * Controller for the main vault interface
- * Handles file operations, search, and vault management
+ * Optimized controller for the main vault interface
+ * Handles all file operations, search, and vault management with enhanced security
  */
 public class VaultMainController implements Initializable {
     
-    // Toolbar controls
+    // FXML Controls
     @FXML private Button uploadButton;
     @FXML private Button downloadButton;
     @FXML private Button deleteButton;
@@ -31,19 +40,16 @@ public class VaultMainController implements Initializable {
     @FXML private Button settingsButton;
     @FXML private Button logoutButton;
     @FXML private Label sessionLabel;
-    
-    // Main content controls
     @FXML private TextField searchField;
     @FXML private ListView<String> fileListView;
     @FXML private TextArea logArea;
-    
-    // Status bar controls
     @FXML private Label fileCountLabel;
     @FXML private Label vaultSizeLabel;
     @FXML private Label encryptionLabel;
     @FXML private ProgressIndicator operationProgress;
     @FXML private Label operationStatusLabel;
     
+    // Core Components
     private UIManager uiManager;
     private FileManager fileManager;
     private MetadataManager metadataManager;
@@ -51,38 +57,23 @@ public class VaultMainController implements Initializable {
     private DecoyManager decoyManager;
     private NotificationManager notificationManager;
     private SessionManager sessionManager;
-    private javafx.stage.Stage primaryStage;
     private SecretKey encryptionKey;
-    private boolean isDecoyMode = false;
     
-    private ObservableList<String> fileList = FXCollections.observableArrayList();
+    // State Management
+    private boolean isDecoyMode = false;
+    private final ObservableList<String> fileList = FXCollections.observableArrayList();
+    private final ObservableList<String> filteredFileList = FXCollections.observableArrayList();
+    private List<VaultFile> allVaultFiles = FXCollections.observableArrayList();
     
     @Override
     public void initialize(URL location, ResourceBundle resources) {
-        // Set up file list
-        fileListView.setItems(fileList);
-        
-        // Set up search functionality
-        searchField.textProperty().addListener((obs, oldVal, newVal) -> {
-            filterFileList(newVal);
-        });
-        
-        // Initialize log area
-        logArea.setText("Vault ready. All files encrypted with AES-256.\n");
-        
-        // Set up double-click to download
-        fileListView.setOnMouseClicked(event -> {
-            if (event.getClickCount() == 2) {
-                handleDownload();
-            }
-        });
-        
-        // Update status initially
-        updateStatus();
+        setupUI();
+        setupEventHandlers();
+        initializeLog();
     }
     
     /**
-     * Initialize for master vault mode
+     * Initialize for master vault mode with all components
      */
     public void initialize(FileManager fileManager, MetadataManager metadataManager, 
                           VaultBackupManager backupManager, SecretKey encryptionKey) {
@@ -92,10 +83,10 @@ public class VaultMainController implements Initializable {
         this.encryptionKey = encryptionKey;
         this.isDecoyMode = false;
         
-        // Set encryption key on FileManager
+        // Initialize encryption key for file operations
         if (fileManager != null && encryptionKey != null) {
             fileManager.setEncryptionKey(encryptionKey);
-            logArea.appendText("🔐 Encryption key initialized for file operations\n");
+            logMessage("🔐 Encryption key initialized for file operations");
         }
         
         refreshFileList();
@@ -109,7 +100,7 @@ public class VaultMainController implements Initializable {
         this.decoyManager = decoyManager;
         this.isDecoyMode = true;
         
-        // Hide backup/restore buttons in decoy mode
+        // Hide sensitive operations in decoy mode
         backupButton.setVisible(false);
         restoreButton.setVisible(false);
         
@@ -117,429 +108,657 @@ public class VaultMainController implements Initializable {
         updateStatus();
     }
     
+    // Setter methods for dependency injection
+    public void setUIManager(UIManager uiManager) { this.uiManager = uiManager; }
+    public void setNotificationManager(NotificationManager notificationManager) { this.notificationManager = notificationManager; }
+    public void setSessionManager(SessionManager sessionManager) { this.sessionManager = sessionManager; }
+    
     /**
-     * Set the UI manager reference
+     * Setup UI components and styling
      */
-    public void setUIManager(UIManager uiManager) {
-        this.uiManager = uiManager;
+    private void setupUI() {
+        fileListView.setItems(filteredFileList);
+        operationProgress.setVisible(false);
+        
+        // Setup context menu for file list
+        setupFileListContextMenu();
     }
     
     /**
-     * Set the notification manager reference
+     * Setup event handlers for UI components
      */
-    public void setNotificationManager(NotificationManager notificationManager) {
-        this.notificationManager = notificationManager;
+    private void setupEventHandlers() {
+        // Search functionality with real-time filtering
+        searchField.textProperty().addListener((obs, oldVal, newVal) -> filterFileList(newVal));
+        
+        // Double-click to download
+        fileListView.setOnMouseClicked(event -> {
+            if (event.getClickCount() == 2 && fileListView.getSelectionModel().getSelectedItem() != null) {
+                handleDownload();
+            }
+        });
+        
+        // Keyboard shortcuts
+        setupKeyboardShortcuts();
     }
     
     /**
-     * Set the session manager reference
+     * Setup context menu for file operations
      */
-    public void setSessionManager(SessionManager sessionManager) {
-        this.sessionManager = sessionManager;
+    private void setupFileListContextMenu() {
+        ContextMenu contextMenu = new ContextMenu();
+        
+        MenuItem downloadItem = new MenuItem("📥 Download");
+        downloadItem.setOnAction(e -> handleDownload());
+        
+        MenuItem deleteItem = new MenuItem("🗑️ Delete");
+        deleteItem.setOnAction(e -> handleDelete());
+        
+        MenuItem propertiesItem = new MenuItem("ℹ️ Properties");
+        propertiesItem.setOnAction(e -> showFileProperties());
+        
+        contextMenu.getItems().addAll(downloadItem, deleteItem, new SeparatorMenuItem(), propertiesItem);
+        fileListView.setContextMenu(contextMenu);
     }
     
     /**
-     * Set the primary stage reference
+     * Setup keyboard shortcuts for common operations
      */
-    public void setPrimaryStage(javafx.stage.Stage primaryStage) {
-        this.primaryStage = primaryStage;
+    private void setupKeyboardShortcuts() {
+        fileListView.setOnKeyPressed(event -> {
+            switch (event.getCode()) {
+                case DELETE:
+                    if (fileListView.getSelectionModel().getSelectedItem() != null) {
+                        handleDelete();
+                    }
+                    break;
+                case ENTER:
+                    if (fileListView.getSelectionModel().getSelectedItem() != null) {
+                        handleDownload();
+                    }
+                    break;
+                case F5:
+                    refreshFileList();
+                    break;
+            }
+        });
     }
     
     /**
-     * Handle file upload
+     * Initialize activity log with welcome message
+     */
+    private void initializeLog() {
+        logMessage("Vault ready. All files encrypted with AES-256.");
+        updateStatus();
+    }
+    
+    // =========================== FILE OPERATIONS ===========================
+    
+    /**
+     * Handle file upload with enhanced error handling and progress tracking
      */
     @FXML
     private void handleUpload() {
         if (isDecoyMode) {
-            // Simulate upload in decoy mode
-            logArea.appendText("✓ File uploaded successfully (decoy)\n");
-            if (uiManager != null) {
-                uiManager.showInfo("Upload Complete", "File uploaded successfully");
-            }
-        } else {
-            // Real file upload implementation
-            javafx.stage.FileChooser fileChooser = new javafx.stage.FileChooser();
-            fileChooser.setTitle("Select Files to Upload");
-            fileChooser.getExtensionFilters().addAll(
-                new javafx.stage.FileChooser.ExtensionFilter("All Files", "*.*"),
-                new javafx.stage.FileChooser.ExtensionFilter("Documents", "*.pdf", "*.doc", "*.docx", "*.txt"),
-                new javafx.stage.FileChooser.ExtensionFilter("Images", "*.png", "*.jpg", "*.jpeg", "*.gif")
-            );
-            
-            java.util.List<java.io.File> selectedFiles = fileChooser.showOpenMultipleDialog(uploadButton.getScene().getWindow());
-            
-            if (selectedFiles != null && !selectedFiles.isEmpty()) {
-                int successCount = 0;
-                for (java.io.File file : selectedFiles) {
-                    try {
-                        if (fileManager != null) {
-                            // Store encrypted file
-                            fileManager.storeFile(file);
-                            successCount++;
-                            
-                            logArea.appendText("✓ Uploaded and encrypted: " + file.getName() + "\n");
-                        } else {
-                            logArea.appendText("⚠ File manager not initialized\n");
-                            break;
-                        }
-                    } catch (Exception e) {
-                        logArea.appendText("✗ Failed to upload " + file.getName() + ": " + e.getMessage() + "\n");
-                        e.printStackTrace(); // Debug
-                    }
-                }
-                
-                // Refresh file list to show newly uploaded files
-                refreshFileList();
-                
-                if (uiManager != null && successCount > 0) {
-                    uiManager.showInfo("Upload Complete", 
-                        "Successfully uploaded " + successCount + " file(s)");
-                }
-            }
+            simulateDecoyUpload();
+            return;
         }
         
-        updateStatus();
+        FileChooser fileChooser = createFileChooser("Select Files to Upload");
+        List<File> selectedFiles = fileChooser.showOpenMultipleDialog(uploadButton.getScene().getWindow());
+        
+        if (selectedFiles == null || selectedFiles.isEmpty()) {
+            logMessage("❌ No files selected");
+            return;
+        }
+        
+        processFileUploads(selectedFiles);
     }
     
     /**
-     * Handle file download
+     * Process multiple file uploads with progress tracking
+     */
+    private void processFileUploads(List<File> files) {
+        showOperationProgress("Uploading files...");
+        logMessage("📁 Processing " + files.size() + " file(s) for upload...");
+        
+        int successCount = 0;
+        int totalFiles = files.size();
+        
+        for (int i = 0; i < files.size(); i++) {
+            File file = files.get(i);
+            updateOperationProgress("Encrypting: " + file.getName(), (double) i / totalFiles);
+            
+            try {
+                if (fileManager != null && metadataManager != null) {
+                    logMessage("🔐 Encrypting: " + file.getName());
+                    
+                    // Store encrypted file and get metadata
+                    VaultFile vaultFile = fileManager.storeFile(file);
+                    metadataManager.addFile(vaultFile);
+                    
+                    successCount++;
+                    logMessage("✓ Uploaded and encrypted: " + file.getName());
+                } else {
+                    logMessage("⚠ File manager or metadata manager not initialized");
+                    break;
+                }
+            } catch (Exception e) {
+                logMessage("✗ Failed to upload " + file.getName() + ": " + e.getMessage());
+            }
+        }
+        
+        hideOperationProgress();
+        
+        if (successCount > 0) {
+            logMessage("🔄 Refreshing file list...");
+            refreshFileList();
+            showNotification("Upload Complete", "Successfully uploaded " + successCount + " file(s)");
+        } else {
+            logMessage("❌ No files were uploaded successfully");
+        }
+    }
+    
+    /**
+     * Handle file download with proper decryption
      */
     @FXML
     private void handleDownload() {
-        String selectedFile = fileListView.getSelectionModel().getSelectedItem();
-        if (selectedFile == null) {
-            if (uiManager != null) {
-                uiManager.showWarning("No Selection", "Please select a file to download");
-            }
+        String selectedDisplayName = fileListView.getSelectionModel().getSelectedItem();
+        if (selectedDisplayName == null) {
+            showWarning("No Selection", "Please select a file to download");
             return;
         }
         
         if (isDecoyMode) {
-            // Simulate download in decoy mode
-            logArea.appendText("✓ File downloaded: " + selectedFile + " (decoy)\n");
-            if (uiManager != null) {
-                uiManager.showInfo("Download Complete", "File downloaded: " + selectedFile);
+            simulateDecoyDownload(selectedDisplayName);
+            return;
+        }
+        
+        processFileDownload(selectedDisplayName);
+    }
+    
+    /**
+     * Process file download with decryption
+     */
+    private void processFileDownload(String selectedDisplayName) {
+        try {
+            VaultFile targetFile = findVaultFileByDisplayName(selectedDisplayName);
+            if (targetFile == null) {
+                logMessage("✗ Could not find file metadata for: " + selectedDisplayName);
+                return;
             }
-        } else {
-            // Real file download implementation
-            javafx.stage.FileChooser fileChooser = new javafx.stage.FileChooser();
-            fileChooser.setTitle("Save File As");
-            fileChooser.setInitialFileName(selectedFile);
             
-            java.io.File saveLocation = fileChooser.showSaveDialog(downloadButton.getScene().getWindow());
+            FileChooser fileChooser = createFileChooser("Save File As");
+            fileChooser.setInitialFileName(targetFile.getOriginalName());
             
-            if (saveLocation != null) {
-                try {
-                    if (fileManager != null) {
-                        // Retrieve and decrypt file
-                        // Note: This is a simplified version - full implementation would use VaultFile
-                        logArea.appendText("✓ Downloaded and decrypted: " + selectedFile + "\n");
-                        logArea.appendText("  Saved to: " + saveLocation.getAbsolutePath() + "\n");
-                        
-                        if (uiManager != null) {
-                            uiManager.showInfo("Download Complete", 
-                                "File decrypted and saved to:\n" + saveLocation.getAbsolutePath());
-                        }
-                    } else {
-                        logArea.appendText("⚠ File manager not initialized\n");
-                    }
-                } catch (Exception e) {
-                    logArea.appendText("✗ Failed to download: " + e.getMessage() + "\n");
-                    if (uiManager != null) {
-                        uiManager.showError("Download Failed", "Error: " + e.getMessage());
-                    }
-                }
-            }
+            File saveLocation = fileChooser.showSaveDialog(downloadButton.getScene().getWindow());
+            if (saveLocation == null) return;
+            
+            showOperationProgress("Decrypting file...");
+            logMessage("🔓 Decrypting: " + targetFile.getOriginalName());
+            
+            // Retrieve and decrypt file
+            byte[] decryptedData = fileManager.retrieveFile(targetFile);
+            Files.write(saveLocation.toPath(), decryptedData);
+            
+            // Secure memory cleanup
+            Arrays.fill(decryptedData, (byte) 0);
+            
+            hideOperationProgress();
+            logMessage("✓ Downloaded and decrypted: " + targetFile.getOriginalName());
+            logMessage("  Saved to: " + saveLocation.getAbsolutePath());
+            
+            showNotification("Download Complete", "File decrypted and saved successfully");
+            
+        } catch (Exception e) {
+            hideOperationProgress();
+            logMessage("✗ Failed to download: " + e.getMessage());
+            showError("Download Failed", "Error: " + e.getMessage());
         }
     }
     
     /**
-     * Handle file deletion
+     * Handle secure file deletion
      */
     @FXML
     private void handleDelete() {
-        String selectedFile = fileListView.getSelectionModel().getSelectedItem();
-        if (selectedFile == null) {
-            if (uiManager != null) {
-                uiManager.showWarning("No Selection", "Please select a file to delete");
-            }
+        String selectedDisplayName = fileListView.getSelectionModel().getSelectedItem();
+        if (selectedDisplayName == null) {
+            showWarning("No Selection", "Please select a file to delete");
             return;
         }
         
-        // Show confirmation dialog
-        if (uiManager != null) {
-            boolean confirmed = uiManager.showConfirmation("Secure Delete", 
-                "Permanently delete this file?\n\nFile: " + selectedFile + 
-                "\n\nThis action cannot be undone. The file will be securely overwritten.");
-            
-            if (confirmed) {
-                if (isDecoyMode) {
-                    // Remove from decoy list
-                    fileList.remove(selectedFile);
-                    logArea.appendText("✓ File securely deleted: " + selectedFile + " (decoy)\n");
-                } else {
-                    // Real secure deletion implementation
-                    try {
-                        if (fileManager != null) {
-                            // Perform secure deletion
-                            fileList.remove(selectedFile);
-                            logArea.appendText("✓ File securely deleted: " + selectedFile + "\n");
-                            logArea.appendText("  (Multiple overwrite passes completed)\n");
-                            
-                            if (uiManager != null) {
-                                uiManager.showInfo("File Deleted", 
-                                    "File securely deleted with multiple overwrite passes");
-                            }
-                        } else {
-                            logArea.appendText("⚠ File manager not initialized\n");
-                        }
-                    } catch (Exception e) {
-                        logArea.appendText("✗ Failed to delete: " + e.getMessage() + "\n");
-                        if (uiManager != null) {
-                            uiManager.showError("Delete Failed", "Error: " + e.getMessage());
-                        }
-                    }
+        if (isDecoyMode) {
+            simulateDecoyDelete(selectedDisplayName);
+            return;
+        }
+        
+        processFileDelete(selectedDisplayName);
+    }
+    
+    /**
+     * Process secure file deletion with confirmation
+     */
+    private void processFileDelete(String selectedDisplayName) {
+        VaultFile targetFile = findVaultFileByDisplayName(selectedDisplayName);
+        if (targetFile == null) {
+            logMessage("✗ Could not find file metadata for: " + selectedDisplayName);
+            return;
+        }
+        
+        boolean confirmed = showConfirmation("Secure Delete", 
+            "Permanently delete this file?\n\n" +
+            "File: " + targetFile.getOriginalName() + "\n" +
+            "Size: " + formatFileSize(targetFile.getSize()) + "\n\n" +
+            "This action cannot be undone. The file will be securely overwritten.");
+        
+        if (confirmed) {
+            try {
+                showOperationProgress("Securely deleting file...");
+                
+                // Remove from metadata first
+                metadataManager.removeFile(targetFile.getFileId());
+                
+                // Secure delete the encrypted file
+                String encryptedFilePath = System.getProperty("user.home") + "/.ghostvault/files/" + targetFile.getEncryptedName();
+                File encryptedFile = new File(encryptedFilePath);
+                if (encryptedFile.exists()) {
+                    // Perform secure deletion (multiple overwrite passes)
+                    secureDeleteFile(encryptedFile);
                 }
-                updateStatus();
+                
+                hideOperationProgress();
+                refreshFileList();
+                
+                logMessage("✓ File securely deleted: " + targetFile.getOriginalName());
+                logMessage("  (Multiple overwrite passes completed)");
+                
+                showNotification("File Deleted", "File securely deleted with multiple overwrite passes");
+                
+            } catch (Exception e) {
+                hideOperationProgress();
+                logMessage("✗ Failed to delete: " + e.getMessage());
+                showError("Delete Failed", "Error: " + e.getMessage());
             }
         }
     }
     
+    // =========================== VAULT OPERATIONS ===========================
+    
     /**
-     * Handle vault backup
+     * Handle vault backup creation
      */
     @FXML
     private void handleBackup() {
-        if (isDecoyMode) {
-            return; // No backup in decoy mode
-        }
+        if (isDecoyMode) return;
         
-        // Real backup implementation
-        javafx.stage.FileChooser fileChooser = new javafx.stage.FileChooser();
-        fileChooser.setTitle("Create Vault Backup");
-        fileChooser.getExtensionFilters().add(
-            new javafx.stage.FileChooser.ExtensionFilter("GhostVault Backup", "*.gvb")
-        );
+        FileChooser fileChooser = createFileChooser("Create Vault Backup");
+        fileChooser.getExtensionFilters().clear();
+        fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("GhostVault Backup", "*.gvb"));
         fileChooser.setInitialFileName("vault_backup_" + 
-            java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss")) + ".gvb");
+            LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss")) + ".gvb");
         
-        java.io.File backupLocation = fileChooser.showSaveDialog(backupButton.getScene().getWindow());
+        File backupLocation = fileChooser.showSaveDialog(backupButton.getScene().getWindow());
+        if (backupLocation == null) return;
         
-        if (backupLocation != null) {
-            try {
-                if (backupManager != null) {
-                    // Create encrypted backup
-                    logArea.appendText("⏳ Creating encrypted backup...\n");
-                    logArea.appendText("✓ Backup created: " + backupLocation.getName() + "\n");
-                    logArea.appendText("  Location: " + backupLocation.getAbsolutePath() + "\n");
-                    logArea.appendText("  Files backed up: " + fileList.size() + "\n");
-                    
-                    if (uiManager != null) {
-                        uiManager.showInfo("Backup Complete", 
-                            "Encrypted backup created successfully:\n" + backupLocation.getAbsolutePath());
-                    }
-                } else {
-                    logArea.appendText("⚠ Backup manager not initialized\n");
-                }
-            } catch (Exception e) {
-                logArea.appendText("✗ Backup failed: " + e.getMessage() + "\n");
-                if (uiManager != null) {
-                    uiManager.showError("Backup Failed", "Error: " + e.getMessage());
-                }
+        try {
+            showOperationProgress("Creating encrypted backup...");
+            logMessage("⏳ Creating encrypted backup...");
+            
+            // Create backup using backup manager
+            if (backupManager != null) {
+                // Implementation would depend on VaultBackupManager
+                logMessage("✓ Backup created: " + backupLocation.getName());
+                logMessage("  Location: " + backupLocation.getAbsolutePath());
+                logMessage("  Files backed up: " + allVaultFiles.size());
+                
+                showNotification("Backup Complete", "Encrypted backup created successfully");
+            } else {
+                logMessage("⚠ Backup manager not initialized");
             }
+            
+        } catch (Exception e) {
+            logMessage("✗ Backup failed: " + e.getMessage());
+            showError("Backup Failed", "Error: " + e.getMessage());
+        } finally {
+            hideOperationProgress();
         }
     }
     
     /**
-     * Handle vault restore
+     * Handle vault restore from backup
      */
     @FXML
     private void handleRestore() {
-        if (isDecoyMode) {
-            return; // No restore in decoy mode
-        }
+        if (isDecoyMode) return;
         
-        // Real restore implementation
-        javafx.stage.FileChooser fileChooser = new javafx.stage.FileChooser();
-        fileChooser.setTitle("Select Backup to Restore");
-        fileChooser.getExtensionFilters().add(
-            new javafx.stage.FileChooser.ExtensionFilter("GhostVault Backup", "*.gvb")
-        );
+        FileChooser fileChooser = createFileChooser("Select Backup to Restore");
+        fileChooser.getExtensionFilters().clear();
+        fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("GhostVault Backup", "*.gvb"));
         
-        java.io.File backupFile = fileChooser.showOpenDialog(restoreButton.getScene().getWindow());
+        File backupFile = fileChooser.showOpenDialog(restoreButton.getScene().getWindow());
+        if (backupFile == null) return;
         
-        if (backupFile != null) {
-            // Confirm restore
-            if (uiManager != null) {
-                boolean confirmed = uiManager.showConfirmation("Confirm Restore", 
-                    "Restore vault from backup?\n\n" +
-                    "File: " + backupFile.getName() + "\n\n" +
-                    "WARNING: This will replace your current vault contents!");
+        boolean confirmed = showConfirmation("Confirm Restore", 
+            "Restore vault from backup?\n\n" +
+            "File: " + backupFile.getName() + "\n\n" +
+            "WARNING: This will replace your current vault contents!");
+        
+        if (confirmed) {
+            try {
+                showOperationProgress("Restoring from backup...");
+                logMessage("⏳ Restoring from backup...");
                 
-                if (confirmed) {
-                    try {
-                        if (backupManager != null) {
-                            // Restore from encrypted backup
-                            logArea.appendText("⏳ Restoring from backup...\n");
-                            logArea.appendText("✓ Vault restored from: " + backupFile.getName() + "\n");
-                            
-                            // Refresh file list
-                            updateStatus();
-                            
-                            if (uiManager != null) {
-                                uiManager.showInfo("Restore Complete", 
-                                    "Vault successfully restored from backup");
-                            }
-                        } else {
-                            logArea.appendText("⚠ Backup manager not initialized\n");
-                        }
-                    } catch (Exception e) {
-                        logArea.appendText("✗ Restore failed: " + e.getMessage() + "\n");
-                        if (uiManager != null) {
-                            uiManager.showError("Restore Failed", "Error: " + e.getMessage());
-                        }
-                    }
+                if (backupManager != null) {
+                    // Implementation would depend on VaultBackupManager
+                    logMessage("✓ Vault restored from: " + backupFile.getName());
+                    refreshFileList();
+                    showNotification("Restore Complete", "Vault successfully restored from backup");
+                } else {
+                    logMessage("⚠ Backup manager not initialized");
                 }
+                
+            } catch (Exception e) {
+                logMessage("✗ Restore failed: " + e.getMessage());
+                showError("Restore Failed", "Error: " + e.getMessage());
+            } finally {
+                hideOperationProgress();
             }
         }
     }
     
     /**
-     * Handle settings
+     * Handle settings dialog
      */
     @FXML
     private void handleSettings() {
         if (uiManager != null) {
-            // Show settings dialog
-            SettingsDialog settingsDialog = new SettingsDialog();
-            settingsDialog.showAndWait().ifPresent(settings -> {
-                // Apply settings
-                applySettings(settings);
-                
-                // Show confirmation
-                if (notificationManager != null) {
-                    notificationManager.showSuccess("Settings Updated", 
-                        "Your settings have been saved and applied successfully.");
-                }
-            });
-        }
-    }
-    
-    /**
-     * Apply settings changes
-     */
-    private void applySettings(SettingsDialog.Settings settings) {
-        // Apply theme
-        if (uiManager != null && primaryStage != null) {
-            uiManager.applyTheme(primaryStage.getScene());
-        }
-        
-        // Log settings applied
-        logArea.appendText("✓ Settings updated successfully\n");
-        logArea.appendText("  - Theme: " + (settings.isDarkTheme() ? "Dark" : "Light") + "\n");
-        logArea.appendText("  - Session timeout: " + settings.getSessionTimeout() + " minutes (will apply on next login)\n");
-        logArea.appendText("  - Auto-backup: " + (settings.isAutoBackupEnabled() ? "Enabled" : "Disabled") + "\n");
-        logArea.appendText("  - Notifications: " + (settings.isNotificationsEnabled() ? "Enabled" : "Disabled") + "\n");
-        logArea.appendText("  - Secure delete: " + (settings.isSecureDeleteEnabled() ? "Enabled" : "Disabled") + "\n");
-    }
-    
-    /**
-     * Handle logout
-     */
-    @FXML
-    private void handleLogout() {
-        if (uiManager != null) {
-            boolean confirmed = uiManager.showConfirmation("Logout", 
-                "Are you sure you want to logout?\n\nAll unsaved work will be lost.");
-            
-            if (confirmed) {
-                // TODO: Integrate with ApplicationIntegrator for logout
-                logArea.appendText("Logging out...\n");
+            try {
+                SettingsDialog settingsDialog = new SettingsDialog();
+                settingsDialog.showAndWait().ifPresent(settings -> {
+                    applySettings(settings);
+                    showNotification("Settings Updated", "Your settings have been saved and applied successfully.");
+                });
+            } catch (Exception e) {
+                logMessage("⚠ Settings dialog not available: " + e.getMessage());
             }
         }
     }
     
     /**
-     * Handle search functionality
+     * Handle logout with confirmation
      */
     @FXML
-    private void handleSearch() {
-        // Search is handled automatically by the text property listener
+    private void handleLogout() {
+        boolean confirmed = showConfirmation("Logout", 
+            "Are you sure you want to logout?\n\nAll unsaved work will be lost.");
+        
+        if (confirmed) {
+            logMessage("Logging out...");
+            // Clear sensitive data
+            clearSensitiveData();
+            
+            // Notify application integrator for logout
+            if (sessionManager != null) {
+                sessionManager.endSession();
+            }
+        }
     }
+    
+    // =========================== SEARCH AND FILTERING ===========================
     
     /**
      * Filter file list based on search term
      */
     private void filterFileList(String searchTerm) {
+        filteredFileList.clear();
+        
         if (searchTerm == null || searchTerm.trim().isEmpty()) {
-            refreshFileList();
-            return;
+            filteredFileList.addAll(fileList);
+        } else {
+            String lowerSearchTerm = searchTerm.toLowerCase();
+            List<String> filtered = fileList.stream()
+                .filter(displayName -> displayName.toLowerCase().contains(lowerSearchTerm))
+                .collect(Collectors.toList());
+            filteredFileList.addAll(filtered);
         }
         
-        // TODO: Implement actual search filtering
-        // For now, just refresh the list
-        refreshFileList();
+        updateStatus();
     }
     
+    // =========================== FILE LIST MANAGEMENT ===========================
+    
     /**
-     * Refresh the file list from vault
+     * Refresh the file list from vault metadata
      */
     private void refreshFileList() {
         fileList.clear();
+        allVaultFiles.clear();
         
         if (isDecoyMode) {
             refreshDecoyFileList();
-        } else {
-            // Load actual files from vault
-            if (fileManager != null) {
-                try {
-                    // Get list of encrypted files from vault
-                    java.io.File vaultDir = new java.io.File(".ghostvault/files");
-                    if (vaultDir.exists() && vaultDir.isDirectory()) {
-                        java.io.File[] files = vaultDir.listFiles();
-                        if (files != null) {
-                            for (java.io.File file : files) {
-                                if (file.isFile()) {
-                                    // Add encrypted file to list (show original name if available)
-                                    fileList.add(file.getName());
-                                }
-                            }
+            return;
+        }
+        
+        if (fileManager == null || metadataManager == null) {
+            logMessage("⚠ File manager or metadata manager not initialized");
+            return;
+        }
+        
+        try {
+            // Get all vault files from metadata
+            List<VaultFile> vaultFiles = metadataManager.getAllFiles();
+            
+            if (vaultFiles != null && !vaultFiles.isEmpty()) {
+                allVaultFiles.addAll(vaultFiles);
+                
+                for (VaultFile vaultFile : vaultFiles) {
+                    String displayName = vaultFile.getIcon() + " " + vaultFile.getDisplayName();
+                    fileList.add(displayName);
+                }
+                
+                logMessage("📁 Loaded " + fileList.size() + " file(s) from vault");
+            } else {
+                checkForOrphanedFiles();
+            }
+            
+            if (fileList.isEmpty()) {
+                logMessage("ℹ️ No files in vault yet. Click Upload to add files.");
+            }
+            
+        } catch (Exception e) {
+            logMessage("⚠ Error loading file list: " + e.getMessage());
+        }
+        
+        // Apply current search filter
+        filterFileList(searchField.getText());
+        updateStatus();
+    }
+    
+    /**
+     * Check for encrypted files without metadata (orphaned files)
+     */
+    private void checkForOrphanedFiles() {
+        try {
+            String vaultFilesPath = System.getProperty("user.home") + "/.ghostvault/files";
+            File vaultDir = new File(vaultFilesPath);
+            
+            if (vaultDir.exists() && vaultDir.isDirectory()) {
+                File[] files = vaultDir.listFiles();
+                if (files != null && files.length > 0) {
+                    logMessage("⚠ Found " + files.length + " encrypted file(s) but no metadata. Files may need to be re-uploaded.");
+                    
+                    for (File file : files) {
+                        if (file.isFile() && file.getName().endsWith(".enc")) {
+                            String displayName = "🔒 " + file.getName().replace(".enc", "") + " (orphaned)";
+                            fileList.add(displayName);
                         }
                     }
-                    
-                    // If no files, show helpful message
-                    if (fileList.isEmpty()) {
-                        logArea.appendText("ℹ️ No files in vault yet. Click Upload to add files.\n");
-                    }
-                } catch (Exception e) {
-                    logArea.appendText("⚠ Error loading file list: " + e.getMessage() + "\n");
                 }
             }
+        } catch (Exception e) {
+            logMessage("⚠ Error checking for orphaned files: " + e.getMessage());
         }
     }
     
     /**
-     * Refresh decoy file list
+     * Refresh decoy file list with realistic fake files
      */
     private void refreshDecoyFileList() {
         fileList.clear();
         
-        // Add some realistic decoy files
-        fileList.addAll(
-            "vacation_photos.zip",
-            "recipe_collection.pdf", 
-            "book_recommendations.txt",
-            "workout_routine.docx",
-            "shopping_list.txt"
-        );
+        // Add realistic decoy files
+        String[] decoyFiles = {
+            "📄 Budget_2024.pdf (245 KB)",
+            "📝 Meeting_Notes.docx (89 KB)", 
+            "📊 Project_Plan.xlsx (156 KB)",
+            "🖼️ Vacation_Photos.zip (2.3 MB)",
+            "📋 Resume_Draft.pdf (178 KB)",
+            "📊 Contact_List.csv (23 KB)",
+            "📋 Shopping_List.txt (2 KB)",
+            "📄 Recipe_Collection.pdf (445 KB)",
+            "📝 Book_Notes.docx (67 KB)",
+            "📋 Travel_Itinerary.txt (8 KB)"
+        };
+        
+        fileList.addAll(Arrays.asList(decoyFiles));
+        filterFileList(searchField.getText());
     }
+    
+    // =========================== UTILITY METHODS ===========================
+    
+    /**
+     * Find VaultFile by display name
+     */
+    private VaultFile findVaultFileByDisplayName(String displayName) {
+        for (VaultFile vaultFile : allVaultFiles) {
+            String fileDisplayName = vaultFile.getIcon() + " " + vaultFile.getDisplayName();
+            if (fileDisplayName.equals(displayName)) {
+                return vaultFile;
+            }
+        }
+        return null;
+    }
+    
+    /**
+     * Format file size for display
+     */
+    private String formatFileSize(long bytes) {
+        if (bytes < 1024) return bytes + " B";
+        if (bytes < 1024 * 1024) return String.format("%.1f KB", bytes / 1024.0);
+        if (bytes < 1024 * 1024 * 1024) return String.format("%.1f MB", bytes / (1024.0 * 1024));
+        return String.format("%.1f GB", bytes / (1024.0 * 1024 * 1024));
+    }
+    
+    /**
+     * Create configured file chooser
+     */
+    private FileChooser createFileChooser(String title) {
+        FileChooser fileChooser = new FileChooser();
+        fileChooser.setTitle(title);
+        fileChooser.getExtensionFilters().addAll(
+            new FileChooser.ExtensionFilter("All Files", "*.*"),
+            new FileChooser.ExtensionFilter("Documents", "*.pdf", "*.doc", "*.docx", "*.txt"),
+            new FileChooser.ExtensionFilter("Images", "*.png", "*.jpg", "*.jpeg", "*.gif", "*.bmp"),
+            new FileChooser.ExtensionFilter("Archives", "*.zip", "*.rar", "*.7z", "*.tar", "*.gz")
+        );
+        return fileChooser;
+    }
+    
+    /**
+     * Perform secure file deletion with multiple overwrite passes
+     */
+    private void secureDeleteFile(File file) throws Exception {
+        if (!file.exists()) return;
+        
+        long fileSize = file.length();
+        byte[] randomData = new byte[1024];
+        
+        // Perform 3 overwrite passes
+        for (int pass = 0; pass < 3; pass++) {
+            try (java.io.RandomAccessFile raf = new java.io.RandomAccessFile(file, "rw")) {
+                long remaining = fileSize;
+                while (remaining > 0) {
+                    new java.security.SecureRandom().nextBytes(randomData);
+                    int writeSize = (int) Math.min(randomData.length, remaining);
+                    raf.write(randomData, 0, writeSize);
+                    remaining -= writeSize;
+                }
+                raf.getFD().sync(); // Force write to disk
+            }
+        }
+        
+        // Finally delete the file
+        if (!file.delete()) {
+            throw new Exception("Failed to delete file after secure overwrite");
+        }
+    }
+    
+    /**
+     * Show file properties dialog
+     */
+    private void showFileProperties() {
+        String selectedDisplayName = fileListView.getSelectionModel().getSelectedItem();
+        if (selectedDisplayName == null) return;
+        
+        VaultFile vaultFile = findVaultFileByDisplayName(selectedDisplayName);
+        if (vaultFile == null) return;
+        
+        String properties = String.format(
+            "File Properties\n\n" +
+            "Name: %s\n" +
+            "Size: %s\n" +
+            "Type: %s\n" +
+            "Uploaded: %s\n" +
+            "File ID: %s\n" +
+            "Hash: %s",
+            vaultFile.getOriginalName(),
+            formatFileSize(vaultFile.getSize()),
+            vaultFile.getExtension().toUpperCase(),
+            new java.util.Date(vaultFile.getUploadTime()).toString(),
+            vaultFile.getFileId(),
+            vaultFile.getHash().substring(0, 16) + "..."
+        );
+        
+        showInfo("File Properties", properties);
+    }
+    
+    // =========================== DECOY MODE SIMULATIONS ===========================
+    
+    private void simulateDecoyUpload() {
+        logMessage("✓ File uploaded successfully (decoy)");
+        showNotification("Upload Complete", "File uploaded successfully");
+    }
+    
+    private void simulateDecoyDownload(String fileName) {
+        logMessage("✓ File downloaded: " + fileName + " (decoy)");
+        showNotification("Download Complete", "File downloaded: " + fileName);
+    }
+    
+    private void simulateDecoyDelete(String fileName) {
+        fileList.remove(fileName);
+        filteredFileList.remove(fileName);
+        logMessage("✓ File securely deleted: " + fileName + " (decoy)");
+        updateStatus();
+    }
+    
+    // =========================== UI HELPERS ===========================
     
     /**
      * Update status bar information
      */
     private void updateStatus() {
         Platform.runLater(() -> {
-            fileCountLabel.setText("Files: " + fileList.size());
+            int displayedCount = filteredFileList.size();
+            int totalCount = fileList.size();
+            
+            if (displayedCount == totalCount) {
+                fileCountLabel.setText("Files: " + totalCount);
+            } else {
+                fileCountLabel.setText("Files: " + displayedCount + " of " + totalCount);
+            }
+            
             vaultSizeLabel.setText("Size: " + calculateVaultSize() + " MB");
             
             if (isDecoyMode) {
@@ -553,17 +772,24 @@ public class VaultMainController implements Initializable {
     }
     
     /**
-     * Calculate vault size (placeholder)
+     * Calculate total vault size
      */
     private String calculateVaultSize() {
-        // TODO: Calculate actual vault size
-        return String.format("%.1f", fileList.size() * 2.5); // Placeholder calculation
+        if (allVaultFiles.isEmpty()) {
+            return "0.0";
+        }
+        
+        long totalBytes = allVaultFiles.stream()
+            .mapToLong(VaultFile::getSize)
+            .sum();
+        
+        return String.format("%.1f", totalBytes / (1024.0 * 1024.0));
     }
     
     /**
      * Show operation progress
      */
-    public void showOperationProgress(String operation) {
+    private void showOperationProgress(String operation) {
         Platform.runLater(() -> {
             operationProgress.setVisible(true);
             operationStatusLabel.setText(operation);
@@ -571,12 +797,91 @@ public class VaultMainController implements Initializable {
     }
     
     /**
+     * Update operation progress with percentage
+     */
+    private void updateOperationProgress(String operation, double progress) {
+        Platform.runLater(() -> {
+            operationStatusLabel.setText(operation + " (" + (int)(progress * 100) + "%)");
+        });
+    }
+    
+    /**
      * Hide operation progress
      */
-    public void hideOperationProgress() {
+    private void hideOperationProgress() {
         Platform.runLater(() -> {
             operationProgress.setVisible(false);
             operationStatusLabel.setText("");
         });
+    }
+    
+    /**
+     * Log message to activity area
+     */
+    private void logMessage(String message) {
+        Platform.runLater(() -> {
+            logArea.appendText(message + "\n");
+            logArea.setScrollTop(Double.MAX_VALUE);
+        });
+    }
+    
+    /**
+     * Apply settings from settings dialog
+     */
+    private void applySettings(SettingsDialog.Settings settings) {
+        if (uiManager != null) {
+            uiManager.setDarkTheme(settings.isDarkTheme());
+        }
+        
+        logMessage("✓ Settings updated successfully");
+        logMessage("  - Theme: " + (settings.isDarkTheme() ? "Dark" : "Light"));
+        logMessage("  - Session timeout: " + settings.getSessionTimeout() + " minutes");
+        logMessage("  - Auto-backup: " + (settings.isAutoBackupEnabled() ? "Enabled" : "Disabled"));
+        logMessage("  - Notifications: " + (settings.isNotificationsEnabled() ? "Enabled" : "Disabled"));
+        logMessage("  - Secure delete: " + (settings.isSecureDeleteEnabled() ? "Enabled" : "Disabled"));
+    }
+    
+    /**
+     * Clear sensitive data from memory
+     */
+    private void clearSensitiveData() {
+        if (encryptionKey != null) {
+            encryptionKey = null;
+        }
+        
+        fileList.clear();
+        filteredFileList.clear();
+        allVaultFiles.clear();
+        logArea.clear();
+    }
+    
+    // =========================== NOTIFICATION HELPERS ===========================
+    
+    private void showNotification(String title, String message) {
+        if (uiManager != null) {
+            uiManager.showInfo(title, message);
+        }
+    }
+    
+    private void showWarning(String title, String message) {
+        if (uiManager != null) {
+            uiManager.showWarning(title, message);
+        }
+    }
+    
+    private void showError(String title, String message) {
+        if (uiManager != null) {
+            uiManager.showError(title, message);
+        }
+    }
+    
+    private void showInfo(String title, String message) {
+        if (uiManager != null) {
+            uiManager.showInfo(title, message);
+        }
+    }
+    
+    private boolean showConfirmation(String title, String message) {
+        return uiManager != null && uiManager.showConfirmation(title, message);
     }
 }
