@@ -144,6 +144,51 @@ public class VaultMainController implements Initializable {
         
         // Setup context menu for file list
         setupFileListContextMenu();
+        
+        // Setup drag and drop
+        setupDragAndDrop();
+    }
+    
+    /**
+     * Setup drag and drop functionality
+     */
+    private void setupDragAndDrop() {
+        // Enable drag over
+        fileListView.setOnDragOver(event -> {
+            if (event.getGestureSource() != fileListView && event.getDragboard().hasFiles()) {
+                event.acceptTransferModes(javafx.scene.input.TransferMode.COPY);
+                
+                // Visual feedback
+                fileListView.setStyle("-fx-border-color: #4CAF50; -fx-border-width: 2px; -fx-border-style: dashed;");
+            }
+            event.consume();
+        });
+        
+        // Handle drag exit
+        fileListView.setOnDragExited(event -> {
+            fileListView.setStyle(""); // Remove border
+            event.consume();
+        });
+        
+        // Handle file drop
+        fileListView.setOnDragDropped(event -> {
+            javafx.scene.input.Dragboard dragboard = event.getDragboard();
+            boolean success = false;
+            
+            if (dragboard.hasFiles()) {
+                java.util.List<java.io.File> files = dragboard.getFiles();
+                if (!files.isEmpty()) {
+                    logMessage("📁 Files dropped: " + files.size() + " file(s)");
+                    processFileUploads(files);
+                    success = true;
+                }
+            }
+            
+            // Remove visual feedback
+            fileListView.setStyle("");
+            event.setDropCompleted(success);
+            event.consume();
+        });
     }
     
     /**
@@ -160,8 +205,47 @@ public class VaultMainController implements Initializable {
             }
         });
         
+        // Setup tooltips with keyboard shortcuts
+        setupTooltips();
+        
         // Keyboard shortcuts
         setupKeyboardShortcuts();
+    }
+    
+    /**
+     * Setup tooltips for buttons with keyboard shortcuts
+     */
+    private void setupTooltips() {
+        if (uploadButton != null) {
+            uploadButton.setTooltip(new javafx.scene.control.Tooltip("Upload files to vault (Ctrl+O)\nOr drag & drop files here"));
+        }
+        if (downloadButton != null) {
+            downloadButton.setTooltip(new javafx.scene.control.Tooltip("Download selected file (Ctrl+S or Enter)"));
+        }
+        if (previewButton != null) {
+            previewButton.setTooltip(new javafx.scene.control.Tooltip("Preview selected file (Space)"));
+        }
+        if (deleteButton != null) {
+            deleteButton.setTooltip(new javafx.scene.control.Tooltip("Delete selected file (Delete key)"));
+        }
+        if (backupButton != null) {
+            backupButton.setTooltip(new javafx.scene.control.Tooltip("Create encrypted backup (Ctrl+B)"));
+        }
+        if (restoreButton != null) {
+            restoreButton.setTooltip(new javafx.scene.control.Tooltip("Restore from backup (Ctrl+R)"));
+        }
+        if (settingsButton != null) {
+            settingsButton.setTooltip(new javafx.scene.control.Tooltip("Open settings"));
+        }
+        if (logoutButton != null) {
+            logoutButton.setTooltip(new javafx.scene.control.Tooltip("Logout and return to login (Ctrl+Q)"));
+        }
+        if (searchField != null) {
+            searchField.setTooltip(new javafx.scene.control.Tooltip("Search files (Ctrl+F to focus, Esc to clear)"));
+        }
+        if (fileListView != null) {
+            fileListView.setTooltip(new javafx.scene.control.Tooltip("File list - Double-click to download, Right-click for options\nPress F1 for all keyboard shortcuts"));
+        }
     }
     
     /**
@@ -208,6 +292,7 @@ public class VaultMainController implements Initializable {
      * Setup keyboard shortcuts for common operations
      */
     private void setupKeyboardShortcuts() {
+        // File list shortcuts
         fileListView.setOnKeyPressed(event -> {
             switch (event.getCode()) {
                 case DELETE:
@@ -223,6 +308,90 @@ public class VaultMainController implements Initializable {
                 case F5:
                     refreshFileList();
                     break;
+                case SPACE:
+                    if (fileListView.getSelectionModel().getSelectedItem() != null) {
+                        handlePreview();
+                    }
+                    break;
+            }
+        });
+        
+        // Global shortcuts for the scene
+        if (fileListView.getScene() != null) {
+            setupGlobalShortcuts(fileListView.getScene());
+        } else {
+            // Set up shortcuts when scene is available
+            fileListView.sceneProperty().addListener((obs, oldScene, newScene) -> {
+                if (newScene != null) {
+                    setupGlobalShortcuts(newScene);
+                }
+            });
+        }
+    }
+    
+    /**
+     * Setup global keyboard shortcuts
+     */
+    private void setupGlobalShortcuts(javafx.scene.Scene scene) {
+        scene.setOnKeyPressed(event -> {
+            if (event.isControlDown()) {
+                switch (event.getCode()) {
+                    case O: // Ctrl+O - Upload
+                        handleUpload();
+                        event.consume();
+                        break;
+                    case S: // Ctrl+S - Download selected
+                        if (fileListView.getSelectionModel().getSelectedItem() != null) {
+                            handleDownload();
+                        }
+                        event.consume();
+                        break;
+                    case B: // Ctrl+B - Backup
+                        handleBackup();
+                        event.consume();
+                        break;
+                    case R: // Ctrl+R - Restore
+                        handleRestore();
+                        event.consume();
+                        break;
+                    case F: // Ctrl+F - Focus search
+                        searchField.requestFocus();
+                        event.consume();
+                        break;
+                    case Q: // Ctrl+Q - Logout
+                        handleLogout();
+                        event.consume();
+                        break;
+                }
+            } else {
+                switch (event.getCode()) {
+                    case F1: // Help
+                        if (uiManager != null) {
+                            // Show help
+                            showInfo("Keyboard Shortcuts", 
+                                "File Operations:\n" +
+                                "• Ctrl+O - Upload files\n" +
+                                "• Ctrl+S - Download selected file\n" +
+                                "• Enter - Download selected file\n" +
+                                "• Space - Preview selected file\n" +
+                                "• Delete - Delete selected file\n\n" +
+                                "Vault Operations:\n" +
+                                "• Ctrl+B - Create backup\n" +
+                                "• Ctrl+R - Restore from backup\n" +
+                                "• F5 - Refresh file list\n\n" +
+                                "Navigation:\n" +
+                                "• Ctrl+F - Focus search box\n" +
+                                "• Ctrl+Q - Logout\n" +
+                                "• F1 - Show this help");
+                        }
+                        event.consume();
+                        break;
+                    case ESCAPE: // Clear search
+                        searchField.clear();
+                        searchField.getParent().requestFocus();
+                        event.consume();
+                        break;
+                }
             }
         });
     }
@@ -1548,18 +1717,24 @@ public class VaultMainController implements Initializable {
             int totalCount = fileList.size();
             
             if (displayedCount == totalCount) {
-                fileCountLabel.setText("Files: " + totalCount);
+                fileCountLabel.setText("📁 " + totalCount + " file(s)");
             } else {
-                fileCountLabel.setText("Files: " + displayedCount + " of " + totalCount);
+                fileCountLabel.setText("📁 " + displayedCount + " of " + totalCount + " files");
             }
             
-            vaultSizeLabel.setText("Size: " + calculateVaultSize() + " MB");
+            // Calculate total vault size from actual VaultFile objects
+            long totalSize = allVaultFiles.stream().mapToLong(VaultFile::getSize).sum();
+            vaultSizeLabel.setText("💾 " + formatFileSize(totalSize));
             
             if (isDecoyMode) {
-                encryptionLabel.setText("🔒 Decoy Mode Active");
+                encryptionLabel.setText("🎭 Decoy Mode Active");
                 sessionLabel.setText("Session: Decoy");
             } else {
-                encryptionLabel.setText("🔒 AES-256 Encrypted");
+                if (totalCount > 0) {
+                    encryptionLabel.setText("🔐 " + totalCount + " files encrypted with AES-256");
+                } else {
+                    encryptionLabel.setText("🔐 Vault ready - Drop files to encrypt");
+                }
                 sessionLabel.setText("Session: Active");
             }
         });

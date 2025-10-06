@@ -41,6 +41,7 @@ public class ApplicationIntegrator {
     private UIManager uiManager;
     private NotificationManager notificationManager;
     private ErrorDialog errorDialog;
+    private SystemTrayManager systemTrayManager;
     
     // Error handling
     private ErrorHandler errorHandler;
@@ -146,6 +147,16 @@ public class ApplicationIntegrator {
         
         // Set up UI manager with primary stage
         uiManager.initialize(primaryStage);
+        
+        // Initialize system tray
+        systemTrayManager = new SystemTrayManager(primaryStage);
+        if (systemTrayManager.initializeSystemTray()) {
+            // Set up minimize to tray behavior
+            primaryStage.setOnCloseRequest(event -> {
+                event.consume(); // Prevent default close
+                systemTrayManager.minimizeToTray();
+            });
+        }
         
         // Set this integrator reference in UI manager
         uiManager.setApplicationIntegrator(this);
@@ -599,6 +610,11 @@ public class ApplicationIntegrator {
                 currentKey = null;
             }
             securityContext = null;
+            
+            // Cleanup system tray
+            if (systemTrayManager != null) {
+                systemTrayManager.cleanup();
+            }
             
             // Shutdown background executor
             if (backgroundExecutor != null) {
