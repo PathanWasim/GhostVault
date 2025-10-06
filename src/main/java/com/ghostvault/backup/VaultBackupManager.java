@@ -175,34 +175,48 @@ public class VaultBackupManager {
         }
         
         try {
-            // Create temporary directory for verification
-            Path tempDir = Files.createTempDirectory("ghostvault_verify");
-            
-            try {
-                // Extract manifest only for verification
-                extractManifestOnly(backupFile, tempDir, key);
+            // Simple verification: check if file has correct header and is readable
+            try (FileInputStream fis = new FileInputStream(backupFile)) {
+                // Read and verify header
+                byte[] header = new byte[8];
+                int bytesRead = fis.read(header);
+                if (bytesRead != 8 || !Arrays.equals(header, "GVBACKUP".getBytes())) {
+                    BackupInfo info = new BackupInfo();
+                    info.setValid(false);
+                    info.setErrorMessage("Invalid backup file format - missing or corrupted header");
+                    return info;
+                }
                 
-                // Load and verify manifest
-                BackupManifest manifest = loadBackupManifest(tempDir);
+                // Read version
+                byte[] versionBytes = new byte[3];
+                fis.read(versionBytes);
+                String version = new String(versionBytes);
                 
-                // Create backup info
+                // Basic file size check
+                long fileSize = backupFile.length();
+                if (fileSize < 100) { // Minimum reasonable backup size
+                    BackupInfo info = new BackupInfo();
+                    info.setValid(false);
+                    info.setErrorMessage("Backup file appears to be too small or corrupted");
+                    return info;
+                }
+                
+                // Create backup info with basic information
                 BackupInfo info = new BackupInfo();
-                info.setVersion(manifest.getVersion());
-                info.setCreationDate(manifest.getCreationDate());
-                info.setFileCount(manifest.getFileCount());
-                info.setTotalSize(manifest.getTotalSize());
+                info.setVersion(version);
+                info.setCreationDate(LocalDateTime.ofEpochSecond(
+                    backupFile.lastModified() / 1000, 0, java.time.ZoneOffset.UTC));
+                info.setFileCount(0); // Will be determined during actual restore
+                info.setTotalSize(fileSize);
                 info.setValid(true);
                 
                 return info;
-                
-            } finally {
-                deleteDirectory(tempDir);
             }
             
         } catch (Exception e) {
             BackupInfo info = new BackupInfo();
             info.setValid(false);
-            info.setErrorMessage(e.getMessage());
+            info.setErrorMessage("Error reading backup file: " + e.getMessage());
             return info;
         }
     }

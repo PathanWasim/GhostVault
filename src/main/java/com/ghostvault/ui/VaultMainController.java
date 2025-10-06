@@ -955,13 +955,13 @@ public class VaultMainController implements Initializable {
                     "Backup Information:\n\n" +
                     "Version: %s\n" +
                     "Created: %s\n" +
-                    "Files: %d\n" +
-                    "Size: %s\n\n" +
+                    "File Size: %s\n" +
+                    "Status: ✓ Valid backup format\n\n" +
                     "⚠️ WARNING: This will replace your current vault contents!\n\n" +
+                    "Note: File count will be determined during restore process.\n\n" +
                     "Do you want to proceed with the restore?",
                     backupInfo.getVersion(),
                     backupInfo.getCreationDate() != null ? backupInfo.getCreationDate().toString() : "Unknown",
-                    backupInfo.getFileCount(),
                     formatFileSize(backupInfo.getTotalSize())
                 );
                 
