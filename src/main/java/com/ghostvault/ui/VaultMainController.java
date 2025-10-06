@@ -7,12 +7,16 @@ import com.ghostvault.core.MetadataManager;
 import com.ghostvault.model.VaultFile;
 import com.ghostvault.security.SessionManager;
 import javafx.fxml.FXML;
+import javafx.fxml.FXMLLoader;
 import javafx.fxml.Initializable;
+import javafx.scene.Parent;
+import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.stage.FileChooser;
+import javafx.stage.Stage;
 
 import javax.crypto.SecretKey;
 import java.io.ByteArrayInputStream;
@@ -812,6 +816,23 @@ public class VaultMainController implements Initializable {
             
             // Create backup using backup manager
             if (backupManager != null && encryptionKey != null) {
+                // Validate encryption key and vault state
+                logMessage("🔐 Validating encryption key for backup...");
+                
+                // Check if vault has files to backup
+                if (allVaultFiles.isEmpty()) {
+                    logMessage("ℹ️ No files in vault to backup");
+                    boolean proceedEmpty = showConfirmation("Empty Vault Backup", 
+                        "Your vault appears to be empty.\n\n" +
+                        "Do you still want to create a backup?\n" +
+                        "(This will create a backup of the vault structure only)");
+                    
+                    if (!proceedEmpty) {
+                        hideOperationProgress();
+                        return;
+                    }
+                }
+                
                 // Create progress callback
                 VaultBackupManager.BackupProgressCallback callback = new VaultBackupManager.BackupProgressCallback() {
                     @Override
@@ -823,8 +844,32 @@ public class VaultMainController implements Initializable {
                     }
                 };
                 
-                // Create the backup
-                backupManager.createBackup(backupLocation, encryptionKey, callback);
+                // Create the backup with enhanced error handling
+                try {
+                    backupManager.createBackup(backupLocation, encryptionKey, callback);
+                } catch (Exception backupError) {
+                    hideOperationProgress();
+                    
+                    // Check for specific error types
+                    String errorMessage = backupError.getMessage();
+                    if (errorMessage != null && errorMessage.contains("Tag mismatch")) {
+                        logMessage("✗ Backup failed: Encryption key mismatch or corrupted data");
+                        showError("Backup Failed - Key Mismatch", 
+                            "The backup failed due to an encryption key mismatch.\n\n" +
+                            "This could happen if:\n" +
+                            "• The vault was created with a different password\n" +
+                            "• The vault data is corrupted\n" +
+                            "• There's an issue with the encryption system\n\n" +
+                            "Please try:\n" +
+                            "1. Restart the application\n" +
+                            "2. Verify your password is correct\n" +
+                            "3. Check if individual files can be downloaded");
+                    } else {
+                        logMessage("✗ Backup failed: " + errorMessage);
+                        showError("Backup Failed", "Failed to create backup:\n\n" + errorMessage);
+                    }
+                    return;
+                }
                 
                 hideOperationProgress();
                 logMessage("✓ Backup created successfully: " + backupLocation.getName());
@@ -872,10 +917,35 @@ public class VaultMainController implements Initializable {
         try {
             if (backupManager != null && encryptionKey != null) {
                 showOperationProgress("Verifying backup...");
-                VaultBackupManager.BackupInfo backupInfo = backupManager.verifyBackup(backupFile, encryptionKey);
+                logMessage("🔍 Verifying backup file: " + backupFile.getName());
+                
+                VaultBackupManager.BackupInfo backupInfo;
+                try {
+                    backupInfo = backupManager.verifyBackup(backupFile, encryptionKey);
+                } catch (Exception verifyError) {
+                    hideOperationProgress();
+                    
+                    String errorMessage = verifyError.getMessage();
+                    if (errorMessage != null && errorMessage.contains("Tag mismatch")) {
+                        logMessage("✗ Backup verification failed: Encryption key mismatch");
+                        showError("Invalid Backup", 
+                            "The backup file cannot be verified due to an encryption key mismatch.\n\n" +
+                            "This could happen if:\n" +
+                            "• The backup was created with a different password\n" +
+                            "• The backup file is corrupted\n" +
+                            "• The backup format is incompatible\n\n" +
+                            "Please ensure you're using the correct password that was used when creating the backup.");
+                    } else {
+                        logMessage("✗ Backup verification failed: " + errorMessage);
+                        showError("Invalid Backup", "Failed to verify backup:\n\n" + errorMessage);
+                    }
+                    return;
+                }
+                
                 hideOperationProgress();
                 
                 if (!backupInfo.isValid()) {
+                    logMessage("✗ Backup file is invalid: " + backupInfo.getErrorMessage());
                     showError("Invalid Backup", "The backup file is invalid or corrupted:\n\n" + backupInfo.getErrorMessage());
                     return;
                 }
@@ -912,20 +982,38 @@ public class VaultMainController implements Initializable {
                     showOperationProgress("Restoring from backup...");
                     logMessage("⏳ Restoring vault from backup: " + backupFile.getName());
                     
-                    // Perform the restore
-                    backupManager.restoreBackup(backupFile, encryptionKey, callback);
-                    
-                    hideOperationProgress();
-                    refreshFileList();
-                    updateStatus();
-                    
-                    logMessage("✓ Vault successfully restored from: " + backupFile.getName());
-                    logMessage("  Files restored: " + backupInfo.getFileCount());
-                    
-                    showNotification("Restore Complete", 
-                        "Vault successfully restored from backup!\n\n" +
-                        "Files restored: " + backupInfo.getFileCount() + "\n" +
-                        "Please verify your files are accessible.");
+                    // Perform the restore with enhanced error handling
+                    try {
+                        backupManager.restoreBackup(backupFile, encryptionKey, callback);
+                        
+                        hideOperationProgress();
+                        refreshFileList();
+                        updateStatus();
+                        
+                        logMessage("✓ Vault successfully restored from: " + backupFile.getName());
+                        logMessage("  Files restored: " + backupInfo.getFileCount());
+                        
+                        showNotification("Restore Complete", 
+                            "Vault successfully restored from backup!\n\n" +
+                            "Files restored: " + backupInfo.getFileCount() + "\n" +
+                            "Please verify your files are accessible.");
+                            
+                    } catch (Exception restoreError) {
+                        hideOperationProgress();
+                        
+                        String errorMessage = restoreError.getMessage();
+                        if (errorMessage != null && errorMessage.contains("Tag mismatch")) {
+                            logMessage("✗ Restore failed: Encryption key mismatch during restore");
+                            showError("Restore Failed - Key Mismatch", 
+                                "The restore failed due to an encryption key mismatch.\n\n" +
+                                "This indicates the backup was created with a different password.\n" +
+                                "Please ensure you're using the exact same password that was used when creating the backup.");
+                        } else {
+                            logMessage("✗ Restore failed: " + errorMessage);
+                            showError("Restore Failed", "Failed to restore from backup:\n\n" + errorMessage);
+                        }
+                        return;
+                    }
                 }
             } else {
                 if (backupManager == null) {
@@ -970,7 +1058,7 @@ public class VaultMainController implements Initializable {
     }
     
     /**
-     * Handle logout with confirmation
+     * Handle logout with confirmation and return to login screen
      */
     @FXML
     private void handleLogout() {
@@ -978,13 +1066,53 @@ public class VaultMainController implements Initializable {
             "Are you sure you want to logout?\n\nAll unsaved work will be lost.");
         
         if (confirmed) {
-            logMessage("Logging out...");
-            // Clear sensitive data
-            clearSensitiveData();
+            logMessage("🚪 Logging out...");
             
-            // Notify application integrator for logout
-            if (sessionManager != null) {
-                sessionManager.endSession();
+            try {
+                // Clear sensitive data
+                clearSensitiveData();
+                
+                // End session
+                if (sessionManager != null) {
+                    sessionManager.endSession();
+                }
+                
+                // Close current window and return to login
+                Platform.runLater(() -> {
+                    try {
+                        // Get current stage
+                        javafx.stage.Stage currentStage = (javafx.stage.Stage) logoutButton.getScene().getWindow();
+                        
+                        // Load login screen
+                        javafx.fxml.FXMLLoader loader = new javafx.fxml.FXMLLoader(
+                            getClass().getResource("/fxml/login.fxml"));
+                        javafx.scene.Parent loginRoot = loader.load();
+                        
+                        // Create new scene
+                        javafx.scene.Scene loginScene = new javafx.scene.Scene(loginRoot);
+                        
+                        // Apply theme
+                        if (uiManager != null) {
+                            uiManager.applyTheme(loginScene);
+                        }
+                        
+                        // Set scene and show
+                        currentStage.setScene(loginScene);
+                        currentStage.setTitle("GhostVault - Login");
+                        currentStage.centerOnScreen();
+                        
+                        logMessage("✓ Returned to login screen");
+                        
+                    } catch (Exception e) {
+                        logMessage("✗ Error returning to login: " + e.getMessage());
+                        // Fallback: close application
+                        Platform.exit();
+                    }
+                });
+                
+            } catch (Exception e) {
+                logMessage("✗ Logout error: " + e.getMessage());
+                showError("Logout Error", "Error during logout: " + e.getMessage());
             }
         }
     }
