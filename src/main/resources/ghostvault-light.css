@@ -55,6 +55,7 @@
 /* Labels */
 .label {
     -fx-text-fill: #333333;
+    -fx-font-size: 13px;
 }
 
 /* List View */

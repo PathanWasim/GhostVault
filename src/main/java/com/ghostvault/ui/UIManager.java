@@ -214,9 +214,9 @@ public class UIManager {
         scene.getStylesheets().add(getClass().getResource("/styles/professional.css").toExternalForm());
         
         if (isDarkTheme) {
-            scene.getStylesheets().add(getClass().getResource("/styles/dark_theme.css").toExternalForm());
+            scene.getStylesheets().add(getClass().getResource("/ghostvault-dark.css").toExternalForm());
         } else {
-            scene.getStylesheets().add(getClass().getResource("/styles/light_theme.css").toExternalForm());
+            scene.getStylesheets().add(getClass().getResource("/ghostvault-light.css").toExternalForm());
         }
         
         // Add common styles (will override professional where needed)

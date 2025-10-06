@@ -42,29 +42,37 @@
    
    <!-- Main Content Area -->
    <center>
-      <VBox spacing="20.0">
-         <padding>
-            <Insets bottom="20.0" left="20.0" right="20.0" top="20.0" />
-         </padding>
-         
-         <!-- Search Section -->
-         <VBox spacing="8.0" styleClass="card">
-            <Label styleClass="card-header" text="🔍 Search Files" />
-            <TextField fx:id="searchField" maxWidth="400.0" onKeyReleased="#handleSearch" promptText="Search files... (try 'find my documents' or 'show me images')" styleClass="text-field, search-field" />
+      <StackPane>
+         <!-- Main Content -->
+         <VBox fx:id="mainContent" spacing="20.0">
+            <padding>
+               <Insets bottom="20.0" left="20.0" right="20.0" top="20.0" />
+            </padding>
+            
+            <!-- Search Section -->
+            <VBox spacing="8.0" styleClass="card">
+               <Label styleClass="card-header" text="🔍 Search Files" />
+               <TextField fx:id="searchField" maxWidth="400.0" onKeyReleased="#handleSearch" promptText="Search files... (try 'find my documents' or 'show me images')" styleClass="text-field, search-field" />
+            </VBox>
+            
+            <!-- File List Section -->
+            <VBox spacing="8.0" styleClass="card" VBox.vgrow="ALWAYS">
+               <Label styleClass="card-header" text="📁 Encrypted Files" />
+               <ListView fx:id="fileListView" styleClass="list-view" VBox.vgrow="ALWAYS" />
+            </VBox>
+            
+            <!-- Activity Log Section -->
+            <VBox spacing="8.0" styleClass="card">
+               <Label styleClass="card-header" text="📋 Activity Log" />
+               <TextArea fx:id="logArea" editable="false" prefHeight="120.0" styleClass="text-area" />
+            </VBox>
          </VBox>
          
-         <!-- File List Section -->
-         <VBox spacing="8.0" styleClass="card" VBox.vgrow="ALWAYS">
-            <Label styleClass="card-header" text="📁 Encrypted Files" />
-            <ListView fx:id="fileListView" styleClass="list-view" VBox.vgrow="ALWAYS" />
+         <!-- Dashboard Overlay (Initially Hidden) -->
+         <VBox fx:id="dashboardOverlay" visible="false" managed="false" styleClass="dashboard-overlay">
+            <!-- Dashboard content will be added programmatically -->
          </VBox>
-         
-         <!-- Activity Log Section -->
-         <VBox spacing="8.0" styleClass="card">
-            <Label styleClass="card-header" text="📋 Activity Log" />
-            <TextArea fx:id="logArea" editable="false" prefHeight="120.0" styleClass="text-area" />
-         </VBox>
-      </VBox>
+      </StackPane>
    </center>
    
    <!-- Status Bar -->

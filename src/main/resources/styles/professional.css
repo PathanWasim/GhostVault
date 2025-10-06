@@ -1,118 +1,114 @@
 /* Professional GhostVault Theme */
-/* Modern, clean design with enterprise appeal */
+/* Clean, readable design with proper contrast */
 
 .root {
-    -fx-base: #f8f9fa;
-    -fx-background: #ffffff;
+    -fx-base: #ffffff;
+    -fx-background: #f5f5f5;
     -fx-control-inner-background: #ffffff;
-    -fx-accent: #2196F3;
-    -fx-focus-color: #2196F3;
-    -fx-faint-focus-color: #2196F322;
-    -fx-selection-bar: #2196F3;
-    -fx-selection-bar-non-focused: #E3F2FD;
-    -fx-font-family: "Segoe UI", "Roboto", "Arial", sans-serif;
-    -fx-font-size: 13px;
+    -fx-accent: #007acc;
+    -fx-focus-color: #007acc;
+    -fx-faint-focus-color: #007acc22;
+    -fx-selection-bar: #007acc;
+    -fx-selection-bar-non-focused: #e3f2fd;
+    -fx-font-family: "Segoe UI", "Arial", sans-serif;
+    -fx-font-size: 14px;
+    -fx-text-fill: #333333;
+    -fx-text-base-color: #333333;
 }
 
 /* Main Application Window */
 .main-container {
-    -fx-background-color: linear-gradient(to bottom, #f8f9fa, #e9ecef);
+    -fx-background-color: #f5f5f5;
     -fx-padding: 0;
 }
 
 /* Header/Toolbar */
 .toolbar {
-    -fx-background-color: linear-gradient(to bottom, #ffffff, #f8f9fa);
-    -fx-border-color: #dee2e6;
+    -fx-background-color: #ffffff;
+    -fx-border-color: #cccccc;
     -fx-border-width: 0 0 1 0;
-    -fx-padding: 12 20;
-    -fx-spacing: 15;
+    -fx-padding: 10 15;
+    -fx-spacing: 10;
 }
 
 /* Professional Buttons */
 .button {
-    -fx-background-color: linear-gradient(to bottom, #ffffff, #f8f9fa);
-    -fx-border-color: #ced4da;
+    -fx-background-color: #ffffff;
+    -fx-border-color: #cccccc;
     -fx-border-width: 1;
-    -fx-border-radius: 6;
-    -fx-background-radius: 6;
+    -fx-border-radius: 4;
+    -fx-background-radius: 4;
     -fx-padding: 8 16;
-    -fx-font-weight: 500;
-    -fx-text-fill: #495057;
+    -fx-font-weight: normal;
+    -fx-text-fill: #333333;
     -fx-cursor: hand;
-    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.1), 2, 0, 0, 1);
+    -fx-font-size: 13px;
 }
 
 .button:hover {
-    -fx-background-color: linear-gradient(to bottom, #f8f9fa, #e9ecef);
-    -fx-border-color: #adb5bd;
-    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.15), 3, 0, 0, 2);
+    -fx-background-color: #f0f0f0;
+    -fx-border-color: #999999;
 }
 
 .button:pressed {
-    -fx-background-color: linear-gradient(to bottom, #e9ecef, #dee2e6);
-    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.2), 1, 0, 0, 1);
+    -fx-background-color: #e0e0e0;
 }
 
 /* Primary Action Buttons */
 .primary-button {
-    -fx-background-color: linear-gradient(to bottom, #2196F3, #1976D2);
-    -fx-border-color: #1976D2;
+    -fx-background-color: #007acc;
+    -fx-border-color: #007acc;
     -fx-text-fill: white;
-    -fx-font-weight: 600;
 }
 
 .primary-button:hover {
-    -fx-background-color: linear-gradient(to bottom, #1976D2, #1565C0);
-    -fx-border-color: #1565C0;
+    -fx-background-color: #005a9e;
+    -fx-border-color: #005a9e;
 }
 
 .primary-button:pressed {
-    -fx-background-color: linear-gradient(to bottom, #1565C0, #0D47A1);
+    -fx-background-color: #004578;
 }
 
 /* Success Buttons */
 .success-button {
-    -fx-background-color: linear-gradient(to bottom, #4CAF50, #388E3C);
-    -fx-border-color: #388E3C;
+    -fx-background-color: #28a745;
+    -fx-border-color: #28a745;
     -fx-text-fill: white;
-    -fx-font-weight: 600;
 }
 
 .success-button:hover {
-    -fx-background-color: linear-gradient(to bottom, #388E3C, #2E7D32);
-    -fx-border-color: #2E7D32;
+    -fx-background-color: #218838;
+    -fx-border-color: #218838;
 }
 
 /* Danger Buttons */
 .danger-button {
-    -fx-background-color: linear-gradient(to bottom, #f44336, #d32f2f);
-    -fx-border-color: #d32f2f;
+    -fx-background-color: #dc3545;
+    -fx-border-color: #dc3545;
     -fx-text-fill: white;
-    -fx-font-weight: 600;
 }
 
 .danger-button:hover {
-    -fx-background-color: linear-gradient(to bottom, #d32f2f, #c62828);
-    -fx-border-color: #c62828;
+    -fx-background-color: #c82333;
+    -fx-border-color: #c82333;
 }
 
 /* Modern Cards */
 .card {
     -fx-background-color: #ffffff;
-    -fx-border-color: #e9ecef;
+    -fx-border-color: #dddddd;
     -fx-border-width: 1;
-    -fx-border-radius: 8;
-    -fx-background-radius: 8;
-    -fx-padding: 20;
-    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.08), 8, 0, 0, 2);
+    -fx-border-radius: 4;
+    -fx-background-radius: 4;
+    -fx-padding: 15;
 }
 
 .card-header {
     -fx-font-size: 16px;
-    -fx-font-weight: 600;
-    -fx-text-fill: #212529;
-    -fx-padding: 0 0 12 0;
+    -fx-font-weight: bold;
+    -fx-text-fill: #333333;
+    -fx-padding: 0 0 10 0;
 }
 
 /* File List */
@@ -131,6 +127,7 @@
     -fx-border-color: transparent transparent #f8f9fa transparent;
     -fx-border-width: 0 0 1 0;
     -fx-font-size: 13px;
+    -fx-text-fill: #212529;
 }
 
 .list-cell:selected {
@@ -153,6 +150,7 @@
     -fx-background-radius: 6;
     -fx-padding: 10 12;
     -fx-font-size: 13px;
+    -fx-text-fill: #212529;
 }
 
 .text-field:focused,
@@ -161,12 +159,19 @@
     -fx-effect: dropshadow(gaussian, rgba(33, 150, 243, 0.3), 4, 0, 0, 0);
 }
 
+/* Labels */
+.label {
+    -fx-text-fill: #212529;
+    -fx-font-size: 13px;
+}
+
 /* Search Field */
 .search-field {
     -fx-background-color: #f8f9fa;
     -fx-border-color: #e9ecef;
     -fx-prompt-text-fill: #6c757d;
     -fx-font-style: italic;
+    -fx-text-fill: #212529;
 }
 
 .search-field:focused {
@@ -234,19 +239,25 @@
     -fx-background-color: linear-gradient(to right, #FFF3E0, #ffffff);
 }
 
+/* Dashboard Overlay */
+.dashboard-overlay {
+    -fx-background-color: rgba(0, 0, 0, 0.8);
+    -fx-padding: 50;
+}
+
 /* Dashboard Cards */
 .dashboard-card {
     -fx-background-color: #ffffff;
-    -fx-border-color: #e9ecef;
+    -fx-border-color: #dddddd;
     -fx-border-width: 1;
-    -fx-border-radius: 12;
-    -fx-background-radius: 12;
-    -fx-padding: 24;
-    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.06), 12, 0, 0, 4);
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+    -fx-padding: 20;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.2), 10, 0, 0, 5);
 }
 
 .dashboard-card:hover {
-    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.12), 16, 0, 0, 6);
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.3), 15, 0, 0, 8);
 }
 
 .metric-value {

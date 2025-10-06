@@ -49,7 +49,7 @@ public class SecurityDashboard {
     }
     
     /**
-     * Show the security dashboard
+     * Show the security dashboard in separate window
      */
     public void show() {
         if (dashboardStage == null) {
@@ -59,6 +59,62 @@ public class SecurityDashboard {
         dashboardStage.show();
         dashboardStage.toFront();
         refreshDashboard();
+    }
+    
+    /**
+     * Show dashboard in parent window
+     */
+    public void showInParent(javafx.stage.Window parentWindow) {
+        if (dashboardStage == null) {
+            createDashboard();
+        }
+        
+        dashboardStage.initOwner(parentWindow);
+        dashboardStage.initModality(javafx.stage.Modality.WINDOW_MODAL);
+        dashboardStage.show();
+        dashboardStage.toFront();
+        refreshDashboard();
+    }
+    
+    /**
+     * Create dashboard content for embedding
+     */
+    public javafx.scene.Node createDashboardContent() {
+        VBox content = new VBox(20);
+        content.setPadding(new javafx.geometry.Insets(30));
+        content.setStyle("-fx-background-color: white; -fx-background-radius: 10;");
+        
+        // Header
+        Label title = new Label("🛡️ Security Dashboard");
+        title.setStyle("-fx-font-size: 24px; -fx-font-weight: bold; -fx-text-fill: #333;");
+        
+        // Close button
+        Button closeBtn = new Button("✕ Close");
+        closeBtn.setStyle("-fx-background-color: #dc3545; -fx-text-fill: white; -fx-font-size: 14px;");
+        closeBtn.setOnAction(e -> {
+            // This will be handled by the parent controller
+            content.setVisible(false);
+            content.setManaged(false);
+        });
+        
+        HBox header = new HBox();
+        header.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+        header.getChildren().addAll(title);
+        
+        HBox headerRight = new HBox();
+        headerRight.setAlignment(javafx.geometry.Pos.CENTER_RIGHT);
+        headerRight.getChildren().add(closeBtn);
+        
+        BorderPane headerPane = new BorderPane();
+        headerPane.setLeft(header);
+        headerPane.setRight(headerRight);
+        
+        // Main dashboard content
+        Node mainContent = createMainContent();
+        
+        content.getChildren().addAll(headerPane, mainContent);
+        
+        return content;
     }
     
     /**

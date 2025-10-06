@@ -12,6 +12,7 @@ import javafx.fxml.Initializable;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
+import javafx.scene.layout.VBox;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -51,6 +52,11 @@ public class VaultMainController implements Initializable {
     @FXML private Button notesButton;
     @FXML private Button passwordsButton;
     @FXML private Label sessionLabel;
+    
+    // Dashboard Components
+    @FXML private VBox mainContent;
+    @FXML private VBox dashboardOverlay;
+    
     @FXML private TextField searchField;
     @FXML private ListView<String> fileListView;
     @FXML private TextArea logArea;
@@ -72,11 +78,13 @@ public class VaultMainController implements Initializable {
     
     // New feature managers
     private SecurityDashboard securityDashboard;
+    private SystemTrayManager systemTrayManager;
     private com.ghostvault.ai.SmartFileOrganizer smartOrganizer;
     private com.ghostvault.security.SecureNotesManager notesManager;
     
     // State Management
     private boolean isDecoyMode = false;
+    private boolean isDashboardVisible = false;
     private final ObservableList<String> fileList = FXCollections.observableArrayList();
     private final ObservableList<String> filteredFileList = FXCollections.observableArrayList();
     private List<VaultFile> allVaultFiles = FXCollections.observableArrayList();
@@ -1774,12 +1782,14 @@ public class VaultMainController implements Initializable {
     private void handleDashboard() {
         if (securityDashboard != null) {
             securityDashboard.updateFileCount(allVaultFiles.size());
-            securityDashboard.show();
-            logMessage("📊 Security dashboard opened");
+            securityDashboard.showInParent(dashboardButton.getScene().getWindow());
+            logMessage("📊 Security Dashboard opened - Real-time monitoring active");
         } else {
             showError("Dashboard Error", "Security dashboard is not available.");
         }
     }
+    
+
     
     /**
      * Handle secure notes
@@ -1842,6 +1852,8 @@ public class VaultMainController implements Initializable {
                 }
                 sessionLabel.setText("Session: Active");
             }
+            
+            // Dashboard updates are handled by SecurityDashboard itself
         });
     }
     
