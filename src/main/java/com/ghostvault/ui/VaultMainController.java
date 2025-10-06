@@ -89,6 +89,20 @@ public class VaultMainController implements Initializable {
             logMessage("🔐 Encryption key initialized for file operations");
         }
         
+        // Initialize encryption key for metadata operations
+        if (metadataManager != null && encryptionKey != null) {
+            metadataManager.setEncryptionKey(encryptionKey);
+            logMessage("🔐 Encryption key initialized for metadata operations");
+            
+            // Load existing metadata
+            try {
+                metadataManager.loadMetadata();
+                logMessage("📋 Metadata loaded successfully");
+            } catch (Exception e) {
+                logMessage("⚠ Could not load metadata: " + e.getMessage());
+            }
+        }
+        
         refreshFileList();
         updateStatus();
     }
@@ -352,48 +366,102 @@ public class VaultMainController implements Initializable {
      */
     private void handleOrphanedFileDownload(String selectedDisplayName) {
         try {
-            // Extract the encrypted filename from the display name
-            String encryptedFileName = selectedDisplayName.replace("🔒 ", "").replace(" (orphaned)", "") + ".enc";
+            // Extract the UUID from the display name
+            String uuidPart = selectedDisplayName.replace("🔒 ", "").replace(" (orphaned)", "");
             
-            showWarning("Orphaned File", 
-                "This file doesn't have metadata. It will be downloaded as encrypted data.\n\n" +
-                "File: " + encryptedFileName + "\n\n" +
-                "Note: You may need the original encryption key to decrypt this file manually.");
+            // Show warning dialog about orphaned file
+            boolean proceed = showConfirmation("Orphaned File Recovery", 
+                "This file has no metadata (orphaned file).\n\n" +
+                "File ID: " + uuidPart + "\n\n" +
+                "⚠️ WARNING:\n" +
+                "• Original filename is unknown\n" +
+                "• File type cannot be determined\n" +
+                "• File may be corrupted or incomplete\n\n" +
+                "Do you want to attempt recovery anyway?");
             
-            FileChooser fileChooser = createFileChooser("Save Encrypted File As");
-            fileChooser.setInitialFileName(encryptedFileName);
+            if (!proceed) {
+                logMessage("❌ Orphaned file download cancelled by user");
+                return;
+            }
+            
+            // Attempt to decrypt the orphaned file
+            String encryptedFilePath = System.getProperty("user.home") + "/.ghostvault/files/" + uuidPart + ".enc";
+            File encryptedFile = new File(encryptedFilePath);
+            
+            if (!encryptedFile.exists()) {
+                logMessage("✗ Encrypted file not found: " + encryptedFilePath);
+                showError("File Not Found", "The encrypted file could not be located on disk.");
+                return;
+            }
+            
+            // Set up file chooser for recovery
+            FileChooser fileChooser = createFileChooser("Recover Orphaned File As");
+            fileChooser.setInitialFileName("recovered_" + uuidPart.substring(0, 8) + ".dat");
             
             File saveLocation = fileChooser.showSaveDialog(downloadButton.getScene().getWindow());
             if (saveLocation == null) return;
             
-            showOperationProgress("Copying encrypted file...");
-            logMessage("📁 Copying orphaned file: " + encryptedFileName);
+            showOperationProgress("Attempting file recovery...");
+            logMessage("🔧 Attempting to recover orphaned file: " + uuidPart);
             
-            // Copy the encrypted file directly
-            String vaultFilesPath = System.getProperty("user.home") + "/.ghostvault/files";
-            File sourceFile = new File(vaultFilesPath, encryptedFileName);
-            
-            if (sourceFile.exists()) {
-                Files.copy(sourceFile.toPath(), saveLocation.toPath(), 
-                    java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-                
-                hideOperationProgress();
-                logMessage("✓ Orphaned file copied: " + encryptedFileName);
-                logMessage("  Saved to: " + saveLocation.getAbsolutePath());
-                logMessage("  ⚠ File is still encrypted - manual decryption may be required");
-                
-                showNotification("File Copied", 
-                    "Orphaned file copied successfully.\nNote: File is still encrypted.");
+            // Try to decrypt using the current encryption key
+            if (fileManager != null) {
+                try {
+                    // Create a temporary VaultFile for decryption attempt
+                    com.ghostvault.model.VaultFile tempVaultFile = new com.ghostvault.model.VaultFile(
+                        "unknown_file",
+                        uuidPart,
+                        uuidPart + ".enc",
+                        encryptedFile.length(),
+                        "unknown",
+                        System.currentTimeMillis()
+                    );
+                    
+                    // Attempt to retrieve/decrypt
+                    byte[] decryptedData = fileManager.retrieveFile(tempVaultFile);
+                    
+                    // Write recovered data
+                    Files.write(saveLocation.toPath(), decryptedData);
+                    
+                    // Clear sensitive data
+                    Arrays.fill(decryptedData, (byte) 0);
+                    
+                    hideOperationProgress();
+                    logMessage("✓ Orphaned file recovered and decrypted: " + saveLocation.getName());
+                    logMessage("  Saved to: " + saveLocation.getAbsolutePath());
+                    logMessage("  ⚠️ Please verify file integrity and rename appropriately");
+                    
+                    showNotification("Recovery Complete", 
+                        "Orphaned file recovered and decrypted successfully!\n\n" +
+                        "⚠️ Please verify the file integrity and rename it appropriately.");
+                        
+                } catch (Exception decryptError) {
+                    hideOperationProgress();
+                    logMessage("✗ Failed to decrypt orphaned file: " + decryptError.getMessage());
+                    
+                    // Offer raw file copy as last resort
+                    boolean copyRaw = showConfirmation("Decryption Failed", 
+                        "Could not decrypt the orphaned file.\n\n" +
+                        "Would you like to copy the raw encrypted file instead?\n" +
+                        "(You can try to decrypt it manually later)");
+                    
+                    if (copyRaw) {
+                        Files.copy(encryptedFile.toPath(), saveLocation.toPath(), 
+                            java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                        logMessage("📄 Raw encrypted file copied: " + saveLocation.getName());
+                        showNotification("Raw File Copied", "Encrypted file copied for manual recovery.");
+                    }
+                }
             } else {
                 hideOperationProgress();
-                logMessage("✗ Orphaned file not found: " + encryptedFileName);
-                showError("File Not Found", "The encrypted file could not be found on disk.");
+                logMessage("⚠ File manager not available for orphaned file recovery");
+                showError("Recovery Failed", "File manager not initialized for recovery.");
             }
             
         } catch (Exception e) {
             hideOperationProgress();
-            logMessage("✗ Failed to copy orphaned file: " + e.getMessage());
-            showError("Copy Failed", "Error: " + e.getMessage());
+            logMessage("✗ Orphaned file recovery failed: " + e.getMessage());
+            showError("Recovery Failed", "Could not recover orphaned file: " + e.getMessage());
         }
     }
     
