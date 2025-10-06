@@ -210,13 +210,16 @@ public class UIManager {
     public void applyTheme(Scene scene) {
         scene.getStylesheets().clear();
         
+        // Add professional base styling first
+        scene.getStylesheets().add(getClass().getResource("/styles/professional.css").toExternalForm());
+        
         if (isDarkTheme) {
             scene.getStylesheets().add(getClass().getResource("/styles/dark_theme.css").toExternalForm());
         } else {
             scene.getStylesheets().add(getClass().getResource("/styles/light_theme.css").toExternalForm());
         }
         
-        // Add common styles
+        // Add common styles (will override professional where needed)
         scene.getStylesheets().add(getClass().getResource("/styles/common.css").toExternalForm());
         
         // Initialize accessibility for the scene

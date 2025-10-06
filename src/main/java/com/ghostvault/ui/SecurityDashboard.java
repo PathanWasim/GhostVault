@@ -163,7 +163,8 @@ public class SecurityDashboard {
         
         // Security Score Card
         VBox scoreCard = createMetricCard("🛡️ Security Score", "85", "/100", "security-score-good");
-        securityScoreLabel = (Label) scoreCard.getChildren().get(1);
+        HBox valueBox = (HBox) scoreCard.getChildren().get(1);
+        securityScoreLabel = (Label) valueBox.getChildren().get(0); // Get the actual value label
         securityScoreBar = new ProgressBar(0.85);
         securityScoreBar.setPrefWidth(200);
         securityScoreBar.getStyleClass().add("security-score-bar");
@@ -171,15 +172,18 @@ public class SecurityDashboard {
         
         // Threat Level Card
         VBox threatCard = createMetricCard("⚠️ Threat Level", "LOW", "", "security-score-excellent");
-        threatLevelLabel = (Label) threatCard.getChildren().get(1);
+        HBox threatValueBox = (HBox) threatCard.getChildren().get(1);
+        threatLevelLabel = (Label) threatValueBox.getChildren().get(0);
         
         // Active Sessions Card
         VBox sessionsCard = createMetricCard("👥 Active Sessions", "1", "", "metric-value");
-        activeSessionsLabel = (Label) sessionsCard.getChildren().get(1);
+        HBox sessionsValueBox = (HBox) sessionsCard.getChildren().get(1);
+        activeSessionsLabel = (Label) sessionsValueBox.getChildren().get(0);
         
         // Total Files Card
         VBox filesCard = createMetricCard("📁 Protected Files", "0", "", "metric-value");
-        totalFilesLabel = (Label) filesCard.getChildren().get(1);
+        HBox filesValueBox = (HBox) filesCard.getChildren().get(1);
+        totalFilesLabel = (Label) filesValueBox.getChildren().get(0);
         
         overview.getChildren().addAll(scoreCard, threatCard, sessionsCard, filesCard);
         return overview;

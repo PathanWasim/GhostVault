@@ -4,60 +4,35 @@
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
 
-<BorderPane xmlns="http://javafx.com/javafx/11.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.ghostvault.ui.VaultMainController">
+<BorderPane xmlns="http://javafx.com/javafx/11.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.ghostvault.ui.VaultMainController" styleClass="main-container">
    
    <!-- Top Toolbar -->
    <top>
-      <ToolBar styleClass="main-toolbar">
+      <ToolBar styleClass="toolbar">
          <!-- File Operations -->
-         <Button fx:id="uploadButton" onAction="#handleUpload" styleClass="toolbar-button, upload-button" text="📁 Upload">
-            <tooltip>
-               <Tooltip text="Encrypt and store a new file" />
-            </tooltip>
-         </Button>
-         <Button fx:id="downloadButton" onAction="#handleDownload" styleClass="toolbar-button, download-button" text="💾 Download">
-            <tooltip>
-               <Tooltip text="Decrypt and download selected file" />
-            </tooltip>
-         </Button>
-         <Button fx:id="previewButton" onAction="#handlePreview" styleClass="toolbar-button, preview-button" text="👁️ Preview">
-            <tooltip>
-               <Tooltip text="Preview selected file content" />
-            </tooltip>
-         </Button>
-         <Button fx:id="deleteButton" onAction="#handleDelete" styleClass="toolbar-button, delete-button" text="🗑️ Delete">
-            <tooltip>
-               <Tooltip text="Securely delete selected file" />
-            </tooltip>
-         </Button>
+         <Button fx:id="uploadButton" onAction="#handleUpload" styleClass="button, primary-button" text="📁 Upload" />
+         <Button fx:id="downloadButton" onAction="#handleDownload" styleClass="button" text="💾 Download" />
+         <Button fx:id="previewButton" onAction="#handlePreview" styleClass="button" text="👁️ Preview" />
+         <Button fx:id="deleteButton" onAction="#handleDelete" styleClass="button, danger-button" text="🗑️ Delete" />
          
          <Separator />
          
          <!-- Vault Operations -->
-         <Button fx:id="backupButton" onAction="#handleBackup" styleClass="toolbar-button, backup-button" text="📦 Backup">
-            <tooltip>
-               <Tooltip text="Create encrypted vault backup" />
-            </tooltip>
-         </Button>
-         <Button fx:id="restoreButton" onAction="#handleRestore" styleClass="toolbar-button, restore-button" text="📥 Restore">
-            <tooltip>
-               <Tooltip text="Restore vault from backup" />
-            </tooltip>
-         </Button>
+         <Button fx:id="backupButton" onAction="#handleBackup" styleClass="button" text="📦 Backup" />
+         <Button fx:id="restoreButton" onAction="#handleRestore" styleClass="button" text="📥 Restore" />
+         
+         <Separator />
+         
+         <!-- Advanced Features -->
+         <Button fx:id="dashboardButton" onAction="#handleDashboard" styleClass="button, primary-button" text="📊 Dashboard" />
+         <Button fx:id="notesButton" onAction="#handleNotes" styleClass="button, success-button" text="📝 Notes" />
+         <Button fx:id="passwordsButton" onAction="#handlePasswords" styleClass="button, success-button" text="🔑 Passwords" />
          
          <Separator />
          
          <!-- Settings and Session -->
-         <Button fx:id="settingsButton" onAction="#handleSettings" styleClass="toolbar-button, settings-button" text="⚙️ Settings">
-            <tooltip>
-               <Tooltip text="Vault settings and preferences" />
-            </tooltip>
-         </Button>
-         <Button fx:id="logoutButton" onAction="#handleLogout" styleClass="toolbar-button, logout-button" text="🚪 Logout">
-            <tooltip>
-               <Tooltip text="Logout and lock vault" />
-            </tooltip>
-         </Button>
+         <Button fx:id="settingsButton" onAction="#handleSettings" styleClass="button" text="⚙️ Settings" />
+         <Button fx:id="logoutButton" onAction="#handleLogout" styleClass="button, danger-button" text="🚪 Logout" />
          
          <!-- Session Info -->
          <Region HBox.hgrow="ALWAYS" />
@@ -67,27 +42,27 @@
    
    <!-- Main Content Area -->
    <center>
-      <VBox spacing="10.0">
+      <VBox spacing="20.0">
          <padding>
-            <Insets bottom="15.0" left="15.0" right="15.0" top="15.0" />
+            <Insets bottom="20.0" left="20.0" right="20.0" top="20.0" />
          </padding>
          
          <!-- Search Section -->
-         <VBox spacing="5.0">
-            <Label styleClass="section-label" text="Search Files:" />
-            <TextField fx:id="searchField" maxWidth="300.0" onKeyReleased="#handleSearch" promptText="🔍 Search files..." styleClass="search-field" />
+         <VBox spacing="8.0" styleClass="card">
+            <Label styleClass="card-header" text="🔍 Search Files" />
+            <TextField fx:id="searchField" maxWidth="400.0" onKeyReleased="#handleSearch" promptText="Search files... (try 'find my documents' or 'show me images')" styleClass="text-field, search-field" />
          </VBox>
          
          <!-- File List Section -->
-         <VBox spacing="5.0" VBox.vgrow="ALWAYS">
-            <Label styleClass="section-label" text="Encrypted Files:" />
-            <ListView fx:id="fileListView" styleClass="file-list" VBox.vgrow="ALWAYS" />
+         <VBox spacing="8.0" styleClass="card" VBox.vgrow="ALWAYS">
+            <Label styleClass="card-header" text="📁 Encrypted Files" />
+            <ListView fx:id="fileListView" styleClass="list-view" VBox.vgrow="ALWAYS" />
          </VBox>
          
          <!-- Activity Log Section -->
-         <VBox spacing="5.0">
-            <Label styleClass="section-label" text="Activity Log:" />
-            <TextArea fx:id="logArea" editable="false" prefHeight="120.0" styleClass="log-area" />
+         <VBox spacing="8.0" styleClass="card">
+            <Label styleClass="card-header" text="📋 Activity Log" />
+            <TextArea fx:id="logArea" editable="false" prefHeight="120.0" styleClass="text-area" />
          </VBox>
       </VBox>
    </center>
