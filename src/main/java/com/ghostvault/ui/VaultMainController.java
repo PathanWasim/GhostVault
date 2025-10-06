@@ -987,6 +987,16 @@ public class VaultMainController implements Initializable {
                     try {
                         backupManager.restoreBackup(backupFile, encryptionKey, callback);
                         
+                        // Reload metadata from restored file
+                        if (metadataManager != null) {
+                            try {
+                                metadataManager.loadMetadata();
+                                logMessage("📋 Metadata reloaded after restore");
+                            } catch (Exception metaError) {
+                                logMessage("⚠ Could not reload metadata after restore: " + metaError.getMessage());
+                            }
+                        }
+                        
                         hideOperationProgress();
                         refreshFileList();
                         updateStatus();
