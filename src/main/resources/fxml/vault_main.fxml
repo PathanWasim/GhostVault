@@ -20,6 +20,11 @@
                <Tooltip text="Decrypt and download selected file" />
             </tooltip>
          </Button>
+         <Button fx:id="previewButton" onAction="#handlePreview" styleClass="toolbar-button, preview-button" text="👁️ Preview">
+            <tooltip>
+               <Tooltip text="Preview selected file content" />
+            </tooltip>
+         </Button>
          <Button fx:id="deleteButton" onAction="#handleDelete" styleClass="toolbar-button, delete-button" text="🗑️ Delete">
             <tooltip>
                <Tooltip text="Securely delete selected file" />
