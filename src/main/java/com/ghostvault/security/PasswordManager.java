@@ -98,6 +98,9 @@ public class PasswordManager {
     private void loadPasswordConfiguration() throws Exception {
         File configFile = new File(AppConfig.CONFIG_FILE);
         
+        System.out.println("🔍 Looking for password configuration at: " + AppConfig.CONFIG_FILE);
+        System.out.println("📁 Config file exists: " + configFile.exists());
+        
         if (configFile.exists()) {
             try {
                 byte[] configData = Files.readAllBytes(configFile.toPath());
@@ -445,6 +448,8 @@ public class PasswordManager {
      * Save encrypted password configuration
      */
     private void savePasswordConfiguration() throws Exception {
+        System.out.println("🔧 Saving password configuration to: " + AppConfig.CONFIG_FILE);
+        
         // Serialize KDF params
         byte[] kdfParamsSerialized = serializeKdfParams(kdfParams);
         
@@ -466,6 +471,8 @@ public class PasswordManager {
         
         // Write to file (unencrypted - verifiers and wrapped keys are already protected)
         Files.write(Paths.get(AppConfig.CONFIG_FILE), baos.toByteArray());
+        
+        System.out.println("✓ Password configuration saved successfully (" + baos.size() + " bytes)");
     }
     
     /**
