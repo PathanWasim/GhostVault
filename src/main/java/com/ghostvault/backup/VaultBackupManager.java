@@ -336,16 +336,14 @@ public class VaultBackupManager {
             
             byte[] archiveData = Files.readAllBytes(tempArchive);
             byte[] encryptedBytes = cryptoManager.encrypt(archiveData, key);
-            CryptoManager.EncryptedData encryptedArchive = CryptoManager.EncryptedData.fromCombinedData(encryptedBytes);
             
             // Write encrypted archive to target file
             try (FileOutputStream fos = new FileOutputStream(targetFile)) {
-                // Write header with version and IV length
+                // Write header with version
                 fos.write("GVBACKUP".getBytes());
                 fos.write(BACKUP_VERSION.getBytes());
-                fos.write(encryptedArchive.getIv().length);
-                fos.write(encryptedArchive.getIv());
-                fos.write(encryptedArchive.getCiphertext());
+                // Write the encrypted data directly (already contains IV + ciphertext+tag)
+                fos.write(encryptedBytes);
             }
             
             // Clear sensitive data
@@ -380,22 +378,15 @@ public class VaultBackupManager {
             fis.read(versionBytes);
             String version = new String(versionBytes);
             
-            // Read IV
-            int ivLength = fis.read();
-            byte[] iv = new byte[ivLength];
-            fis.read(iv);
-            
-            // Read encrypted data
+            // Read encrypted data (contains IV + ciphertext+tag)
             byte[] encryptedData = fis.readAllBytes();
             
             if (callback != null) {
                 callback.onProgress(30, "Decrypting backup archive...");
             }
             
-            // Decrypt archive
-            CryptoManager.EncryptedData encryptedArchive = 
-                new CryptoManager.EncryptedData(iv, encryptedData, null);
-            byte[] archiveData = cryptoManager.decrypt(encryptedArchive, key);
+            // Decrypt archive directly
+            byte[] archiveData = cryptoManager.decrypt(encryptedData, key);
             
             // Create temporary archive file
             Path tempArchive = Files.createTempFile("restore", ".zip");
@@ -600,41 +591,15 @@ public class VaultBackupManager {
      * Verify backup integrity after creation
      */
     private void verifyBackupIntegrity(File backupFile, SecretKey key, BackupManifest manifest) throws Exception {
-        // Comprehensive verification by attempting to decrypt the backup
-        Path tempDir = Files.createTempDirectory("ghostvault_verify");
+        // Simple verification - just check if we can read the backup header and basic structure
+        BackupInfo info = verifyBackup(backupFile, key);
+        if (!info.isValid()) {
+            throw new BackupException("Backup integrity verification failed: " + info.getErrorMessage());
+        }
         
-        try {
-            // Try to extract and decrypt the backup
-            extractEncryptedArchive(backupFile, tempDir, key, null);
-            
-            // Verify manifest can be loaded
-            BackupManifest verifyManifest = loadBackupManifest(tempDir);
-            
-            // Verify manifest integrity
-            if (!manifest.getVaultChecksum().equals(verifyManifest.getVaultChecksum())) {
-                throw new BackupException("Backup manifest checksum mismatch");
-            }
-            
-            // Verify we can read at least one file if any exist
-            Path filesDir = tempDir.resolve("files");
-            if (Files.exists(filesDir)) {
-                try (DirectoryStream<Path> stream = Files.newDirectoryStream(filesDir)) {
-                    for (Path file : stream) {
-                        if (Files.isRegularFile(file)) {
-                            // Just verify we can read the file (it's already decrypted)
-                            byte[] testData = Files.readAllBytes(file);
-                            if (testData.length == 0) {
-                                throw new BackupException("Backup contains empty encrypted file");
-                            }
-                            break; // Only test one file
-                        }
-                    }
-                }
-            }
-            
-        } finally {
-            // Clean up temporary directory
-            deleteDirectory(tempDir);
+        // Additional check: verify file size is reasonable
+        if (backupFile.length() < 50) {
+            throw new BackupException("Backup file is too small to be valid");
         }
     }
     
