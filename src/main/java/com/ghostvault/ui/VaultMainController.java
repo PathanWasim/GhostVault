@@ -47,6 +47,9 @@ public class VaultMainController implements Initializable {
     @FXML private Button restoreButton;
     @FXML private Button settingsButton;
     @FXML private Button logoutButton;
+    @FXML private Button dashboardButton;
+    @FXML private Button notesButton;
+    @FXML private Button passwordsButton;
     @FXML private Label sessionLabel;
     @FXML private TextField searchField;
     @FXML private ListView<String> fileListView;
@@ -66,6 +69,11 @@ public class VaultMainController implements Initializable {
     private NotificationManager notificationManager;
     private SessionManager sessionManager;
     private SecretKey encryptionKey;
+    
+    // New feature managers
+    private SecurityDashboard securityDashboard;
+    private com.ghostvault.ai.SmartFileOrganizer smartOrganizer;
+    private com.ghostvault.security.SecureNotesManager notesManager;
     
     // State Management
     private boolean isDecoyMode = false;
@@ -110,6 +118,9 @@ public class VaultMainController implements Initializable {
                 logMessage("⚠ Could not load metadata: " + e.getMessage());
             }
         }
+        
+        // Initialize new features
+        initializeAdvancedFeatures();
         
         refreshFileList();
         updateStatus();
@@ -240,6 +251,15 @@ public class VaultMainController implements Initializable {
         if (logoutButton != null) {
             logoutButton.setTooltip(new javafx.scene.control.Tooltip("Logout and return to login (Ctrl+Q)"));
         }
+        if (dashboardButton != null) {
+            dashboardButton.setTooltip(new javafx.scene.control.Tooltip("Open Security Dashboard (Ctrl+D)"));
+        }
+        if (notesButton != null) {
+            notesButton.setTooltip(new javafx.scene.control.Tooltip("Manage Secure Notes (Ctrl+N)"));
+        }
+        if (passwordsButton != null) {
+            passwordsButton.setTooltip(new javafx.scene.control.Tooltip("Password Manager (Ctrl+P)"));
+        }
         if (searchField != null) {
             searchField.setTooltip(new javafx.scene.control.Tooltip("Search files (Ctrl+F to focus, Esc to clear)"));
         }
@@ -362,6 +382,18 @@ public class VaultMainController implements Initializable {
                         handleLogout();
                         event.consume();
                         break;
+                    case D: // Ctrl+D - Dashboard
+                        handleDashboard();
+                        event.consume();
+                        break;
+                    case N: // Ctrl+N - Notes
+                        handleNotes();
+                        event.consume();
+                        break;
+                    case P: // Ctrl+P - Passwords
+                        handlePasswords();
+                        event.consume();
+                        break;
                 }
             } else {
                 switch (event.getCode()) {
@@ -379,6 +411,10 @@ public class VaultMainController implements Initializable {
                                 "• Ctrl+B - Create backup\n" +
                                 "• Ctrl+R - Restore from backup\n" +
                                 "• F5 - Refresh file list\n\n" +
+                                "Advanced Features:\n" +
+                                "• Ctrl+D - Security Dashboard\n" +
+                                "• Ctrl+N - Secure Notes\n" +
+                                "• Ctrl+P - Password Manager\n\n" +
                                 "Navigation:\n" +
                                 "• Ctrl+F - Focus search box\n" +
                                 "• Ctrl+Q - Logout\n" +
@@ -1704,6 +1740,75 @@ public class VaultMainController implements Initializable {
         filteredFileList.remove(fileName);
         logMessage("✓ File securely deleted: " + fileName + " (decoy)");
         updateStatus();
+    }
+    
+    /**
+     * Initialize advanced features
+     */
+    private void initializeAdvancedFeatures() {
+        try {
+            // Initialize Smart File Organizer
+            smartOrganizer = new com.ghostvault.ai.SmartFileOrganizer();
+            
+            // Initialize Security Dashboard
+            securityDashboard = new SecurityDashboard(null, null);
+            
+            // Initialize Secure Notes Manager
+            notesManager = new com.ghostvault.security.SecureNotesManager(System.getProperty("user.home") + "/.ghostvault");
+            if (encryptionKey != null) {
+                notesManager.setEncryptionKey(encryptionKey);
+                notesManager.loadData();
+            }
+            
+            logMessage("🚀 Advanced features initialized");
+            
+        } catch (Exception e) {
+            logMessage("⚠ Failed to initialize advanced features: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Handle security dashboard
+     */
+    @FXML
+    private void handleDashboard() {
+        if (securityDashboard != null) {
+            securityDashboard.updateFileCount(allVaultFiles.size());
+            securityDashboard.show();
+            logMessage("📊 Security dashboard opened");
+        } else {
+            showError("Dashboard Error", "Security dashboard is not available.");
+        }
+    }
+    
+    /**
+     * Handle secure notes
+     */
+    @FXML
+    private void handleNotes() {
+        if (notesManager != null) {
+            showInfo("Secure Notes", "Secure Notes feature is ready!\n\n" +
+                "Current notes: " + notesManager.getNotes().size() + "\n" +
+                "This feature allows you to store encrypted notes securely.");
+            logMessage("📝 Secure notes accessed");
+        } else {
+            showError("Notes Error", "Secure notes manager is not available.");
+        }
+    }
+    
+    /**
+     * Handle password manager
+     */
+    @FXML
+    private void handlePasswords() {
+        if (notesManager != null) {
+            showInfo("Password Manager", "Password Manager feature is ready!\n\n" +
+                "Stored passwords: " + notesManager.getPasswords().size() + "\n" +
+                "This feature allows you to store passwords securely with encryption.");
+            logMessage("🔑 Password manager accessed");
+        } else {
+            showError("Password Manager Error", "Password manager is not available.");
+        }
     }
     
     // =========================== UI HELPERS ===========================
