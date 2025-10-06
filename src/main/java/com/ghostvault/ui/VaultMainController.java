@@ -1091,26 +1091,13 @@ public class VaultMainController implements Initializable {
                 // Close current window and return to login
                 Platform.runLater(() -> {
                     try {
-                        // Get current stage
-                        javafx.stage.Stage currentStage = (javafx.stage.Stage) logoutButton.getScene().getWindow();
-                        
-                        // Load login screen
-                        javafx.fxml.FXMLLoader loader = new javafx.fxml.FXMLLoader(
-                            getClass().getResource("/fxml/login.fxml"));
-                        javafx.scene.Parent loginRoot = loader.load();
-                        
-                        // Create new scene
-                        javafx.scene.Scene loginScene = new javafx.scene.Scene(loginRoot);
-                        
-                        // Apply theme
+                        // Use UIManager to show login scene (properly initialized)
                         if (uiManager != null) {
-                            uiManager.applyTheme(loginScene);
+                            uiManager.showLoginScene();
+                        } else {
+                            // Fallback: close application if UIManager not available
+                            Platform.exit();
                         }
-                        
-                        // Set scene and show
-                        currentStage.setScene(loginScene);
-                        currentStage.setTitle("GhostVault - Login");
-                        currentStage.centerOnScreen();
                         
                         logMessage("✓ Returned to login screen");
                         
