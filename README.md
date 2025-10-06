@@ -1,289 +1,140 @@
-# GhostVault - Secure File Vault
+# 🔐 GhostVault - Secure File Encryption
 
-![GhostVault Logo](docs/logo.png)
+A modern, secure file vault application with military-grade encryption and advanced security features.
 
-GhostVault is a comprehensive secure file storage application built with JavaFX that provides military-grade encryption, advanced security features, and multiple protection modes including panic and decoy functionality.
+## ✨ Features
 
-## 🔐 Key Features
+### �️ ySecurity
+- **AES-256 Encryption** - Military-grade file protection
+- **Multi-Password System** - Master, Panic, and Decoy passwords
+- **Secure Deletion** - DoD-standard file wiping
+- **Session Management** - Auto-timeout and activity monitoring
 
-### Core Security
-- **AES-256-CBC Encryption** - Military-grade encryption for all files
-- **PBKDF2 Password Hashing** - 100,000+ iterations with secure salt
-- **SHA-256 Integrity Verification** - Ensures file integrity and detects corruption
-- **Secure Memory Management** - Automatic memory wiping and protection
+### 📁 File Management
+- **Drag & Drop Upload** - Easy file encryption
+- **File Preview** - View images, text, and PDFs securely
+- **Search & Filter** - Find files quickly
+- **Backup & Restore** - Encrypted vault backups
 
-### Multi-Password System
-- **Master Password** - Full access to your secure vault
-- **Panic Password** - Emergency data destruction (silent operation)
-- **Decoy Password** - Shows fake files to mislead attackers
-
-### Advanced Security Features
-- **Session Management** - Automatic timeout and activity monitoring
-- **Threat Detection** - Real-time monitoring and anomaly detection
-- **Anti-Debugging** - Protection against reverse engineering attempts
-- **Secure Deletion** - DoD 5220.22-M standard multi-pass overwriting
-
-### User Interface
-- **Modern JavaFX UI** - Clean, intuitive interface
-- **Dark/Light Themes** - Professional theme support with smooth transitions
-- **Accessibility Features** - Screen reader support, high contrast mode, keyboard navigation
-- **Smooth Animations** - Professional animations and transitions
-- **Progress Feedback** - Real-time progress for all operations
-
-### Backup & Recovery
-- **Encrypted Backups** - Secure vault backup with integrity verification
-- **Flexible Restore** - Merge or replace options with conflict resolution
-- **Cross-Platform** - Backups work across different operating systems
+### 🎨 Interface
+- **Modern UI** - Clean JavaFX interface
+- **Dark/Light Themes** - Professional theme support
+- **Accessibility** - Screen reader and keyboard navigation
+- **Cross-Platform** - Windows, macOS, Linux
 
 ## 🚀 Quick Start
 
-### Prerequisites
+### Requirements
 - Java 11 or higher
-- JavaFX 11 or higher (included in most Java distributions)
+- 512MB RAM minimum
 
 ### Installation
-1. Download the latest release from the releases page
-2. Extract the archive to your desired location
-3. Run the application:
+1. Download the latest release
+2. Extract and run:
    ```bash
    java -jar ghostvault.jar
    ```
 
-### First Run Setup
+### First Setup
 1. Launch GhostVault
-2. Create three strong passwords:
-   - **Master Password**: Your main vault access
-   - **Panic Password**: Emergency destruction trigger
-   - **Decoy Password**: Fake vault access
-3. All passwords must be different and meet strength requirements
-4. Your vault is now ready to use!
+2. Create three passwords:
+   - **Master**: Normal vault access
+   - **Panic**: Emergency data destruction
+   - **Decoy**: Shows fake files
+3. Start encrypting your files!
 
-## 📖 Usage Guide
+## 📖 Usage
 
 ### Basic Operations
+- **Upload**: Click 📁 Upload → Select file → Automatically encrypted
+- **Download**: Select file → Click 💾 Download → Choose save location
+- **Preview**: Select file → Click 👁️ Preview → View content securely
+- **Delete**: Select file → Click 🗑️ Delete → Secure multi-pass deletion
 
-#### Uploading Files
-1. Click the "📁 Upload" button
-2. Select the file you want to encrypt
-3. File is automatically encrypted and stored securely
+### Security Modes
+- **Normal Mode**: Enter master password for full access
+- **Panic Mode**: Enter panic password to silently destroy all data
+- **Decoy Mode**: Enter decoy password to show fake files
 
-#### Downloading Files
-1. Select a file from the vault list
-2. Click the "💾 Download" button
-3. Choose where to save the decrypted file
-4. File integrity is automatically verified
-
-#### Secure Deletion
-1. Select a file from the vault list
-2. Click the "🗑️ Delete" button
-3. Confirm deletion in the dialog
-4. File is securely overwritten multiple times
-
-#### Searching Files
-- Use the search box to find files by name
-- Results update in real-time as you type
-- Search works on original file names
-
-### Advanced Features
-
-#### Creating Backups
-1. Click the "📦 Backup" button
-2. Choose a secure location for the backup file
-3. Enter your master password to confirm
-4. Backup file (.gvbackup) is created with full encryption
-
-#### Restoring from Backup
-1. Click the "📥 Restore" button
-2. Select your .gvbackup file
-3. Enter your master password
-4. Choose merge or replace option
-
-#### Security Modes
-
-**Panic Mode**
-- Enter your panic password at login
-- Silently destroys all vault data
-- Appears as normal failed login
-- Cannot be undone - use with extreme caution
-
-**Decoy Mode**
-- Enter your decoy password at login
-- Shows fake files to mislead attackers
-- Completely separate from real vault
-- Maintains plausible deniability
-
-## 🛡️ Security Architecture
-
-### Encryption Details
-- **Algorithm**: AES-256-CBC with PKCS5 padding
-- **Key Derivation**: PBKDF2WithHmacSHA256 (100,000+ iterations)
-- **IV Generation**: Cryptographically secure random
-- **File Integrity**: SHA-256 hash verification
-- **Metadata Protection**: Encrypted separately from file data
-
-### Password Security
-- Passwords stored as salted hashes only
-- Memory wiping after password operations
-- Strong password requirements enforced
-- Protection against timing attacks
-
-### File Storage
-- Files stored with random UUID names
-- Original names encrypted in metadata
-- Flat storage structure (no directory preservation)
-- Secure deletion with multiple overwrites
-
-### Session Security
-- Configurable session timeout
-- Activity monitoring (mouse/keyboard)
-- Failed login attempt tracking
-- Automatic lockout after max attempts
-
-## 🎨 Themes and Accessibility
-
-### Theme Support
-- **Dark Theme** - Professional dark interface (default)
-- **Light Theme** - Clean light interface
-- **High Contrast** - Enhanced visibility for accessibility
-- **Smooth Transitions** - Professional animations between themes
-
-### Accessibility Features
-- Full keyboard navigation support
-- Screen reader compatibility
-- High contrast mode for visual impairments
-- Tooltips and descriptive labels
-- Configurable font sizes
-
-### Keyboard Shortcuts
-- `Tab/Shift+Tab` - Navigate controls
-- `Ctrl+U` - Upload file
-- `Ctrl+D` - Download file
-- `Delete` - Secure delete file
-- `Ctrl+T` - Toggle theme
-- `Ctrl+H` - Toggle high contrast
-- `F1` - Show help
-- `Escape` - Close dialogs
+### Backup & Restore
+- **Backup**: Click 📦 Backup → Choose location → Creates encrypted .gvbackup file
+- **Restore**: Click 📥 Restore → Select .gvbackup → Restores vault contents
 
 ## 🔧 Technical Details
 
-### System Requirements
-- **Operating System**: Windows, macOS, Linux
-- **Java Version**: 11 or higher
-- **Memory**: 512MB RAM minimum, 1GB recommended
-- **Storage**: 50MB for application, additional space for vault files
+### Encryption
+- **Algorithm**: AES-256-CBC with PBKDF2 key derivation
+- **Iterations**: 100,000+ for password hashing
+- **Integrity**: SHA-256 verification for all files
+- **Memory**: Secure wiping of sensitive data
 
-### File Locations
-- **Vault Directory**: `~/.ghostvault/`
-- **Configuration**: `~/.ghostvault/config.enc`
-- **Encrypted Files**: `~/.ghostvault/files/`
-- **Decoy Files**: `~/.ghostvault/decoys/`
-- **Audit Logs**: `~/.ghostvault/audit.log.enc`
+### File Storage
+- **Location**: `~/.ghostvault/` directory
+- **Structure**: Encrypted files with random UUID names
+- **Metadata**: Separately encrypted file information
+- **Backups**: Fully encrypted vault snapshots
 
-### Performance
-- **Encryption Speed**: ~50-100 MB/s (depends on hardware)
-- **File Size Limits**: Limited only by available disk space
-- **Concurrent Operations**: Background processing for large files
-- **Memory Usage**: Efficient streaming for large files
+## 🎯 Security Features
 
-## 🧪 Testing
-
-The application includes comprehensive test coverage:
-
-### Test Categories
-- **Unit Tests** - Individual component testing
-- **Integration Tests** - Component interaction testing
-- **Security Tests** - Cryptographic and security validation
-- **Performance Tests** - Load and stress testing
-- **Penetration Tests** - Security vulnerability assessment
-
-### Running Tests
-```bash
-# Run all tests
-mvn test
-
-# Run specific test categories
-mvn test -Dtest=SecurityValidationTest
-mvn test -Dtest=PerformanceValidationTest
-mvn test -Dtest=PenetrationTest
-```
-
-## 🔒 Security Considerations
+### Protection Against
+- **Data Theft** - Strong encryption protects files
+- **Password Attacks** - High-iteration hashing
+- **Coercion** - Panic mode destroys evidence
+- **Surveillance** - Decoy mode provides cover
+- **Forensics** - Secure deletion prevents recovery
 
 ### Best Practices
-1. **Use Strong Passwords** - Follow the strength requirements
-2. **Regular Backups** - Create encrypted backups frequently
-3. **Secure Storage** - Store backups in multiple secure locations
-4. **Password Management** - Never reuse vault passwords elsewhere
-5. **Physical Security** - Secure your computer and backup media
+1. Use strong, unique passwords
+2. Create regular encrypted backups
+3. Store backups in secure locations
+4. Never reuse vault passwords
+5. Keep your system physically secure
 
-### Threat Model
-GhostVault protects against:
-- **Data Theft** - Files encrypted with strong algorithms
-- **Password Attacks** - Strong hashing with high iteration counts
-- **Coercion** - Panic mode for emergency data destruction
-- **Surveillance** - Decoy mode for plausible deniability
-- **Forensic Analysis** - Secure deletion and encrypted metadata
+## 🔑 Keyboard Shortcuts
 
-### Limitations
-- **Password Recovery** - Lost passwords cannot be recovered (by design)
-- **Quantum Resistance** - AES-256 is currently quantum-resistant
-- **Side-Channel Attacks** - Mitigated but not completely eliminated
-- **Physical Access** - Cannot protect against hardware-level attacks
+- `Ctrl+U` - Upload file
+- `Ctrl+D` - Download file
+- `Delete` - Secure delete
+- `Ctrl+T` - Toggle theme
+- `F1` - Help system
+- `Escape` - Close dialogs
 
-## 📚 Documentation
+## ⚠️ Important Notes
 
-### Help System
-- Built-in comprehensive help system (F1 key)
-- Getting started guide
-- Security features explanation
-- Troubleshooting guide
-- Keyboard shortcuts reference
+### Security Warnings
+- **Lost passwords cannot be recovered** (by design)
+- **Panic mode permanently destroys data** - use with caution
+- **Keep backups secure** - they contain your encrypted vault
 
-### API Documentation
-- JavaDoc documentation included
-- Component architecture diagrams
-- Security implementation details
-- Extension points for customization
+### Legal Notice
+GhostVault is for legitimate privacy and security needs. Users must comply with all applicable laws. The panic feature permanently destroys data and should be used responsibly.
 
-## 🤝 Contributing
+## 🛠️ Development
 
-We welcome contributions to GhostVault! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
+### Building from Source
+```bash
+git clone https://github.com/PathanWasim/GhostVault.git
+cd GhostVault
+mvn compile
+mvn javafx:run
+```
 
-### Development Setup
-1. Clone the repository
-2. Install Java 11+ and Maven
-3. Run `mvn compile` to build
-4. Run `mvn test` to execute tests
-5. Run `mvn javafx:run` to start the application
-
-### Code Style
-- Follow Java naming conventions
-- Include comprehensive JavaDoc comments
-- Write unit tests for new features
-- Follow security best practices
+### Testing
+```bash
+mvn test                    # Run all tests
+mvn test -Dtest=Security*   # Security tests only
+```
 
 ## 📄 License
 
-GhostVault is released under the MIT License. See [LICENSE](LICENSE) for details.
+MIT License - see [LICENSE](LICENSE) for details.
 
 ## 🆘 Support
 
-### Getting Help
-1. Check the built-in help system (F1 key)
-2. Review this README and documentation
-3. Search existing issues on GitHub
-4. Create a new issue with detailed information
-
-### Reporting Security Issues
-Please report security vulnerabilities privately to [security@ghostvault.com](mailto:security@ghostvault.com).
-
-## 🏆 Acknowledgments
-
-- JavaFX team for the excellent UI framework
-- Bouncy Castle for cryptographic implementations
-- The security community for best practices guidance
-- All contributors and testers
+- **Help System**: Press F1 in the application
+- **Issues**: Report bugs on GitHub
+- **Security**: Email security issues privately
 
 ---
 
-**⚠️ Important Security Notice**: GhostVault is designed for legitimate privacy and security needs. Users are responsible for complying with all applicable laws and regulations in their jurisdiction. The panic mode feature permanently destroys data and should be used with extreme caution.
+**Built with ❤️ for privacy and security**
