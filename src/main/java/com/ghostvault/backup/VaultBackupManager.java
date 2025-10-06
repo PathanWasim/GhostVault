@@ -69,9 +69,8 @@ public class VaultBackupManager {
                 // Create encrypted backup archive
                 createEncryptedArchive(tempDir, backupFile, key, callback);
                 
-                // Note: Immediate verification disabled due to timing issues
-                // Verification will be performed when user attempts to restore
-                // verifyBackupIntegrity(backupFile, key, manifest);
+                // Verify backup integrity immediately after creation
+                verifyBackupIntegrity(backupFile, key, manifest);
                 
                 // Log successful backup
                 if (auditManager != null) {
@@ -601,10 +600,41 @@ public class VaultBackupManager {
      * Verify backup integrity after creation
      */
     private void verifyBackupIntegrity(File backupFile, SecretKey key, BackupManifest manifest) throws Exception {
-        // Quick verification by checking if we can read the manifest
-        BackupInfo info = verifyBackup(backupFile, key);
-        if (!info.isValid()) {
-            throw new BackupException("Backup integrity verification failed: " + info.getErrorMessage());
+        // Comprehensive verification by attempting to decrypt the backup
+        Path tempDir = Files.createTempDirectory("ghostvault_verify");
+        
+        try {
+            // Try to extract and decrypt the backup
+            extractEncryptedArchive(backupFile, tempDir, key, null);
+            
+            // Verify manifest can be loaded
+            BackupManifest verifyManifest = loadBackupManifest(tempDir);
+            
+            // Verify manifest integrity
+            if (!manifest.getVaultChecksum().equals(verifyManifest.getVaultChecksum())) {
+                throw new BackupException("Backup manifest checksum mismatch");
+            }
+            
+            // Verify we can read at least one file if any exist
+            Path filesDir = tempDir.resolve("files");
+            if (Files.exists(filesDir)) {
+                try (DirectoryStream<Path> stream = Files.newDirectoryStream(filesDir)) {
+                    for (Path file : stream) {
+                        if (Files.isRegularFile(file)) {
+                            // Just verify we can read the file (it's already decrypted)
+                            byte[] testData = Files.readAllBytes(file);
+                            if (testData.length == 0) {
+                                throw new BackupException("Backup contains empty encrypted file");
+                            }
+                            break; // Only test one file
+                        }
+                    }
+                }
+            }
+            
+        } finally {
+            // Clean up temporary directory
+            deleteDirectory(tempDir);
         }
     }
     

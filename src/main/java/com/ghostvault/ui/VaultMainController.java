@@ -26,6 +26,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.ResourceBundle;
@@ -1171,7 +1172,13 @@ public class VaultMainController implements Initializable {
                 
                 logMessage("📁 Loaded " + fileList.size() + " file(s) from vault");
             } else {
-                checkForOrphanedFiles();
+                // Only check for orphaned files if this isn't a fresh vault
+                // This prevents showing orphaned files in a newly initialized vault
+                if (metadataManager.hasBeenInitialized()) {
+                    checkForOrphanedFiles();
+                } else {
+                    logMessage("ℹ️ Fresh vault detected - skipping orphaned file check");
+                }
             }
             
             if (fileList.isEmpty()) {
@@ -1198,18 +1205,82 @@ public class VaultMainController implements Initializable {
             if (vaultDir.exists() && vaultDir.isDirectory()) {
                 File[] files = vaultDir.listFiles();
                 if (files != null && files.length > 0) {
-                    logMessage("⚠ Found " + files.length + " encrypted file(s) but no metadata. Files may need to be re-uploaded.");
+                    List<File> orphanedFiles = new ArrayList<>();
                     
                     for (File file : files) {
                         if (file.isFile() && file.getName().endsWith(".enc")) {
+                            orphanedFiles.add(file);
                             String displayName = "🔒 " + file.getName().replace(".enc", "") + " (orphaned)";
                             fileList.add(displayName);
                         }
+                    }
+                    
+                    if (!orphanedFiles.isEmpty()) {
+                        logMessage("⚠ Found " + orphanedFiles.size() + " orphaned encrypted file(s)");
+                        
+                        // Offer to clean up orphaned files
+                        Platform.runLater(() -> {
+                            boolean cleanup = showConfirmation("Orphaned Files Detected", 
+                                "Found " + orphanedFiles.size() + " encrypted file(s) without metadata.\n\n" +
+                                "These files cannot be properly decrypted and may be from:\n" +
+                                "• Previous vault sessions with lost metadata\n" +
+                                "• Corrupted or incomplete uploads\n" +
+                                "• Failed restore operations\n\n" +
+                                "Would you like to clean up these orphaned files?\n" +
+                                "(This will permanently delete the encrypted files)");
+                            
+                            if (cleanup) {
+                                cleanupOrphanedFiles(orphanedFiles);
+                            }
+                        });
                     }
                 }
             }
         } catch (Exception e) {
             logMessage("⚠ Error checking for orphaned files: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Clean up orphaned encrypted files
+     */
+    private void cleanupOrphanedFiles(List<File> orphanedFiles) {
+        try {
+            showOperationProgress("Cleaning up orphaned files...");
+            logMessage("🧹 Cleaning up " + orphanedFiles.size() + " orphaned file(s)...");
+            
+            int deletedCount = 0;
+            for (File file : orphanedFiles) {
+                try {
+                    if (file.delete()) {
+                        deletedCount++;
+                        logMessage("✓ Deleted orphaned file: " + file.getName());
+                    } else {
+                        logMessage("✗ Failed to delete: " + file.getName());
+                    }
+                } catch (Exception e) {
+                    logMessage("✗ Error deleting " + file.getName() + ": " + e.getMessage());
+                }
+            }
+            
+            hideOperationProgress();
+            
+            if (deletedCount > 0) {
+                logMessage("✓ Cleanup complete: " + deletedCount + " orphaned file(s) removed");
+                showNotification("Cleanup Complete", 
+                    "Successfully removed " + deletedCount + " orphaned file(s)");
+                
+                // Refresh the file list to remove orphaned entries
+                refreshFileList();
+            } else {
+                logMessage("⚠ No files were deleted during cleanup");
+                showWarning("Cleanup Failed", "Could not delete any orphaned files. Check file permissions.");
+            }
+            
+        } catch (Exception e) {
+            hideOperationProgress();
+            logMessage("✗ Cleanup failed: " + e.getMessage());
+            showError("Cleanup Error", "Error during orphaned file cleanup: " + e.getMessage());
         }
     }
     

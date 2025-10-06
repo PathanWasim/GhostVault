@@ -251,6 +251,14 @@ public class MetadataManager {
     }
     
     /**
+     * Check if metadata has been initialized (metadata file exists)
+     */
+    public boolean hasBeenInitialized() {
+        Path metadataPath = Paths.get(metadataFilePath);
+        return Files.exists(metadataPath) && Files.isRegularFile(metadataPath);
+    }
+    
+    /**
      * Verify metadata integrity
      */
     public boolean verifyMetadataIntegrity() {

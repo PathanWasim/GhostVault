@@ -153,9 +153,29 @@ public class PasswordManager {
         }
 
         
-        // Benchmark and get KDF parameters
+        // Generate a single salt for this vault (will be reused for all passwords)
+        byte[] vaultSalt = cryptoManager.generateSecureRandom(32);
+        
+        // Benchmark and get KDF parameters with our vault salt
         KDF.BenchmarkResult benchmark = KDF.benchmark();
-        this.kdfParams = benchmark.getRecommendedParams();
+        KDF.KdfParams benchmarkParams = benchmark.getRecommendedParams();
+        
+        // Create KDF params with our consistent vault salt
+        if (benchmarkParams.getAlgorithm() == KDF.Algorithm.ARGON2ID) {
+            this.kdfParams = new KDF.KdfParams(
+                benchmarkParams.getAlgorithm(),
+                vaultSalt,
+                benchmarkParams.getMemory(),
+                benchmarkParams.getIterations(),
+                benchmarkParams.getParallelism()
+            );
+        } else {
+            this.kdfParams = new KDF.KdfParams(
+                benchmarkParams.getAlgorithm(),
+                vaultSalt,
+                benchmarkParams.getPbkdf2Iterations()
+            );
+        }
 
         
         // Generate Vault Master Keys

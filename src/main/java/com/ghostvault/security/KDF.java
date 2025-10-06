@@ -229,7 +229,10 @@ public class KDF {
      */
     private static BenchmarkResult benchmarkArgon2() {
         Argon2 argon2 = Argon2Factory.create(Argon2Factory.Argon2Types.ARGON2id);
-        byte[] salt = generateSalt();
+        // Use a fixed salt for benchmarking - actual salt will be provided during real usage
+        byte[] salt = new byte[SALT_LENGTH];
+        // Use a deterministic salt for benchmarking to ensure consistency
+        System.arraycopy("GhostVault_Benchmark_Salt_32B".getBytes(), 0, salt, 0, Math.min(32, "GhostVault_Benchmark_Salt_32B".getBytes().length));
         char[] testPassword = "BenchmarkPassword123!".toCharArray();
         
         try {
@@ -266,7 +269,10 @@ public class KDF {
      * Benchmark PBKDF2 (fallback)
      */
     private static BenchmarkResult benchmarkPBKDF2() {
-        byte[] salt = generateSalt();
+        // Use a fixed salt for benchmarking - actual salt will be provided during real usage
+        byte[] salt = new byte[SALT_LENGTH];
+        // Use a deterministic salt for benchmarking to ensure consistency
+        System.arraycopy("GhostVault_Benchmark_Salt_32B".getBytes(), 0, salt, 0, Math.min(32, "GhostVault_Benchmark_Salt_32B".getBytes().length));
         char[] testPassword = "BenchmarkPassword123!".toCharArray();
         
         try {
@@ -289,6 +295,30 @@ public class KDF {
             return new BenchmarkResult(params, 500);
         } finally {
             MemoryUtils.secureWipe(testPassword);
+        }
+    }
+    
+    /**
+     * Get default KDF parameters with provided salt (for first-time setup)
+     */
+    public static KdfParams getDefaultParams(byte[] salt) {
+        if (salt == null || salt.length != SALT_LENGTH) {
+            throw new IllegalArgumentException("Salt must be exactly " + SALT_LENGTH + " bytes");
+        }
+        
+        // Try to use Argon2id by default
+        try {
+            Argon2Factory.create(Argon2Factory.Argon2Types.ARGON2id);
+            return new KdfParams(
+                Algorithm.ARGON2ID,
+                salt,
+                DEFAULT_ARGON2_MEMORY,
+                DEFAULT_ARGON2_ITERATIONS,
+                DEFAULT_ARGON2_PARALLELISM
+            );
+        } catch (Exception e) {
+            // Fallback to PBKDF2
+            return new KdfParams(Algorithm.PBKDF2, salt, DEFAULT_PBKDF2_ITERATIONS);
         }
     }
     

@@ -155,7 +155,12 @@ public class CryptoManager {
         
         // Decrypt and verify authentication tag
         // Will throw AEADBadTagException if authentication fails
-        return cipher.doFinal(ciphertextWithTag);
+        try {
+            return cipher.doFinal(ciphertextWithTag);
+        } catch (javax.crypto.AEADBadTagException e) {
+            throw new GeneralSecurityException("Decryption failed: Invalid key or corrupted data. " +
+                "This usually indicates the wrong password was used or the data has been tampered with.", e);
+        }
     }
     
     /**
