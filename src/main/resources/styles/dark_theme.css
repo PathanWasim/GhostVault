@@ -112,6 +112,16 @@
     -fx-border-color: #3E2723;
 }
 
+.preview-button {
+    -fx-background-color: #00BCD4;
+    -fx-border-color: #00ACC1;
+}
+
+.preview-button:hover {
+    -fx-background-color: #26C6DA;
+    -fx-border-color: #00ACC1;
+}
+
 /* Section Labels */
 .section-label {
     -fx-text-fill: #ffffff;

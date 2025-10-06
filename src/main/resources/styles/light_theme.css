@@ -108,6 +108,23 @@
     -fx-border-color: #c82333;
 }
 
+/* Preview button */
+.preview-button {
+    -fx-background-color: #17a2b8;
+    -fx-text-fill: white;
+    -fx-border-color: #17a2b8;
+}
+
+.preview-button:hover {
+    -fx-background-color: #138496;
+    -fx-border-color: #138496;
+}
+
+.preview-button:pressed {
+    -fx-background-color: #117a8b;
+    -fx-border-color: #117a8b;
+}
+
 /* Text fields and areas */
 .text-field,
 .password-field {

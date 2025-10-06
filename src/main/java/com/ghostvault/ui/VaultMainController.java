@@ -7,17 +7,23 @@ import com.ghostvault.core.MetadataManager;
 import com.ghostvault.model.VaultFile;
 import com.ghostvault.security.SessionManager;
 import javafx.fxml.FXML;
+import javafx.fxml.FXMLLoader;
 import javafx.fxml.Initializable;
+import javafx.scene.Parent;
+import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.stage.FileChooser;
+import javafx.stage.Stage;
 
 import javax.crypto.SecretKey;
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.net.URL;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
@@ -34,6 +40,7 @@ public class VaultMainController implements Initializable {
     // FXML Controls
     @FXML private Button uploadButton;
     @FXML private Button downloadButton;
+    @FXML private Button previewButton;
     @FXML private Button deleteButton;
     @FXML private Button backupButton;
     @FXML private Button restoreButton;
@@ -314,6 +321,25 @@ public class VaultMainController implements Initializable {
     }
     
     /**
+     * Handle file preview
+     */
+    @FXML
+    private void handlePreview() {
+        String selectedDisplayName = fileListView.getSelectionModel().getSelectedItem();
+        if (selectedDisplayName == null) {
+            showWarning("No Selection", "Please select a file to preview");
+            return;
+        }
+        
+        if (isDecoyMode) {
+            simulateDecoyPreview(selectedDisplayName);
+            return;
+        }
+        
+        processFilePreview(selectedDisplayName);
+    }
+    
+    /**
      * Process file download with decryption
      */
     private void processFileDownload(String selectedDisplayName) {
@@ -466,6 +492,241 @@ public class VaultMainController implements Initializable {
     }
     
     /**
+     * Process file preview with decryption and display
+     */
+    private void processFilePreview(String selectedDisplayName) {
+        try {
+            VaultFile targetFile = findVaultFileByDisplayName(selectedDisplayName);
+            
+            if (targetFile == null) {
+                if (selectedDisplayName.contains("(orphaned)")) {
+                    showWarning("Preview Not Available", "Cannot preview orphaned files. Please recover the file first.");
+                    return;
+                } else {
+                    logMessage("✗ Could not find file metadata for preview: " + selectedDisplayName);
+                    showWarning("File Not Found", "Could not find metadata for the selected file.");
+                    return;
+                }
+            }
+            
+            // Check if file type is previewable
+            String extension = targetFile.getExtension().toLowerCase();
+            if (!isPreviewableFileType(extension)) {
+                showWarning("Preview Not Supported", 
+                    "Preview is not supported for this file type: " + extension.toUpperCase() + "\n\n" +
+                    "Supported types: TXT, MD, PDF, JPG, JPEG, PNG, GIF, BMP");
+                return;
+            }
+            
+            showOperationProgress("Loading file for preview...");
+            logMessage("👁️ Loading file for preview: " + targetFile.getOriginalName());
+            
+            // Retrieve and decrypt file
+            byte[] decryptedData = fileManager.retrieveFile(targetFile);
+            
+            hideOperationProgress();
+            
+            // Show preview based on file type
+            showFilePreview(targetFile, decryptedData);
+            
+            // Secure memory cleanup
+            Arrays.fill(decryptedData, (byte) 0);
+            
+            logMessage("✓ File preview loaded: " + targetFile.getOriginalName());
+            
+        } catch (Exception e) {
+            hideOperationProgress();
+            logMessage("✗ Failed to preview file: " + e.getMessage());
+            showError("Preview Failed", "Error loading file preview:\n\n" + e.getMessage());
+        }
+    }
+    
+    /**
+     * Check if file type supports preview
+     */
+    private boolean isPreviewableFileType(String extension) {
+        return Arrays.asList("txt", "md", "pdf", "jpg", "jpeg", "png", "gif", "bmp").contains(extension);
+    }
+    
+    /**
+     * Show file preview in appropriate viewer
+     */
+    private void showFilePreview(VaultFile vaultFile, byte[] fileData) {
+        String extension = vaultFile.getExtension().toLowerCase();
+        
+        try {
+            if (Arrays.asList("txt", "md").contains(extension)) {
+                showTextPreview(vaultFile, fileData);
+            } else if (extension.equals("pdf")) {
+                showPdfPreview(vaultFile, fileData);
+            } else if (Arrays.asList("jpg", "jpeg", "png", "gif", "bmp").contains(extension)) {
+                showImagePreview(vaultFile, fileData);
+            } else {
+                showWarning("Preview Not Supported", "Preview not supported for file type: " + extension.toUpperCase());
+            }
+        } catch (Exception e) {
+            showError("Preview Error", "Failed to display preview:\n\n" + e.getMessage());
+        }
+    }
+    
+    /**
+     * Show text file preview
+     */
+    private void showTextPreview(VaultFile vaultFile, byte[] fileData) {
+        try {
+            String content = new String(fileData, "UTF-8");
+            
+            // Create preview dialog
+            Dialog<Void> previewDialog = new Dialog<>();
+            previewDialog.setTitle("File Preview - " + vaultFile.getOriginalName());
+            previewDialog.setHeaderText("Text File Preview");
+            
+            // Create text area for content
+            TextArea textArea = new TextArea(content);
+            textArea.setEditable(false);
+            textArea.setWrapText(true);
+            textArea.setPrefSize(600, 400);
+            textArea.setStyle("-fx-font-family: 'Courier New', monospace;");
+            
+            // Add scroll pane
+            ScrollPane scrollPane = new ScrollPane(textArea);
+            scrollPane.setFitToWidth(true);
+            scrollPane.setFitToHeight(true);
+            
+            previewDialog.getDialogPane().setContent(scrollPane);
+            previewDialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
+            
+            // Show dialog
+            previewDialog.showAndWait();
+            
+        } catch (Exception e) {
+            showError("Text Preview Error", "Failed to display text preview:\n\n" + e.getMessage());
+        }
+    }
+    
+    /**
+     * Show image file preview
+     */
+    private void showImagePreview(VaultFile vaultFile, byte[] fileData) {
+        try {
+            // Create image from byte array
+            ByteArrayInputStream bis = new ByteArrayInputStream(fileData);
+            javafx.scene.image.Image image = new javafx.scene.image.Image(bis);
+            
+            if (image.isError()) {
+                showError("Image Preview Error", "Failed to load image. The file may be corrupted.");
+                return;
+            }
+            
+            // Create preview dialog
+            Dialog<Void> previewDialog = new Dialog<>();
+            previewDialog.setTitle("File Preview - " + vaultFile.getOriginalName());
+            previewDialog.setHeaderText("Image Preview");
+            
+            // Create image view
+            javafx.scene.image.ImageView imageView = new javafx.scene.image.ImageView(image);
+            imageView.setPreserveRatio(true);
+            imageView.setFitWidth(600);
+            imageView.setFitHeight(400);
+            
+            // Add scroll pane for large images
+            ScrollPane scrollPane = new ScrollPane(imageView);
+            scrollPane.setPrefSize(650, 450);
+            scrollPane.setFitToWidth(true);
+            scrollPane.setFitToHeight(true);
+            
+            previewDialog.getDialogPane().setContent(scrollPane);
+            previewDialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
+            
+            // Show dialog
+            previewDialog.showAndWait();
+            
+        } catch (Exception e) {
+            showError("Image Preview Error", "Failed to display image preview:\n\n" + e.getMessage());
+        }
+    }
+    
+    /**
+     * Show PDF file preview (basic implementation)
+     */
+    private void showPdfPreview(VaultFile vaultFile, byte[] fileData) {
+        // For now, show a message that PDF preview requires external viewer
+        // In a full implementation, you could integrate a PDF viewer library
+        
+        boolean openExternal = showConfirmation("PDF Preview", 
+            "PDF preview requires an external viewer.\n\n" +
+            "File: " + vaultFile.getOriginalName() + "\n" +
+            "Size: " + formatFileSize(vaultFile.getSize()) + "\n\n" +
+            "Would you like to temporarily save and open the PDF in your default viewer?\n" +
+            "(The temporary file will be securely deleted after viewing)");
+        
+        if (openExternal) {
+            try {
+                // Create temporary file
+                Path tempFile = Files.createTempFile("ghostvault_preview_", ".pdf");
+                Files.write(tempFile, fileData);
+                
+                // Open with default application
+                if (java.awt.Desktop.isDesktopSupported()) {
+                    java.awt.Desktop.getDesktop().open(tempFile.toFile());
+                    
+                    // Schedule cleanup after delay
+                    Platform.runLater(() -> {
+                        try {
+                            Thread.sleep(5000); // Wait 5 seconds
+                            Files.deleteIfExists(tempFile);
+                        } catch (Exception e) {
+                            // Ignore cleanup errors
+                        }
+                    });
+                    
+                    showNotification("PDF Opened", "PDF opened in external viewer. Temporary file will be cleaned up automatically.");
+                } else {
+                    Files.deleteIfExists(tempFile);
+                    showError("PDF Preview Error", "Desktop operations not supported on this system.");
+                }
+                
+            } catch (Exception e) {
+                showError("PDF Preview Error", "Failed to open PDF:\n\n" + e.getMessage());
+            }
+        }
+    }
+    
+    /**
+     * Simulate decoy preview for decoy mode
+     */
+    private void simulateDecoyPreview(String selectedDisplayName) {
+        showOperationProgress("Loading preview...");
+        
+        // Simulate loading delay
+        Platform.runLater(() -> {
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            
+            hideOperationProgress();
+            
+            // Show fake preview content
+            Dialog<Void> previewDialog = new Dialog<>();
+            previewDialog.setTitle("File Preview - " + selectedDisplayName.substring(2)); // Remove icon
+            previewDialog.setHeaderText("Document Preview");
+            
+            TextArea textArea = new TextArea("This is a sample document preview.\n\nLorem ipsum dolor sit amet, consectetur adipiscing elit...");
+            textArea.setEditable(false);
+            textArea.setPrefSize(500, 300);
+            
+            previewDialog.getDialogPane().setContent(textArea);
+            previewDialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
+            
+            previewDialog.showAndWait();
+            
+            logMessage("👁️ Decoy preview shown for: " + selectedDisplayName);
+        });
+    }
+    
+    /**
      * Handle secure file deletion
      */
     @FXML
@@ -542,9 +803,9 @@ public class VaultMainController implements Initializable {
         
         FileChooser fileChooser = createFileChooser("Create Vault Backup");
         fileChooser.getExtensionFilters().clear();
-        fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("GhostVault Backup", "*.gvb"));
+        fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("GhostVault Backup", "*.gvbackup"));
         fileChooser.setInitialFileName("vault_backup_" + 
-            LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss")) + ".gvb");
+            LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss")) + ".gvbackup");
         
         File backupLocation = fileChooser.showSaveDialog(backupButton.getScene().getWindow());
         if (backupLocation == null) return;
@@ -554,22 +815,87 @@ public class VaultMainController implements Initializable {
             logMessage("⏳ Creating encrypted backup...");
             
             // Create backup using backup manager
-            if (backupManager != null) {
-                // Implementation would depend on VaultBackupManager
-                logMessage("✓ Backup created: " + backupLocation.getName());
+            if (backupManager != null && encryptionKey != null) {
+                // Validate encryption key and vault state
+                logMessage("🔐 Validating encryption key for backup...");
+                
+                // Check if vault has files to backup
+                if (allVaultFiles.isEmpty()) {
+                    logMessage("ℹ️ No files in vault to backup");
+                    boolean proceedEmpty = showConfirmation("Empty Vault Backup", 
+                        "Your vault appears to be empty.\n\n" +
+                        "Do you still want to create a backup?\n" +
+                        "(This will create a backup of the vault structure only)");
+                    
+                    if (!proceedEmpty) {
+                        hideOperationProgress();
+                        return;
+                    }
+                }
+                
+                // Create progress callback
+                VaultBackupManager.BackupProgressCallback callback = new VaultBackupManager.BackupProgressCallback() {
+                    @Override
+                    public void onProgress(int percentage, String message) {
+                        Platform.runLater(() -> {
+                            updateOperationProgress(message, percentage / 100.0);
+                            logMessage("📦 " + message + " (" + percentage + "%)");
+                        });
+                    }
+                };
+                
+                // Create the backup with enhanced error handling
+                try {
+                    backupManager.createBackup(backupLocation, encryptionKey, callback);
+                } catch (Exception backupError) {
+                    hideOperationProgress();
+                    
+                    // Check for specific error types
+                    String errorMessage = backupError.getMessage();
+                    if (errorMessage != null && errorMessage.contains("Tag mismatch")) {
+                        logMessage("✗ Backup failed: Encryption key mismatch or corrupted data");
+                        showError("Backup Failed - Key Mismatch", 
+                            "The backup failed due to an encryption key mismatch.\n\n" +
+                            "This could happen if:\n" +
+                            "• The vault was created with a different password\n" +
+                            "• The vault data is corrupted\n" +
+                            "• There's an issue with the encryption system\n\n" +
+                            "Please try:\n" +
+                            "1. Restart the application\n" +
+                            "2. Verify your password is correct\n" +
+                            "3. Check if individual files can be downloaded");
+                    } else {
+                        logMessage("✗ Backup failed: " + errorMessage);
+                        showError("Backup Failed", "Failed to create backup:\n\n" + errorMessage);
+                    }
+                    return;
+                }
+                
+                hideOperationProgress();
+                logMessage("✓ Backup created successfully: " + backupLocation.getName());
                 logMessage("  Location: " + backupLocation.getAbsolutePath());
                 logMessage("  Files backed up: " + allVaultFiles.size());
                 
-                showNotification("Backup Complete", "Encrypted backup created successfully");
+                showNotification("Backup Complete", 
+                    "Encrypted backup created successfully!\n\n" +
+                    "Location: " + backupLocation.getAbsolutePath() + "\n" +
+                    "Files: " + allVaultFiles.size());
+                
             } else {
-                logMessage("⚠ Backup manager not initialized");
+                hideOperationProgress();
+                if (backupManager == null) {
+                    logMessage("⚠ Backup manager not initialized");
+                    showError("Backup Failed", "Backup manager is not available.");
+                } else {
+                    logMessage("⚠ Encryption key not available");
+                    showError("Backup Failed", "Encryption key is not available for backup.");
+                }
             }
             
         } catch (Exception e) {
-            logMessage("✗ Backup failed: " + e.getMessage());
-            showError("Backup Failed", "Error: " + e.getMessage());
-        } finally {
             hideOperationProgress();
+            logMessage("✗ Backup failed: " + e.getMessage());
+            showError("Backup Failed", "Failed to create backup:\n\n" + e.getMessage());
         }
     }
     
@@ -582,36 +908,125 @@ public class VaultMainController implements Initializable {
         
         FileChooser fileChooser = createFileChooser("Select Backup to Restore");
         fileChooser.getExtensionFilters().clear();
-        fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("GhostVault Backup", "*.gvb"));
+        fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("GhostVault Backup", "*.gvbackup"));
         
         File backupFile = fileChooser.showOpenDialog(restoreButton.getScene().getWindow());
         if (backupFile == null) return;
         
-        boolean confirmed = showConfirmation("Confirm Restore", 
-            "Restore vault from backup?\n\n" +
-            "File: " + backupFile.getName() + "\n\n" +
-            "WARNING: This will replace your current vault contents!");
-        
-        if (confirmed) {
-            try {
-                showOperationProgress("Restoring from backup...");
-                logMessage("⏳ Restoring from backup...");
+        // First verify the backup
+        try {
+            if (backupManager != null && encryptionKey != null) {
+                showOperationProgress("Verifying backup...");
+                logMessage("🔍 Verifying backup file: " + backupFile.getName());
                 
-                if (backupManager != null) {
-                    // Implementation would depend on VaultBackupManager
-                    logMessage("✓ Vault restored from: " + backupFile.getName());
-                    refreshFileList();
-                    showNotification("Restore Complete", "Vault successfully restored from backup");
-                } else {
-                    logMessage("⚠ Backup manager not initialized");
+                VaultBackupManager.BackupInfo backupInfo;
+                try {
+                    backupInfo = backupManager.verifyBackup(backupFile, encryptionKey);
+                } catch (Exception verifyError) {
+                    hideOperationProgress();
+                    
+                    String errorMessage = verifyError.getMessage();
+                    if (errorMessage != null && errorMessage.contains("Tag mismatch")) {
+                        logMessage("✗ Backup verification failed: Encryption key mismatch");
+                        showError("Invalid Backup", 
+                            "The backup file cannot be verified due to an encryption key mismatch.\n\n" +
+                            "This could happen if:\n" +
+                            "• The backup was created with a different password\n" +
+                            "• The backup file is corrupted\n" +
+                            "• The backup format is incompatible\n\n" +
+                            "Please ensure you're using the correct password that was used when creating the backup.");
+                    } else {
+                        logMessage("✗ Backup verification failed: " + errorMessage);
+                        showError("Invalid Backup", "Failed to verify backup:\n\n" + errorMessage);
+                    }
+                    return;
                 }
                 
-            } catch (Exception e) {
-                logMessage("✗ Restore failed: " + e.getMessage());
-                showError("Restore Failed", "Error: " + e.getMessage());
-            } finally {
                 hideOperationProgress();
+                
+                if (!backupInfo.isValid()) {
+                    logMessage("✗ Backup file is invalid: " + backupInfo.getErrorMessage());
+                    showError("Invalid Backup", "The backup file is invalid or corrupted:\n\n" + backupInfo.getErrorMessage());
+                    return;
+                }
+                
+                // Show backup information and confirm restore
+                String backupDetails = String.format(
+                    "Backup Information:\n\n" +
+                    "Version: %s\n" +
+                    "Created: %s\n" +
+                    "Files: %d\n" +
+                    "Size: %s\n\n" +
+                    "⚠️ WARNING: This will replace your current vault contents!\n\n" +
+                    "Do you want to proceed with the restore?",
+                    backupInfo.getVersion(),
+                    backupInfo.getCreationDate() != null ? backupInfo.getCreationDate().toString() : "Unknown",
+                    backupInfo.getFileCount(),
+                    formatFileSize(backupInfo.getTotalSize())
+                );
+                
+                boolean confirmed = showConfirmation("Confirm Restore", backupDetails);
+                
+                if (confirmed) {
+                    // Create progress callback
+                    VaultBackupManager.BackupProgressCallback callback = new VaultBackupManager.BackupProgressCallback() {
+                        @Override
+                        public void onProgress(int percentage, String message) {
+                            Platform.runLater(() -> {
+                                updateOperationProgress(message, percentage / 100.0);
+                                logMessage("📥 " + message + " (" + percentage + "%)");
+                            });
+                        }
+                    };
+                    
+                    showOperationProgress("Restoring from backup...");
+                    logMessage("⏳ Restoring vault from backup: " + backupFile.getName());
+                    
+                    // Perform the restore with enhanced error handling
+                    try {
+                        backupManager.restoreBackup(backupFile, encryptionKey, callback);
+                        
+                        hideOperationProgress();
+                        refreshFileList();
+                        updateStatus();
+                        
+                        logMessage("✓ Vault successfully restored from: " + backupFile.getName());
+                        logMessage("  Files restored: " + backupInfo.getFileCount());
+                        
+                        showNotification("Restore Complete", 
+                            "Vault successfully restored from backup!\n\n" +
+                            "Files restored: " + backupInfo.getFileCount() + "\n" +
+                            "Please verify your files are accessible.");
+                            
+                    } catch (Exception restoreError) {
+                        hideOperationProgress();
+                        
+                        String errorMessage = restoreError.getMessage();
+                        if (errorMessage != null && errorMessage.contains("Tag mismatch")) {
+                            logMessage("✗ Restore failed: Encryption key mismatch during restore");
+                            showError("Restore Failed - Key Mismatch", 
+                                "The restore failed due to an encryption key mismatch.\n\n" +
+                                "This indicates the backup was created with a different password.\n" +
+                                "Please ensure you're using the exact same password that was used when creating the backup.");
+                        } else {
+                            logMessage("✗ Restore failed: " + errorMessage);
+                            showError("Restore Failed", "Failed to restore from backup:\n\n" + errorMessage);
+                        }
+                        return;
+                    }
+                }
+            } else {
+                if (backupManager == null) {
+                    showError("Restore Failed", "Backup manager is not available.");
+                } else {
+                    showError("Restore Failed", "Encryption key is not available for restore.");
+                }
             }
+            
+        } catch (Exception e) {
+            hideOperationProgress();
+            logMessage("✗ Restore failed: " + e.getMessage());
+            showError("Restore Failed", "Failed to restore from backup:\n\n" + e.getMessage());
         }
     }
     
@@ -643,7 +1058,7 @@ public class VaultMainController implements Initializable {
     }
     
     /**
-     * Handle logout with confirmation
+     * Handle logout with confirmation and return to login screen
      */
     @FXML
     private void handleLogout() {
@@ -651,13 +1066,53 @@ public class VaultMainController implements Initializable {
             "Are you sure you want to logout?\n\nAll unsaved work will be lost.");
         
         if (confirmed) {
-            logMessage("Logging out...");
-            // Clear sensitive data
-            clearSensitiveData();
+            logMessage("🚪 Logging out...");
             
-            // Notify application integrator for logout
-            if (sessionManager != null) {
-                sessionManager.endSession();
+            try {
+                // Clear sensitive data
+                clearSensitiveData();
+                
+                // End session
+                if (sessionManager != null) {
+                    sessionManager.endSession();
+                }
+                
+                // Close current window and return to login
+                Platform.runLater(() -> {
+                    try {
+                        // Get current stage
+                        javafx.stage.Stage currentStage = (javafx.stage.Stage) logoutButton.getScene().getWindow();
+                        
+                        // Load login screen
+                        javafx.fxml.FXMLLoader loader = new javafx.fxml.FXMLLoader(
+                            getClass().getResource("/fxml/login.fxml"));
+                        javafx.scene.Parent loginRoot = loader.load();
+                        
+                        // Create new scene
+                        javafx.scene.Scene loginScene = new javafx.scene.Scene(loginRoot);
+                        
+                        // Apply theme
+                        if (uiManager != null) {
+                            uiManager.applyTheme(loginScene);
+                        }
+                        
+                        // Set scene and show
+                        currentStage.setScene(loginScene);
+                        currentStage.setTitle("GhostVault - Login");
+                        currentStage.centerOnScreen();
+                        
+                        logMessage("✓ Returned to login screen");
+                        
+                    } catch (Exception e) {
+                        logMessage("✗ Error returning to login: " + e.getMessage());
+                        // Fallback: close application
+                        Platform.exit();
+                    }
+                });
+                
+            } catch (Exception e) {
+                logMessage("✗ Logout error: " + e.getMessage());
+                showError("Logout Error", "Error during logout: " + e.getMessage());
             }
         }
     }
