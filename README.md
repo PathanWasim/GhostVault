@@ -1,25 +1,35 @@
-# 🔐 GhostVault - Secure File Encryption
+# 🚀 GhostVault Enterprise Edition
 
-A modern, secure file vault application with military-grade encryption and advanced security features.
+A **professional, enterprise-grade security suite** with comprehensive file encryption, real-time security monitoring, and advanced features for modern security needs.
 
-## ✨ Features
+## ✨ Enterprise Features
 
-### �️ ySecurity
+### 🛡️ **Advanced Security Suite**
 - **AES-256 Encryption** - Military-grade file protection
+- **Real-time Threat Detection** - Advanced security monitoring
+- **Memory Protection** - Secure data handling with encryption
+- **File System Monitoring** - Tamper detection and integrity verification
 - **Multi-Password System** - Master, Panic, and Decoy passwords
 - **Secure Deletion** - DoD-standard file wiping
-- **Session Management** - Auto-timeout and activity monitoring
 
-### 📁 File Management
-- **Drag & Drop Upload** - Easy file encryption
+### 🚀 **Professional Features**
+- **📊 Security Dashboard** - Real-time monitoring with charts and metrics
+- **📝 Secure Notes Manager** - Encrypted note storage with categories
+- **🔑 Password Manager** - Enterprise-grade password vault
+- **🤖 Smart Search** - AI-powered natural language file search
+- **🔔 System Tray Integration** - Background monitoring and notifications
+
+### 📁 **Enhanced File Management**
+- **Drag & Drop Upload** - Professional file encryption interface
 - **File Preview** - View images, text, and PDFs securely
-- **Search & Filter** - Find files quickly
+- **Smart Search & Filter** - Natural language file discovery
 - **Backup & Restore** - Encrypted vault backups
 
-### 🎨 Interface
-- **Modern UI** - Clean JavaFX interface
-- **Dark/Light Themes** - Professional theme support
-- **Accessibility** - Screen reader and keyboard navigation
+### 🎨 **Professional Interface**
+- **Enterprise UI Design** - Modern card-based layout with professional styling
+- **Responsive Design** - Adapts to different screen sizes
+- **Keyboard Shortcuts** - Full keyboard navigation (Ctrl+D, Ctrl+N, Ctrl+P)
+- **Real-time Feedback** - Professional status updates and notifications
 - **Cross-Platform** - Windows, macOS, Linux
 
 ## 🚀 Quick Start
@@ -36,12 +46,50 @@ A modern, secure file vault application with military-grade encryption and advan
    ```
 
 ### First Setup
-1. Launch GhostVault
+1. Launch GhostVault Enterprise Edition
 2. Create three passwords:
    - **Master**: Normal vault access
    - **Panic**: Emergency data destruction
    - **Decoy**: Shows fake files
-3. Start encrypting your files!
+3. Explore the new enterprise features:
+   - **📊 Dashboard** - Click to see real-time security monitoring
+   - **📝 Notes** - Access the secure notes manager
+   - **🔑 Passwords** - Open the enterprise password vault
+   - **🔍 Smart Search** - Try "find my documents" in the search box
+
+## 🌟 **Enterprise Features Guide**
+
+### 📊 **Security Dashboard**
+Access real-time security monitoring with professional charts and metrics:
+- **Security Score**: Live security assessment (0-100)
+- **Threat Level**: Current threat status monitoring
+- **Active Sessions**: Session management and tracking
+- **Protected Files**: Real-time file count and vault statistics
+- **Security Events**: Timeline of recent security activities
+
+### 📝 **Secure Notes Manager**
+Enterprise-grade encrypted note storage:
+- **Military-grade AES-256 encryption** for all notes
+- **Category organization** for better note management
+- **Tag-based search** for quick note discovery
+- **Full-text search** capability across all notes
+- **Secure cloud sync** ready for team deployment
+
+### 🔑 **Password Manager**
+Professional password security suite:
+- **Zero-knowledge architecture** for maximum security
+- **Password strength analysis** with recommendations
+- **Secure password generation** with customizable rules
+- **Breach monitoring** ready for security alerts
+- **Multi-device sync** capability for team access
+- **Category-based organization** for business passwords
+
+### 🤖 **Smart Search**
+AI-powered natural language file search:
+- Try queries like: `"find my documents"`, `"show me images"`, `"search for pdf files"`
+- **Intelligent results** based on file content and metadata
+- **Real-time feedback** in the activity log
+- **Fallback to basic search** if smart search is unavailable
 
 ## 📖 Usage
 
@@ -92,10 +140,19 @@ A modern, secure file vault application with military-grade encryption and advan
 
 ## 🔑 Keyboard Shortcuts
 
+### **File Operations**
 - `Ctrl+U` - Upload file
 - `Ctrl+D` - Download file
 - `Delete` - Secure delete
 - `Ctrl+T` - Toggle theme
+
+### **Enterprise Features** ⭐
+- `Ctrl+D` - Open Security Dashboard
+- `Ctrl+N` - Access Secure Notes Manager
+- `Ctrl+P` - Open Password Manager
+- `Ctrl+F` - Focus Smart Search
+
+### **General**
 - `F1` - Help system
 - `Escape` - Close dialogs
 
