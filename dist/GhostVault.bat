@@ -4,8 +4,6 @@ echo          GhostVault Launcher
 echo    Secure File Encryption System
 echo ========================================
 echo.
-echo Starting GhostVault...
-echo.
 
 REM Check if Java is installed
 java -version >nul 2>&1
@@ -17,15 +15,49 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
-REM Run GhostVault with JavaFX modules
-java --module-path . --add-modules javafx.controls,javafx.fxml,javafx.media -jar GhostVault.jar
+echo Starting GhostVault...
+echo.
+
+REM Try different methods to run JavaFX application
+echo Method 1: Running with module path...
+java --module-path . --add-modules javafx.controls,javafx.fxml,javafx.media -jar GhostVault.jar 2>nul
 
 if %errorlevel% neq 0 (
-    echo.
-    echo If you see JavaFX errors, try running with:
-    echo java -jar GhostVault.jar
-    echo.
-    echo Or install JavaFX separately.
+    echo Method 1 failed. Trying Method 2: Direct JAR execution...
+    java -Djava.awt.headless=false -jar GhostVault.jar 2>nul
+    
+    if %errorlevel% neq 0 (
+        echo Method 2 failed. Trying Method 3: With JavaFX system properties...
+        java -Dprism.order=sw -Dprism.text=t2k -jar GhostVault.jar 2>nul
+        
+        if %errorlevel% neq 0 (
+            echo.
+            echo ========================================
+            echo        JAVAFX SETUP REQUIRED
+            echo ========================================
+            echo.
+            echo Your Java installation doesn't include JavaFX.
+            echo.
+            echo SOLUTIONS:
+            echo.
+            echo 1. EASIEST - Install Java with JavaFX:
+            echo    Download from: https://bell-sw.com/pages/downloads/
+            echo    Choose "Full JDK" which includes JavaFX
+            echo.
+            echo 2. OR - Install JavaFX separately:
+            echo    Download from: https://openjfx.io/
+            echo    Extract and set JAVAFX_HOME
+            echo.
+            echo 3. OR - Use different Java distribution:
+            echo    Try Azul Zulu FX: https://www.azul.com/downloads/
+            echo.
+            echo Current Java version:
+            java -version
+            echo.
+            pause
+            exit /b 1
+        )
+    )
 )
 
 echo.
