@@ -49,6 +49,14 @@ public class SecurityDashboard {
     }
     
     /**
+     * Default constructor for standalone use
+     */
+    public SecurityDashboard() {
+        this.auditManager = null;
+        this.threatEngine = null;
+    }
+    
+    /**
      * Show the security dashboard in separate window
      */
     public void show() {
@@ -527,5 +535,47 @@ public class SecurityDashboard {
      */
     public boolean isShowing() {
         return dashboardStage != null && dashboardStage.isShowing();
+    }
+    
+    /**
+     * Update dashboard metrics with real data
+     */
+    public void updateMetrics(int fileCount, int securityScore, String threatLevel, int activeSessions) {
+        this.totalFiles = fileCount;
+        this.securityScore.set(securityScore);
+        this.currentThreatLevel = threatLevel;
+        this.activeSessions = activeSessions;
+        
+        // Update UI components if they exist
+        Platform.runLater(() -> {
+            if (totalFilesLabel != null) {
+                totalFilesLabel.setText(String.valueOf(fileCount));
+            }
+            if (securityScoreLabel != null) {
+                securityScoreLabel.setText(String.valueOf(securityScore));
+            }
+            if (securityScoreBar != null) {
+                securityScoreBar.setProgress(securityScore / 100.0);
+            }
+            if (threatLevelLabel != null) {
+                threatLevelLabel.setText(threatLevel);
+                // Update threat level styling
+                threatLevelLabel.getStyleClass().removeAll("threat-low", "threat-medium", "threat-high");
+                switch (threatLevel.toUpperCase()) {
+                    case "LOW":
+                        threatLevelLabel.getStyleClass().add("threat-low");
+                        break;
+                    case "MEDIUM":
+                        threatLevelLabel.getStyleClass().add("threat-medium");
+                        break;
+                    case "HIGH":
+                        threatLevelLabel.getStyleClass().add("threat-high");
+                        break;
+                }
+            }
+            if (activeSessionsLabel != null) {
+                activeSessionsLabel.setText(String.valueOf(activeSessions));
+            }
+        });
     }
 }

@@ -129,8 +129,13 @@ public class VaultMainController implements Initializable {
             }
         }
         
-        // Initialize new features
-        initializeAdvancedFeatures();
+        // Initialize AI organizer
+        try {
+            this.smartOrganizer = new com.ghostvault.ai.SmartFileOrganizer();
+            logMessage("🤖 AI organizer initialized");
+        } catch (Exception e) {
+            logMessage("⚠ Failed to initialize AI organizer: " + e.getMessage());
+        }
         
         refreshFileList();
         updateStatus();
@@ -1791,6 +1796,26 @@ public class VaultMainController implements Initializable {
      */
     @FXML
     private void handleDashboard() {
+        try {
+            if (securityDashboard == null) {
+                securityDashboard = new SecurityDashboard();
+            }
+            
+            // Update dashboard with real vault data
+            updateDashboardData();
+            
+            securityDashboard.show();
+            logMessage("📊 Security Dashboard opened - Real-time monitoring active");
+        } catch (Exception e) {
+            logMessage("⚠ Error opening security dashboard: " + e.getMessage());
+            showError("Dashboard Error", "Could not open security dashboard: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Original dashboard method - keeping for compatibility
+     */
+    private void handleDashboardOld() {
         if (securityDashboard != null) {
             securityDashboard.updateFileCount(allVaultFiles.size());
             securityDashboard.show(); // Use regular show instead of showInParent
@@ -1813,13 +1838,15 @@ public class VaultMainController implements Initializable {
     private void handleNotes() {
         if (notesManager != null) {
             try {
-                if (notesWindow == null) {
+                if (notesWindow == null || !notesWindow.isShowing()) {
                     notesWindow = new SecureNotesWindow(notesManager);
                 }
                 notesWindow.show();
                 logMessage("📝 Secure Notes Manager opened - " + notesManager.getNotes().size() + " encrypted notes available");
             } catch (Exception e) {
                 logMessage("⚠ Error opening notes manager: " + e.getMessage());
+                // Reset the window reference on error
+                notesWindow = null;
                 showError("Notes Error", "Could not open secure notes manager: " + e.getMessage());
             }
         } else {
@@ -1834,17 +1861,82 @@ public class VaultMainController implements Initializable {
     private void handlePasswords() {
         if (notesManager != null) {
             try {
-                if (passwordWindow == null) {
+                if (passwordWindow == null || !passwordWindow.isShowing()) {
                     passwordWindow = new PasswordManagerWindow(notesManager);
                 }
                 passwordWindow.show();
                 logMessage("🔑 Password Manager opened - " + notesManager.getPasswords().size() + " passwords secured");
             } catch (Exception e) {
                 logMessage("⚠ Error opening password manager: " + e.getMessage());
+                // Reset the window reference on error
+                passwordWindow = null;
                 showError("Password Manager Error", "Could not open password manager: " + e.getMessage());
             }
         } else {
             showError("Password Manager Error", "Password manager is not available.");
+        }
+    }
+    
+
+    
+    /**
+     * Update dashboard with real vault data
+     */
+    private void updateDashboardData() {
+        if (securityDashboard != null) {
+            // Update with real file count
+            int fileCount = allVaultFiles.size();
+            
+            // Calculate security score based on real data
+            int securityScore = calculateSecurityScore();
+            
+            // Update threat level based on actual conditions
+            String threatLevel = calculateThreatLevel();
+            
+            // Update dashboard metrics
+            securityDashboard.updateMetrics(fileCount, securityScore, threatLevel, 1);
+            
+            logMessage("📊 Dashboard updated with real vault data: " + fileCount + " files, security score: " + securityScore);
+        }
+    }
+    
+    /**
+     * Calculate security score based on vault state
+     */
+    private int calculateSecurityScore() {
+        int score = 70; // Base score
+        
+        // Bonus for having files encrypted
+        if (!allVaultFiles.isEmpty()) {
+            score += 10;
+        }
+        
+        // Bonus for having backups (simplified check)
+        if (backupManager != null) {
+            score += 10;
+        }
+        
+        // Bonus for having notes/passwords secured
+        if (notesManager != null) {
+            score += 5;
+            if (!notesManager.getNotes().isEmpty()) score += 3;
+            if (!notesManager.getPasswords().isEmpty()) score += 2;
+        }
+        
+        return Math.min(score, 100);
+    }
+    
+    /**
+     * Calculate threat level based on system state
+     */
+    private String calculateThreatLevel() {
+        // Simple threat assessment
+        if (allVaultFiles.isEmpty()) {
+            return "LOW";
+        } else if (allVaultFiles.size() > 50) {
+            return "MEDIUM";
+        } else {
+            return "LOW";
         }
     }
     

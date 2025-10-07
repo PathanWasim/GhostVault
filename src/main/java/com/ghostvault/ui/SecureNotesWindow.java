@@ -284,4 +284,8 @@ public class SecureNotesWindow {
     public void hide() {
         stage.hide();
     }
+    
+    public boolean isShowing() {
+        return stage != null && stage.isShowing();
+    }
 }
