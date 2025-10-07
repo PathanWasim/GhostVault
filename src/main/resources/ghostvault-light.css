@@ -1,37 +1,42 @@
-/* GhostVault Light Theme */
+/* Modern Light Theme */
 
 .root {
-    -fx-base: #f5f5f5;
-    -fx-background: #ffffff;
+    -fx-base: #ffffff;
+    -fx-background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 50%, #cbd5e1 100%);
     -fx-control-inner-background: #ffffff;
-    -fx-control-inner-background-alt: #f8f8f8;
-    -fx-accent: #2196F3;
-    -fx-default-button: #2196F3;
-    -fx-focus-color: #2196F3;
-    -fx-faint-focus-color: #2196F322;
-    -fx-text-fill: #333333;
-    -fx-text-base-color: #333333;
+    -fx-control-inner-background-alt: #f1f5f9;
+    -fx-accent: #3b82f6;
+    -fx-default-button: #3b82f6;
+    -fx-focus-color: #3b82f6;
+    -fx-faint-focus-color: #3b82f644;
+    -fx-text-fill: #1e293b;
+    -fx-text-base-color: #1e293b;
 }
 
-/* Buttons */
+/* Modern Light Buttons */
 .button {
-    -fx-background-color: #ffffff;
-    -fx-text-fill: #333333;
-    -fx-border-color: #cccccc;
+    -fx-background-color: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+    -fx-text-fill: #475569;
+    -fx-border-color: #cbd5e1;
     -fx-border-width: 1px;
-    -fx-background-radius: 3px;
-    -fx-border-radius: 3px;
-    -fx-padding: 8px 16px;
+    -fx-background-radius: 6px;
+    -fx-border-radius: 6px;
+    -fx-padding: 10px 18px;
     -fx-font-size: 12px;
+    -fx-font-weight: 600;
+    -fx-font-family: "JetBrains Mono", "Fira Code", monospace;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.1), 4, 0, 0, 2);
 }
 
 .button:hover {
-    -fx-background-color: #f0f0f0;
-    -fx-border-color: #999999;
+    -fx-background-color: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+    -fx-border-color: #3b82f6;
+    -fx-text-fill: #1e293b;
+    -fx-effect: dropshadow(gaussian, rgba(59, 130, 246, 0.3), 8, 0, 0, 4);
 }
 
 .button:pressed {
-    -fx-background-color: #e0e0e0;
+    -fx-background-color: linear-gradient(135deg, #e2e8f0 0%, #cbd5e1 100%);
 }
 
 /* Text Fields */
@@ -52,10 +57,12 @@
     -fx-border-width: 2px;
 }
 
-/* Labels */
+/* Modern Labels */
 .label {
-    -fx-text-fill: #333333;
+    -fx-text-fill: #334155;
     -fx-font-size: 13px;
+    -fx-font-family: "JetBrains Mono", "Fira Code", monospace;
+    -fx-font-weight: 500;
 }
 
 /* List View */
