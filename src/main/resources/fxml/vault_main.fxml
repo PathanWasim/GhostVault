@@ -44,27 +44,29 @@
    <center>
       <StackPane>
          <!-- Main Content -->
-         <VBox fx:id="mainContent" spacing="20.0">
-            <padding>
-               <Insets bottom="20.0" left="20.0" right="20.0" top="20.0" />
-            </padding>
-            
+         <VBox fx:id="mainContent" spacing="1">
             <!-- Search Section -->
-            <VBox spacing="8.0" styleClass="card">
-               <Label styleClass="card-header" text="🔍 Search Files" />
-               <TextField fx:id="searchField" maxWidth="400.0" onKeyReleased="#handleSearch" promptText="Search files... (try 'find my documents' or 'show me images')" styleClass="text-field, search-field" />
+            <VBox spacing="8" styleClass="search-section">
+               <padding>
+                  <Insets bottom="12" left="16" right="16" top="12" />
+               </padding>
+               <TextField fx:id="searchField" promptText="Search files... (try 'find my documents' or 'show me images')" styleClass="search-field" />
             </VBox>
             
             <!-- File List Section -->
-            <VBox spacing="8.0" styleClass="card" VBox.vgrow="ALWAYS">
-               <Label styleClass="card-header" text="📁 Encrypted Files" />
+            <VBox VBox.vgrow="ALWAYS" styleClass="file-section">
+               <padding>
+                  <Insets bottom="0" left="16" right="16" top="0" />
+               </padding>
                <ListView fx:id="fileListView" styleClass="list-view" VBox.vgrow="ALWAYS" />
             </VBox>
             
             <!-- Activity Log Section -->
-            <VBox spacing="8.0" styleClass="card">
-               <Label styleClass="card-header" text="📋 Activity Log" />
-               <TextArea fx:id="logArea" editable="false" prefHeight="120.0" styleClass="text-area" />
+            <VBox styleClass="log-section">
+               <padding>
+                  <Insets bottom="16" left="16" right="16" top="8" />
+               </padding>
+               <TextArea fx:id="logArea" editable="false" prefHeight="120" styleClass="text-area" />
             </VBox>
          </VBox>
          
@@ -77,21 +79,19 @@
    
    <!-- Status Bar -->
    <bottom>
-      <HBox alignment="CENTER_LEFT" spacing="10.0" styleClass="status-bar">
+      <HBox alignment="CENTER_LEFT" spacing="16" styleClass="status-bar">
          <padding>
-            <Insets bottom="5.0" left="10.0" right="10.0" top="5.0" />
+            <Insets bottom="8" left="16" right="16" top="8" />
          </padding>
          
-         <Label fx:id="fileCountLabel" styleClass="status-label" text="Files: 0" />
-         <Separator orientation="VERTICAL" />
-         <Label fx:id="vaultSizeLabel" styleClass="status-label" text="Size: 0 MB" />
-         <Separator orientation="VERTICAL" />
-         <Label fx:id="encryptionLabel" styleClass="status-label" text="🔒 AES-256 Encrypted" />
+         <Label fx:id="fileCountLabel" styleClass="status-label" text="📁 0 files" />
+         <Label fx:id="vaultSizeLabel" styleClass="status-label" text="💾 0 MB" />
+         <Label fx:id="encryptionLabel" styleClass="status-label" text="🔐 Vault ready" />
          
          <Region HBox.hgrow="ALWAYS" />
          
-         <ProgressIndicator fx:id="operationProgress" styleClass="operation-progress" visible="false" />
-         <Label fx:id="operationStatusLabel" styleClass="operation-status" />
+         <Label fx:id="operationStatusLabel" styleClass="status-label" />
+         <ProgressIndicator fx:id="operationProgress" maxHeight="16" maxWidth="16" visible="false" />
       </HBox>
    </bottom>
 </BorderPane>
