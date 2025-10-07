@@ -1,197 +1,211 @@
-# 🚀 GhostVault Enterprise Edition
+# 🔐 GhostVault
 
-A **professional, enterprise-grade security suite** with comprehensive file encryption, real-time security monitoring, and advanced features for modern security needs.
+**Military-grade file encryption system with AI-powered organization and secure credential management**
 
-## ✨ Enterprise Features
+![Java](https://img.shields.io/badge/Java-17+-orange.svg)
+![JavaFX](https://img.shields.io/badge/JavaFX-17+-blue.svg)
+![Status](https://img.shields.io/badge/Status-Production%20Ready-brightgreen.svg)
+![License](https://img.shields.io/badge/License-MIT-blue.svg)
 
-### 🛡️ **Advanced Security Suite**
-- **AES-256 Encryption** - Military-grade file protection
-- **Real-time Threat Detection** - Advanced security monitoring
-- **Memory Protection** - Secure data handling with encryption
-- **File System Monitoring** - Tamper detection and integrity verification
-- **Multi-Password System** - Master, Panic, and Decoy passwords
-- **Secure Deletion** - DoD-standard file wiping
+## 🌟 Features
 
-### 🚀 **Professional Features**
-- **📊 Security Dashboard** - Real-time monitoring with charts and metrics
-- **📝 Secure Notes Manager** - Encrypted note storage with categories
-- **🔑 Password Manager** - Enterprise-grade password vault
-- **🤖 Smart Search** - AI-powered natural language file search
-- **🔔 System Tray Integration** - Background monitoring and notifications
+### 🔒 **File Encryption & Security**
+- **AES-256-GCM Encryption** - Military-grade file protection
+- **Drag & Drop Interface** - Encrypt files instantly
+- **Batch Operations** - Handle multiple files at once
+- **Secure File Preview** - View encrypted files safely
+- **Zero-Knowledge Architecture** - Your data, your keys only
+- **Memory Protection** - Secure cleanup of sensitive data
 
-### 📁 **Enhanced File Management**
-- **Drag & Drop Upload** - Professional file encryption interface
-- **File Preview** - View images, text, and PDFs securely
-- **Smart Search & Filter** - Natural language file discovery
-- **Backup & Restore** - Encrypted vault backups
+### 📝 **Secure Notes Manager**
+- **Encrypted Note Storage** - AES-256 protected notes
+- **Real-time Search** - Find notes instantly as you type
+- **Category Organization** - Organize by Personal, Work, Ideas, etc.
+- **Auto-tagging** - Smart content-based tagging
+- **Rich Text Support** - Format your notes beautifully
+- **Export Options** - Secure backup and sharing
 
-### 🎨 **Professional Interface**
-- **Enterprise UI Design** - Modern card-based layout with professional styling
-- **Responsive Design** - Adapts to different screen sizes
-- **Keyboard Shortcuts** - Full keyboard navigation (Ctrl+D, Ctrl+N, Ctrl+P)
-- **Real-time Feedback** - Professional status updates and notifications
-- **Cross-Platform** - Windows, macOS, Linux
+### 🔑 **Password Manager**
+- **Encrypted Credential Storage** - Secure login management
+- **Password Generator** - Create strong, unique passwords
+- **Security Audit** - Analyze password strength and duplicates
+- **Breach Detection** - Monitor for compromised passwords
+- **Auto-fill Ready** - Easy password retrieval
+- **Category Management** - Organize by Banking, Social, Work, etc.
+
+### 🤖 **AI-Powered Features**
+- **Smart File Organization** - Automatic categorization
+- **Natural Language Search** - "find my work documents"
+- **Content Analysis** - Intelligent file understanding
+- **Auto-suggestions** - Smart recommendations
+- **Pattern Recognition** - Learn from your usage
+
+### 🛡️ **Advanced Security**
+- **Security Dashboard** - Real-time threat monitoring
+- **Session Management** - Secure login sessions
+- **Decoy Mode** - Hide your real vault with fake data
+- **Panic Mode** - Emergency data wipe capability
+- **System Tray Integration** - Background protection
+- **Activity Logging** - Comprehensive audit trails
+
+### 🎯 **User Experience**
+- **Professional Dark Theme** - Easy on the eyes
+- **Intuitive Interface** - Clean, modern design
+- **Keyboard Shortcuts** - Power user friendly
+- **Multi-platform** - Windows, macOS, Linux
+- **Offline Operation** - No internet required
+- **Portable** - Single JAR file distribution
 
 ## 🚀 Quick Start
 
-### Requirements
-- Java 11 or higher
-- 512MB RAM minimum
+### Prerequisites
+- **Java 17+** ([Download from Adoptium](https://adoptium.net/))
 
-### Installation
-1. Download the latest release
-2. Extract and run:
-   ```bash
-   java -jar ghostvault.jar
-   ```
+### Installation & Usage
 
-### First Setup
-1. Launch GhostVault Enterprise Edition
-2. Create three passwords:
-   - **Master**: Normal vault access
-   - **Panic**: Emergency data destruction
-   - **Decoy**: Shows fake files
-3. Explore the new enterprise features:
-   - **📊 Dashboard** - Click to see real-time security monitoring
-   - **📝 Notes** - Access the secure notes manager
-   - **🔑 Passwords** - Open the enterprise password vault
-   - **🔍 Smart Search** - Try "find my documents" in the search box
+**Option 1: Download & Run**
+```bash
+# Download the latest release
+# Extract and run
+java -jar GhostVault.jar
+```
 
-## 🌟 **Enterprise Features Guide**
-
-### 📊 **Security Dashboard**
-Access real-time security monitoring with professional charts and metrics:
-- **Security Score**: Live security assessment (0-100)
-- **Threat Level**: Current threat status monitoring
-- **Active Sessions**: Session management and tracking
-- **Protected Files**: Real-time file count and vault statistics
-- **Security Events**: Timeline of recent security activities
-
-### 📝 **Secure Notes Manager**
-Enterprise-grade encrypted note storage:
-- **Military-grade AES-256 encryption** for all notes
-- **Category organization** for better note management
-- **Tag-based search** for quick note discovery
-- **Full-text search** capability across all notes
-- **Secure cloud sync** ready for team deployment
-
-### 🔑 **Password Manager**
-Professional password security suite:
-- **Zero-knowledge architecture** for maximum security
-- **Password strength analysis** with recommendations
-- **Secure password generation** with customizable rules
-- **Breach monitoring** ready for security alerts
-- **Multi-device sync** capability for team access
-- **Category-based organization** for business passwords
-
-### 🤖 **Smart Search**
-AI-powered natural language file search:
-- Try queries like: `"find my documents"`, `"show me images"`, `"search for pdf files"`
-- **Intelligent results** based on file content and metadata
-- **Real-time feedback** in the activity log
-- **Fallback to basic search** if smart search is unavailable
-
-## 📖 Usage
-
-### Basic Operations
-- **Upload**: Click 📁 Upload → Select file → Automatically encrypted
-- **Download**: Select file → Click 💾 Download → Choose save location
-- **Preview**: Select file → Click 👁️ Preview → View content securely
-- **Delete**: Select file → Click 🗑️ Delete → Secure multi-pass deletion
-
-### Security Modes
-- **Normal Mode**: Enter master password for full access
-- **Panic Mode**: Enter panic password to silently destroy all data
-- **Decoy Mode**: Enter decoy password to show fake files
-
-### Backup & Restore
-- **Backup**: Click 📦 Backup → Choose location → Creates encrypted .gvbackup file
-- **Restore**: Click 📥 Restore → Select .gvbackup → Restores vault contents
-
-## 🔧 Technical Details
-
-### Encryption
-- **Algorithm**: AES-256-CBC with PBKDF2 key derivation
-- **Iterations**: 100,000+ for password hashing
-- **Integrity**: SHA-256 verification for all files
-- **Memory**: Secure wiping of sensitive data
-
-### File Storage
-- **Location**: `~/.ghostvault/` directory
-- **Structure**: Encrypted files with random UUID names
-- **Metadata**: Separately encrypted file information
-- **Backups**: Fully encrypted vault snapshots
-
-## 🎯 Security Features
-
-### Protection Against
-- **Data Theft** - Strong encryption protects files
-- **Password Attacks** - High-iteration hashing
-- **Coercion** - Panic mode destroys evidence
-- **Surveillance** - Decoy mode provides cover
-- **Forensics** - Secure deletion prevents recovery
-
-### Best Practices
-1. Use strong, unique passwords
-2. Create regular encrypted backups
-3. Store backups in secure locations
-4. Never reuse vault passwords
-5. Keep your system physically secure
-
-## 🔑 Keyboard Shortcuts
-
-### **File Operations**
-- `Ctrl+U` - Upload file
-- `Ctrl+D` - Download file
-- `Delete` - Secure delete
-- `Ctrl+T` - Toggle theme
-
-### **Enterprise Features** ⭐
-- `Ctrl+D` - Open Security Dashboard
-- `Ctrl+N` - Access Secure Notes Manager
-- `Ctrl+P` - Open Password Manager
-- `Ctrl+F` - Focus Smart Search
-
-### **General**
-- `F1` - Help system
-- `Escape` - Close dialogs
-
-## ⚠️ Important Notes
-
-### Security Warnings
-- **Lost passwords cannot be recovered** (by design)
-- **Panic mode permanently destroys data** - use with caution
-- **Keep backups secure** - they contain your encrypted vault
-
-### Legal Notice
-GhostVault is for legitimate privacy and security needs. Users must comply with all applicable laws. The panic feature permanently destroys data and should be used responsibly.
-
-## 🛠️ Development
-
-### Building from Source
+**Option 2: Build from Source**
 ```bash
 git clone https://github.com/PathanWasim/GhostVault.git
 cd GhostVault
-mvn compile
 mvn javafx:run
 ```
 
-### Testing
+### First Time Setup
+1. **Launch GhostVault** - Run the application
+2. **Create Master Password** - This encrypts everything (remember it!)
+3. **Start Encrypting** - Drag & drop files to encrypt them
+4. **Explore Features** - Try Notes, Passwords, and AI search
+
+## 📱 Screenshots & Demo
+
+### Main Interface
+- **File Encryption**: Drag & drop files for instant AES-256 encryption
+- **Smart Search**: Use natural language like "find my tax documents"
+- **Security Dashboard**: Real-time monitoring of vault security
+
+### Notes Manager
+- **Create & Edit**: Rich text notes with categories
+- **Search & Filter**: Find notes instantly with real-time search
+- **Auto-tagging**: Smart tags based on content analysis
+
+### Password Manager
+- **Secure Storage**: Military-grade encryption for credentials
+- **Password Generator**: Create strong, unique passwords
+- **Security Audit**: Analyze and improve password security
+
+## 🏗️ Technical Details
+
+### Architecture
+- **82 Java Classes** - Clean, modular design
+- **JavaFX UI** - Modern, responsive interface
+- **Maven Build** - Professional build system
+- **Layered Security** - Multiple protection levels
+
+### Security Implementation
+- **Encryption**: AES-256-GCM with PBKDF2 key derivation
+- **Salt Generation**: Cryptographically secure random salts
+- **Memory Safety**: Automatic cleanup of sensitive data
+- **File Protection**: Encrypted metadata and content
+- **Session Security**: Secure authentication and timeouts
+
+### Performance
+- **Fast Encryption**: Optimized for large files
+- **Smart Caching**: Efficient memory usage
+- **Background Processing**: Non-blocking operations
+- **Minimal Footprint**: ~50MB distribution size
+
+## 🛠️ Building
+
+### Quick Build
 ```bash
-mvn test                    # Run all tests
-mvn test -Dtest=Security*   # Security tests only
+# Windows
+build-executable.bat
+
+# Linux/Mac
+mvn clean package -Dmaven.test.skip=true
 ```
+
+### Development
+```bash
+# Run from source
+mvn javafx:run
+
+# Compile only
+mvn compile
+```
+
+See [BUILD.md](BUILD.md) for detailed instructions.
+
+## 📦 Distribution
+
+The build creates a `dist/` folder containing:
+- **GhostVault.jar** - Complete application (~50MB)
+- **GhostVault.bat** - Windows launcher script
+- **README.txt** - User documentation
+
+**Sharing**: Copy the entire `dist/` folder. Recipients need Java 17+.
+
+## 🔧 Configuration
+
+### Vault Location
+- **Default**: `~/.ghostvault/`
+- **Files**: Encrypted file storage
+- **Notes**: `secure_notes.enc`
+- **Passwords**: `stored_passwords.enc`
+- **Config**: Application settings
+
+### Security Settings
+- **Encryption**: AES-256-GCM
+- **Key Derivation**: PBKDF2-SHA256
+- **Iterations**: 100,000+
+- **Salt Length**: 32 bytes
+
+## 🆘 System Requirements
+
+- **Operating System**: Windows 10+, macOS 10.14+, Linux
+- **Java Runtime**: 17 or higher
+- **Memory**: 512MB minimum, 1GB recommended
+- **Storage**: 100MB + space for encrypted files
+- **Network**: None required (fully offline)
+
+## 🤝 Contributing
+
+We welcome contributions! Please:
+
+1. **Fork** the repository
+2. **Create** a feature branch
+3. **Test** your changes thoroughly
+4. **Submit** a pull request
 
 ## 📄 License
 
-MIT License - see [LICENSE](LICENSE) for details.
+This project is licensed under the **MIT License** - see [LICENSE](LICENSE) for details.
 
 ## 🆘 Support
 
-- **Help System**: Press F1 in the application
-- **Issues**: Report bugs on GitHub
-- **Security**: Email security issues privately
+- **🐛 Bug Reports**: [GitHub Issues](https://github.com/PathanWasim/GhostVault/issues)
+- **💬 Discussions**: [GitHub Discussions](https://github.com/PathanWasim/GhostVault/discussions)
+- **📖 Documentation**: Check `dist/README.txt` for user guide
+
+## ⭐ Why Choose GhostVault?
+
+- **🔒 Military-Grade Security** - AES-256 encryption used by governments
+- **🤖 AI-Powered** - Smart organization and search capabilities
+- **🎯 Zero-Knowledge** - We never see your data or passwords
+- **📱 User-Friendly** - Professional interface, easy to use
+- **🌍 Cross-Platform** - Works on Windows, Mac, and Linux
+- **📦 Portable** - Single file, no installation required
+- **🔓 Open Source** - Transparent, auditable code
 
 ---
 
-**Built with ❤️ for privacy and security**
+**⚠️ Security Notice**: Your master password cannot be recovered if lost. Keep it safe!
+
+**🔐 Your Privacy, Your Security, Your Control.**

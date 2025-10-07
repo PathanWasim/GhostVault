@@ -1,25 +1,57 @@
-# Ignore sensitive and build files
-/.ghostvault/
+# Build artifacts and compiled files
 /target/
-*.log
 *.class
 *.jar
-*.iml
-.DS_Store
+*.war
+*.ear
+dependency-reduced-pom.xml
+
+# Distribution folder (JAR files are large and can be built from source)
+/dist/
+/native/
+
+# IDE files
 .idea/
+*.iml
+.vscode/
+.eclipse/
+.settings/
+.project
+.classpath
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
 *.swp
+*.swo
+*~
+
+# Logs
+*.log
+logs/
+
+# Vault data (sensitive)
+/.ghostvault/
 
 # Kiro IDE files
 .kiro/
 
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.backup
+
+# Test output
+test-downloads/
+
 # Project audit files
 project-audit/
-
-# Unnecessary documentation
-**/IMPLEMENTATION_SUMMARY.md
-**/COMPLETION_REPORT.md
-**/BUG_FIXES.md
-**/FEATURE_IMPLEMENTATION.md
-**/PROJECT_STATUS.md
-**/CURRENT_STATUS.md
-**/IMPLEMENTATION_PLAN.md
+simple-demo/
+build/
+docs/

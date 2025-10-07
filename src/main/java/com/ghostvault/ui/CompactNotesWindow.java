@@ -22,6 +22,14 @@ public class CompactNotesWindow {
     
     public CompactNotesWindow(SecureNotesManager notesManager) {
         this.notesManager = notesManager;
+        
+        // Ensure data is loaded
+        try {
+            notesManager.loadData();
+        } catch (Exception e) {
+            System.err.println("Warning: Could not load notes data: " + e.getMessage());
+        }
+        
         createWindow();
     }
     
@@ -186,8 +194,17 @@ public class CompactNotesWindow {
     }
     
     private void loadNote(String noteTitle) {
+        System.out.println("DEBUG: Loading note: '" + noteTitle + "'");
+        System.out.println("DEBUG: Available notes count: " + notesManager.getNotes().size());
+        
+        // Debug: Print all available notes
+        notesManager.getNotes().forEach(note -> 
+            System.out.println("DEBUG: Available note: '" + note.getTitle() + "' with content: '" + 
+                note.getContent().substring(0, Math.min(50, note.getContent().length())) + "'"));
+        
         if (noteTitle.startsWith("📄 ")) {
-            String title = noteTitle.substring(2);
+            String title = noteTitle.substring(2).trim();
+            System.out.println("DEBUG: Looking for note with title: '" + title + "'");
             
             // Find and load the actual note
             notesManager.getNotes().stream()
@@ -200,10 +217,11 @@ public class CompactNotesWindow {
                     categoryCombo.setValue(note.getCategory());
                     
                     // Show note info in status
-                    System.out.println("Loaded note: " + note.getTitle() + 
+                    System.out.println("SUCCESS: Loaded note: " + note.getTitle() + 
                         " (" + note.getContent().length() + " chars, " + 
                         note.getCategory() + " category)");
                 }, () -> {
+                    System.out.println("ERROR: Note not found in manager: '" + title + "'");
                     // Note not found - clear fields
                     titleField.setText(title);
                     noteContent.setText("");
@@ -215,8 +233,25 @@ public class CompactNotesWindow {
                         "• The note data is corrupted\n\n" +
                         "You can create a new note with this title.");
                 });
-        } else if (noteTitle.contains("No notes yet") || noteTitle.contains("No notes match")) {
-            createNewNote();
+        } else {
+            System.out.println("DEBUG: Note title doesn't start with emoji, treating as special case");
+            // Handle cases where notes don't have the emoji prefix
+            notesManager.getNotes().stream()
+                .filter(note -> note.getTitle().equals(noteTitle))
+                .findFirst()
+                .ifPresentOrElse(note -> {
+                    titleField.setText(note.getTitle());
+                    noteContent.setText(note.getContent());
+                    categoryCombo.setValue(note.getCategory());
+                    System.out.println("SUCCESS: Loaded note without emoji: " + note.getTitle());
+                }, () -> {
+                    if (noteTitle.contains("No notes yet") || noteTitle.contains("No notes match")) {
+                        createNewNote();
+                    } else {
+                        System.out.println("ERROR: Could not find note: '" + noteTitle + "'");
+                        createNewNote();
+                    }
+                });
         }
     }
     
@@ -328,17 +363,51 @@ public class CompactNotesWindow {
             return;
         }
         
-        Alert confirm = new Alert(Alert.AlertType.CONFIRMATION);
-        confirm.setTitle("Confirm Deletion");
-        confirm.setHeaderText("Delete Note");
-        confirm.setContentText("Are you sure you want to delete this note?\n\nThis action cannot be undone.");
-        
-        if (confirm.showAndWait().orElse(ButtonType.CANCEL) == ButtonType.OK) {
-            String title = selectedNote.substring(2); // Remove emoji
-            notesManager.getNotes().removeIf(note -> note.getTitle().equals(title));
-            refreshNotesList();
-            createNewNote();
-            showAlert("Success", "Note deleted successfully.");
+        if (selectedNote.startsWith("📄 ")) {
+            String title = selectedNote.substring(2).trim(); // Remove emoji and trim
+            
+            // Find the note to delete
+            notesManager.getNotes().stream()
+                .filter(note -> note.getTitle().equals(title))
+                .findFirst()
+                .ifPresentOrElse(noteToDelete -> {
+                    // Confirm deletion
+                    Alert confirm = new Alert(Alert.AlertType.CONFIRMATION);
+                    confirm.setTitle("Confirm Deletion");
+                    confirm.setHeaderText("Delete Note");
+                    confirm.setContentText("Are you sure you want to delete this note?\n\n" +
+                        "Title: " + noteToDelete.getTitle() + "\n" +
+                        "Category: " + noteToDelete.getCategory() + "\n" +
+                        "Content: " + noteToDelete.getContent().substring(0, Math.min(50, noteToDelete.getContent().length())) + 
+                        (noteToDelete.getContent().length() > 50 ? "..." : "") + "\n\n" +
+                        "This action cannot be undone.");
+                    
+                    if (confirm.showAndWait().orElse(ButtonType.CANCEL) == ButtonType.OK) {
+                        try {
+                            // Delete from manager using proper method
+                            notesManager.deleteNote(noteToDelete.getId());
+                            
+                            // Refresh the list
+                            refreshNotesList();
+                            
+                            // Clear the editor
+                            createNewNote();
+                            
+                            showAlert("Success", "Note deleted successfully!\n\n" +
+                                "🗑️ Deleted: " + noteToDelete.getTitle() + "\n" +
+                                "🔐 Securely removed from vault\n" +
+                                "💾 Changes saved automatically");
+                                
+                            System.out.println("Deleted note: " + noteToDelete.getTitle());
+                            
+                        } catch (Exception e) {
+                            showAlert("Error", "Failed to delete note: " + e.getMessage());
+                            System.err.println("Error deleting note: " + e.getMessage());
+                        }
+                    }
+                }, () -> {
+                    showAlert("Error", "Note not found in vault.");
+                });
         }
     }
     
@@ -443,6 +512,8 @@ public class CompactNotesWindow {
             }
         });
     }
+    
+
     
     private void showAlert(String title, String message) {
         Alert alert = new Alert(Alert.AlertType.INFORMATION);

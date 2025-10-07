@@ -84,6 +84,11 @@ public class VaultMainController implements Initializable {
     private com.ghostvault.ai.SmartFileOrganizer smartOrganizer;
     private com.ghostvault.security.SecureNotesManager notesManager;
     
+    // Feature windows
+    private CompactNotesWindow notesWindow;
+    private CompactPasswordWindow passwordWindow;
+    private CompactAIWindow aiWindow;
+    
     // State Management
     private boolean isDecoyMode = false;
     private boolean isDashboardVisible = false;
@@ -1842,11 +1847,6 @@ public class VaultMainController implements Initializable {
     
     // AI mode state
     private boolean aiModeEnabled = false;
-    
-    // Compact windows
-    private CompactNotesWindow notesWindow;
-    private CompactPasswordWindow passwordWindow;
-    private CompactAIWindow aiWindow;
     
     /**
      * Handle secure notes - integrated into main vault

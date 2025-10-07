@@ -28,6 +28,14 @@ public class CompactPasswordWindow {
     
     public CompactPasswordWindow(SecureNotesManager notesManager) {
         this.notesManager = notesManager;
+        
+        // Ensure data is loaded
+        try {
+            notesManager.loadData();
+        } catch (Exception e) {
+            System.err.println("Warning: Could not load password data: " + e.getMessage());
+        }
+        
         createWindow();
     }
     
@@ -272,8 +280,19 @@ public class CompactPasswordWindow {
     }
     
     private void loadPassword(String passwordEntry) {
+        System.out.println("DEBUG: Loading password: '" + passwordEntry + "'");
+        System.out.println("DEBUG: Available passwords count: " + notesManager.getPasswords().size());
+        
+        // Debug: Print all available passwords
+        notesManager.getPasswords().forEach(pwd -> 
+            System.out.println("DEBUG: Available password: '" + pwd.getTitle() + "' for " + pwd.getWebsite()));
+        
         if (passwordEntry.startsWith("🔐 ")) {
-            String title = passwordEntry.substring(2); // Remove emoji
+            String rawTitle = passwordEntry.substring(2).trim(); // Remove emoji and trim
+            // Remove website info if present in display
+            final String title = rawTitle.contains(" (") ? 
+                rawTitle.substring(0, rawTitle.indexOf(" (")).trim() : rawTitle;
+            System.out.println("DEBUG: Looking for password with title: '" + title + "'");
             
             // Find and load the actual password
             notesManager.getPasswords().stream()
@@ -288,9 +307,10 @@ public class CompactPasswordWindow {
                     updatePasswordStrength(pwd.getPassword());
                     
                     // Show password info in status
-                    System.out.println("Loaded password: " + pwd.getTitle() + 
+                    System.out.println("SUCCESS: Loaded password: " + pwd.getTitle() + 
                         " for " + pwd.getWebsite() + " (" + pwd.getCategory() + " category)");
                 }, () -> {
+                    System.out.println("ERROR: Password not found in manager: '" + title + "'");
                     // Password not found - clear fields
                     websiteField.setText("");
                     usernameField.setText("");
@@ -502,11 +522,10 @@ public class CompactPasswordWindow {
         }
         
         if (selectedPassword.startsWith("🔐 ")) {
-            String title = selectedPassword.substring(2);
+            String rawTitle = selectedPassword.substring(2).trim();
             // Remove website info if present
-            if (title.contains(" (")) {
-                title = title.substring(0, title.indexOf(" ("));
-            }
+            final String title = rawTitle.contains(" (") ? 
+                rawTitle.substring(0, rawTitle.indexOf(" (")).trim() : rawTitle;
             
             // Find the password to delete
             StoredPassword passwordToDelete = notesManager.getPasswords().stream()
@@ -672,6 +691,8 @@ public class CompactPasswordWindow {
             "Overall Security Score: " + overallScore + "/100 " + 
             (overallScore >= 80 ? "🛡️" : overallScore >= 60 ? "⚠️" : "🚨"));
     }
+    
+
     
     private void showAlert(String title, String message) {
         Alert alert = new Alert(Alert.AlertType.INFORMATION);

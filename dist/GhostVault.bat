@@ -4,6 +4,8 @@ echo          GhostVault Launcher
 echo    Secure File Encryption System
 echo ========================================
 echo.
+echo Starting GhostVault...
+echo.
 
 REM Check if Java is installed
 java -version >nul 2>&1
@@ -15,29 +17,15 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
-REM Check if Maven is installed
-mvn -version >nul 2>&1
-if %errorlevel% neq 0 (
-    echo ERROR: Maven is not installed or not in PATH
-    echo Please install Maven from: https://maven.apache.org/download.cgi
-    echo.
-    pause
-    exit /b 1
-)
-
-echo Starting GhostVault...
-echo.
-
-REM Run the application
-mvn javafx:run
+REM Run GhostVault with JavaFX modules
+java --module-path . --add-modules javafx.controls,javafx.fxml,javafx.media -jar GhostVault.jar
 
 if %errorlevel% neq 0 (
     echo.
-    echo ERROR: Failed to start GhostVault
-    echo Check the error messages above for details
+    echo If you see JavaFX errors, try running with:
+    echo java -jar GhostVault.jar
     echo.
-    pause
-    exit /b 1
+    echo Or install JavaFX separately.
 )
 
 echo.
