@@ -1,5 +1,6 @@
 package com.ghostvault.ui;
 
+import com.ghostvault.model.StoredPassword;
 import com.ghostvault.security.SecureNotesManager;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -73,10 +74,11 @@ public class CompactPasswordWindow {
         Label header = new Label("🔐 Password Vault");
         header.getStyleClass().addAll("card-header", "label");
         
-        // Search field
+        // Search field with real-time filtering
         TextField searchField = new TextField();
         searchField.setPromptText("🔍 Search passwords...");
         searchField.getStyleClass().addAll("text-field", "search-field");
+        searchField.textProperty().addListener((obs, oldVal, newVal) -> filterPasswords(newVal));
         
         passwordsList = new ListView<>();
         passwordsList.getStyleClass().add("list-view");
@@ -234,34 +236,100 @@ public class CompactPasswordWindow {
     
     private void refreshPasswordsList() {
         passwordsList.getItems().clear();
+        
         if (notesManager.getPasswords().isEmpty()) {
             passwordsList.getItems().add("No passwords yet - add your first password!");
-            // Add some demo passwords
+            // Add some demo entries to show functionality
             passwordsList.getItems().addAll(
-                "🌐 GitHub Account",
-                "📧 Gmail Account", 
-                "💼 Work Portal",
-                "🏦 Bank Account"
+                "🌐 GitHub Account (demo)",
+                "📧 Gmail Account (demo)", 
+                "💼 Work Portal (demo)",
+                "🏦 Bank Account (demo)"
             );
         } else {
-            notesManager.getPasswords().forEach(pwd -> 
-                passwordsList.getItems().add("🔐 " + pwd.getTitle()));
+            // Show actual saved passwords
+            notesManager.getPasswords().forEach(pwd -> {
+                String displayText = "🔐 " + pwd.getTitle();
+                // Add website info if available
+                if (pwd.getWebsite() != null && !pwd.getWebsite().isEmpty()) {
+                    displayText += " (" + pwd.getWebsite() + ")";
+                }
+                passwordsList.getItems().add(displayText);
+            });
+        }
+        
+        // Update stats label
+        Label statsLabel = (Label) passwordsList.getParent().getChildrenUnmodifiable().stream()
+            .filter(node -> node instanceof Label && ((Label) node).getText().startsWith("Total:"))
+            .findFirst()
+            .orElse(null);
+        
+        if (statsLabel != null) {
+            int actualCount = notesManager.getPasswords().size();
+            statsLabel.setText("Total: " + actualCount + " passwords" + 
+                (actualCount == 0 ? " (4 demo entries)" : ""));
         }
     }
     
     private void loadPassword(String passwordEntry) {
-        if (passwordEntry.startsWith("🔐 ") || passwordEntry.startsWith("🌐 ") || 
-            passwordEntry.startsWith("📧 ") || passwordEntry.startsWith("💼 ") || 
-            passwordEntry.startsWith("🏦 ")) {
+        if (passwordEntry.startsWith("🔐 ")) {
+            String title = passwordEntry.substring(2); // Remove emoji
             
-            String[] parts = passwordEntry.split(" ", 2);
-            if (parts.length > 1) {
-                websiteField.setText(parts[1].toLowerCase().replace(" account", ".com"));
-                usernameField.setText("user@example.com");
-                passwordField.setText("SecurePass123!");
+            // Find and load the actual password
+            notesManager.getPasswords().stream()
+                .filter(pwd -> pwd.getTitle().equals(title))
+                .findFirst()
+                .ifPresentOrElse(pwd -> {
+                    // Load the actual saved password data
+                    websiteField.setText(pwd.getWebsite());
+                    usernameField.setText(pwd.getUsername());
+                    passwordField.setText(pwd.getPassword());
+                    categoryCombo.setValue(pwd.getCategory());
+                    updatePasswordStrength(pwd.getPassword());
+                    
+                    // Show password info in status
+                    System.out.println("Loaded password: " + pwd.getTitle() + 
+                        " for " + pwd.getWebsite() + " (" + pwd.getCategory() + " category)");
+                }, () -> {
+                    // Password not found - clear fields
+                    websiteField.setText("");
+                    usernameField.setText("");
+                    passwordField.setText("");
+                    categoryCombo.setValue("Personal");
+                    updatePasswordStrength("");
+                    showAlert("Password Not Found", "The selected password could not be loaded.\n\n" +
+                        "This might happen if:\n" +
+                        "• The password was deleted\n" +
+                        "• There was a sync error\n" +
+                        "• The password data is corrupted\n\n" +
+                        "You can create a new password entry.");
+                });
+        } else if (passwordEntry.contains("No passwords yet") || passwordEntry.contains("demo")) {
+            // Handle demo entries or empty state
+            if (passwordEntry.contains("GitHub")) {
+                websiteField.setText("github.com");
+                usernameField.setText("your_username");
+                passwordField.setText("");
+                categoryCombo.setValue("Work");
+            } else if (passwordEntry.contains("Gmail")) {
+                websiteField.setText("gmail.com");
+                usernameField.setText("your.email@gmail.com");
+                passwordField.setText("");
                 categoryCombo.setValue("Personal");
-                updatePasswordStrength("SecurePass123!");
+            } else if (passwordEntry.contains("Work Portal")) {
+                websiteField.setText("company-portal.com");
+                usernameField.setText("employee_id");
+                passwordField.setText("");
+                categoryCombo.setValue("Work");
+            } else if (passwordEntry.contains("Bank")) {
+                websiteField.setText("bank.com");
+                usernameField.setText("account_number");
+                passwordField.setText("");
+                categoryCombo.setValue("Banking");
+            } else {
+                createNewPassword();
             }
+            updatePasswordStrength("");
         }
     }
     
@@ -426,21 +494,52 @@ public class CompactPasswordWindow {
     
     private void deleteCurrentPassword() {
         String selectedPassword = passwordsList.getSelectionModel().getSelectedItem();
-        if (selectedPassword == null || selectedPassword.equals("No passwords yet - add your first password!")) {
-            showAlert("Error", "Please select a password to delete.");
+        if (selectedPassword == null || selectedPassword.equals("No passwords yet - add your first password!") ||
+            selectedPassword.contains("(demo)")) {
+            showAlert("Error", "Please select a saved password to delete.\n\n" +
+                "Demo entries cannot be deleted - they're just examples.");
             return;
         }
         
-        Alert confirm = new Alert(Alert.AlertType.CONFIRMATION);
-        confirm.setTitle("Confirm Deletion");
-        confirm.setHeaderText("Delete Password");
-        confirm.setContentText("Are you sure you want to delete this password?\n\nThis action cannot be undone.");
-        
-        if (confirm.showAndWait().orElse(ButtonType.CANCEL) == ButtonType.OK) {
-            // Remove from demo list or actual manager
-            refreshPasswordsList();
-            createNewPassword();
-            showAlert("Success", "Password deleted successfully.");
+        if (selectedPassword.startsWith("🔐 ")) {
+            String title = selectedPassword.substring(2);
+            // Remove website info if present
+            if (title.contains(" (")) {
+                title = title.substring(0, title.indexOf(" ("));
+            }
+            
+            // Find the password to delete
+            StoredPassword passwordToDelete = notesManager.getPasswords().stream()
+                .filter(pwd -> pwd.getTitle().equals(title))
+                .findFirst()
+                .orElse(null);
+            
+            if (passwordToDelete == null) {
+                showAlert("Error", "Password not found in vault.");
+                return;
+            }
+            
+            Alert confirm = new Alert(Alert.AlertType.CONFIRMATION);
+            confirm.setTitle("Confirm Deletion");
+            confirm.setHeaderText("Delete Password");
+            confirm.setContentText("Are you sure you want to delete this password?\n\n" +
+                "Website: " + passwordToDelete.getWebsite() + "\n" +
+                "Username: " + passwordToDelete.getUsername() + "\n\n" +
+                "This action cannot be undone.");
+            
+            if (confirm.showAndWait().orElse(ButtonType.CANCEL) == ButtonType.OK) {
+                try {
+                    notesManager.deletePassword(passwordToDelete.getId());
+                    refreshPasswordsList();
+                    createNewPassword();
+                    showAlert("Success", "Password deleted successfully!\n\n" +
+                        "🗑️ Deleted: " + passwordToDelete.getTitle() + "\n" +
+                        "🔐 Securely removed from vault\n" +
+                        "💾 Changes saved automatically");
+                } catch (Exception e) {
+                    showAlert("Error", "Failed to delete password: " + e.getMessage());
+                }
+            }
         }
     }
     
@@ -473,18 +572,105 @@ public class CompactPasswordWindow {
         }
     }
     
+    /**
+     * Filter passwords in real-time based on search term
+     */
+    private void filterPasswords(String searchTerm) {
+        if (searchTerm == null || searchTerm.trim().isEmpty()) {
+            refreshPasswordsList();
+            return;
+        }
+        
+        passwordsList.getItems().clear();
+        
+        if (notesManager.getPasswords().isEmpty()) {
+            // Filter demo entries
+            java.util.List<String> demoEntries = java.util.Arrays.asList(
+                "🌐 GitHub Account (demo)",
+                "📧 Gmail Account (demo)", 
+                "💼 Work Portal (demo)",
+                "🏦 Bank Account (demo)"
+            );
+            
+            java.util.List<String> filteredDemo = demoEntries.stream()
+                .filter(entry -> entry.toLowerCase().contains(searchTerm.toLowerCase()))
+                .collect(java.util.stream.Collectors.toList());
+            
+            if (filteredDemo.isEmpty()) {
+                passwordsList.getItems().add("No demo entries match: '" + searchTerm + "'");
+            } else {
+                passwordsList.getItems().add("No passwords yet - add your first password!");
+                passwordsList.getItems().addAll(filteredDemo);
+            }
+        } else {
+            // Filter actual saved passwords
+            java.util.List<String> filteredPasswords = notesManager.getPasswords().stream()
+                .filter(pwd -> 
+                    pwd.getTitle().toLowerCase().contains(searchTerm.toLowerCase()) ||
+                    pwd.getWebsite().toLowerCase().contains(searchTerm.toLowerCase()) ||
+                    pwd.getUsername().toLowerCase().contains(searchTerm.toLowerCase()) ||
+                    pwd.getCategory().toLowerCase().contains(searchTerm.toLowerCase()))
+                .map(pwd -> {
+                    String displayText = "🔐 " + pwd.getTitle();
+                    if (pwd.getWebsite() != null && !pwd.getWebsite().isEmpty()) {
+                        displayText += " (" + pwd.getWebsite() + ")";
+                    }
+                    return displayText;
+                })
+                .collect(java.util.stream.Collectors.toList());
+            
+            if (filteredPasswords.isEmpty()) {
+                passwordsList.getItems().add("No passwords match: '" + searchTerm + "'");
+            } else {
+                passwordsList.getItems().addAll(filteredPasswords);
+            }
+        }
+    }
+    
     private void performSecurityAudit() {
+        int totalPasswords = notesManager.getPasswords().size();
+        
+        if (totalPasswords == 0) {
+            showAlert("🔍 Security Audit", "No passwords to audit.\n\n" +
+                "Add some passwords first to get a security analysis!");
+            return;
+        }
+        
+        // Analyze actual passwords
+        int strongPasswords = 0;
+        int weakPasswords = 0;
+        java.util.Set<String> uniquePasswords = new java.util.HashSet<>();
+        
+        for (StoredPassword pwd : notesManager.getPasswords()) {
+            SecureNotesManager.PasswordStrength strength = notesManager.checkPasswordStrength(pwd.getPassword());
+            if (strength.getScore() >= 60) {
+                strongPasswords++;
+            } else {
+                weakPasswords++;
+            }
+            uniquePasswords.add(pwd.getPassword());
+        }
+        
+        int duplicateCount = totalPasswords - uniquePasswords.size();
+        double strongPercentage = totalPasswords > 0 ? (strongPasswords * 100.0 / totalPasswords) : 0;
+        double uniquePercentage = totalPasswords > 0 ? (uniquePasswords.size() * 100.0 / totalPasswords) : 0;
+        
+        int overallScore = (int) ((strongPercentage + uniquePercentage) / 2);
+        
         showAlert("🔍 Security Audit", "Security analysis completed!\n\n" +
             "📊 Audit Results:\n" +
-            "• Strong passwords: 85%\n" +
-            "• Unique passwords: 92%\n" +
-            "• Recently updated: 78%\n" +
-            "• Two-factor enabled: 65%\n\n" +
+            "• Total passwords: " + totalPasswords + "\n" +
+            "• Strong passwords: " + strongPasswords + " (" + Math.round(strongPercentage) + "%)\n" +
+            "• Weak passwords: " + weakPasswords + "\n" +
+            "• Unique passwords: " + uniquePasswords.size() + " (" + Math.round(uniquePercentage) + "%)\n" +
+            "• Duplicate passwords: " + duplicateCount + "\n\n" +
             "🎯 Recommendations:\n" +
-            "• Update 3 weak passwords\n" +
-            "• Enable 2FA on 5 accounts\n" +
-            "• Review duplicate passwords\n\n" +
-            "Overall Security Score: 87/100 🛡️");
+            (weakPasswords > 0 ? "• Update " + weakPasswords + " weak passwords\n" : "") +
+            (duplicateCount > 0 ? "• Replace " + duplicateCount + " duplicate passwords\n" : "") +
+            "• Enable 2FA where possible\n" +
+            "• Regular password updates\n\n" +
+            "Overall Security Score: " + overallScore + "/100 " + 
+            (overallScore >= 80 ? "🛡️" : overallScore >= 60 ? "⚠️" : "🚨"));
     }
     
     private void showAlert(String title, String message) {

@@ -189,29 +189,33 @@ public class CompactNotesWindow {
         if (noteTitle.startsWith("📄 ")) {
             String title = noteTitle.substring(2);
             
-            // Find the actual note
+            // Find and load the actual note
             notesManager.getNotes().stream()
                 .filter(note -> note.getTitle().equals(title))
                 .findFirst()
                 .ifPresentOrElse(note -> {
+                    // Load the actual saved content
                     titleField.setText(note.getTitle());
                     noteContent.setText(note.getContent());
                     categoryCombo.setValue(note.getCategory());
+                    
+                    // Show note info in status
+                    System.out.println("Loaded note: " + note.getTitle() + 
+                        " (" + note.getContent().length() + " chars, " + 
+                        note.getCategory() + " category)");
                 }, () -> {
-                    // Demo content for non-existent notes
+                    // Note not found - clear fields
                     titleField.setText(title);
-                    noteContent.setText("📝 Sample encrypted note content for: " + title + "\n\n" +
-                        "This note demonstrates the secure notes functionality.\n\n" +
-                        "Features:\n" +
-                        "• AES-256 encryption\n" +
-                        "• Full-text search\n" +
-                        "• Category organization\n" +
-                        "• Auto-tagging\n" +
-                        "• Real-time sync\n\n" +
-                        "You can edit this content and save it as a real note!");
+                    noteContent.setText("");
                     categoryCombo.setValue("Personal");
+                    showAlert("Note Not Found", "The selected note could not be loaded.\n\n" +
+                        "This might happen if:\n" +
+                        "• The note was deleted\n" +
+                        "• There was a sync error\n" +
+                        "• The note data is corrupted\n\n" +
+                        "You can create a new note with this title.");
                 });
-        } else if (noteTitle.contains("No notes yet")) {
+        } else if (noteTitle.contains("No notes yet") || noteTitle.contains("No notes match")) {
             createNewNote();
         }
     }
