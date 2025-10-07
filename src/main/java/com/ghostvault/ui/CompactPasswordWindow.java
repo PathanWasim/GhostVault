@@ -320,7 +320,7 @@ public class CompactPasswordWindow {
         if (password.matches(".*[a-z].*")) strength += 0.1;
         if (password.matches(".*[A-Z].*")) strength += 0.1;
         if (password.matches(".*[0-9].*")) strength += 0.1;
-        if (password.matches(".*[!@#$%^&*()_+\\\\-=\\\\[\\\\]{}|;:,.<>?].*")) strength += 0.2;
+        if (password.matches(".*[!@#$%^&*()_+={}|;:,.<>?-].*")) strength += 0.2;
         
         // Length bonus for very long passwords
         if (password.length() >= 12) strength += 0.2;
