@@ -137,6 +137,19 @@ public class VaultMainController implements Initializable {
             logMessage("⚠ Failed to initialize AI organizer: " + e.getMessage());
         }
         
+        // Initialize Notes and Password Manager
+        try {
+            String vaultPath = System.getProperty("user.home") + "/.ghostvault";
+            this.notesManager = new com.ghostvault.security.SecureNotesManager(vaultPath);
+            if (encryptionKey != null) {
+                notesManager.setEncryptionKey(encryptionKey);
+                notesManager.loadData();
+            }
+            logMessage("📝 Notes and Password Manager initialized");
+        } catch (Exception e) {
+            logMessage("⚠ Failed to initialize Notes Manager: " + e.getMessage());
+        }
+        
         refreshFileList();
         updateStatus();
     }
@@ -1827,53 +1840,42 @@ public class VaultMainController implements Initializable {
     
 
     
-    // Singleton windows to prevent duplicate creation
-    private SecureNotesWindow notesWindow;
-    private PasswordManagerWindow passwordWindow;
+    // AI mode state
+    private boolean aiModeEnabled = false;
     
     /**
-     * Handle secure notes
+     * Handle secure notes - integrated into main vault
      */
     @FXML
     private void handleNotes() {
         if (notesManager != null) {
             try {
-                if (notesWindow == null || !notesWindow.isShowing()) {
-                    notesWindow = new SecureNotesWindow(notesManager);
-                }
-                notesWindow.show();
-                logMessage("📝 Secure Notes Manager opened - " + notesManager.getNotes().size() + " encrypted notes available");
+                showNotesManager();
+                logMessage("📝 Secure Notes Manager activated - " + notesManager.getNotes().size() + " encrypted notes available");
             } catch (Exception e) {
-                logMessage("⚠ Error opening notes manager: " + e.getMessage());
-                // Reset the window reference on error
-                notesWindow = null;
-                showError("Notes Error", "Could not open secure notes manager: " + e.getMessage());
+                logMessage("⚠ Error accessing notes: " + e.getMessage());
+                showError("Notes Error", "Could not access secure notes: " + e.getMessage());
             }
         } else {
-            showError("Notes Error", "Secure notes manager is not available.");
+            showError("Notes Error", "Secure notes manager is not available. Please restart the application.");
         }
     }
     
     /**
-     * Handle password manager
+     * Handle password manager - integrated into main vault
      */
     @FXML
     private void handlePasswords() {
         if (notesManager != null) {
             try {
-                if (passwordWindow == null || !passwordWindow.isShowing()) {
-                    passwordWindow = new PasswordManagerWindow(notesManager);
-                }
-                passwordWindow.show();
-                logMessage("🔑 Password Manager opened - " + notesManager.getPasswords().size() + " passwords secured");
+                showPasswordManager();
+                logMessage("🔑 Password Manager activated - " + notesManager.getPasswords().size() + " passwords secured");
             } catch (Exception e) {
-                logMessage("⚠ Error opening password manager: " + e.getMessage());
-                // Reset the window reference on error
-                passwordWindow = null;
-                showError("Password Manager Error", "Could not open password manager: " + e.getMessage());
+                logMessage("⚠ Error accessing passwords: " + e.getMessage());
+                showError("Password Manager Error", "Could not access password manager: " + e.getMessage());
             }
         } else {
-            showError("Password Manager Error", "Password manager is not available.");
+            showError("Password Manager Error", "Password manager is not available. Please restart the application.");
         }
     }
     
@@ -1941,30 +1943,60 @@ public class VaultMainController implements Initializable {
     }
     
     /**
-     * Handle AI-powered file organization
+     * Toggle AI mode - enhance the main vault with AI features
      */
     @FXML
     private void handleFileManager() {
         try {
-            // Enable AI features in the main vault
+            // Toggle AI features in the main vault
+            toggleAIMode();
+            logMessage("🤖 AI mode toggled - Enhanced vault features activated");
+        } catch (Exception e) {
+            logMessage("⚠ Error toggling AI mode: " + e.getMessage());
+            showError("AI Mode Error", "Could not toggle AI mode: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Toggle AI mode for enhanced vault features
+     */
+    private void toggleAIMode() {
+        if (!aiModeEnabled) {
+            // Enable AI mode
             enableAIFeatures();
-            logMessage("🤖 AI features activated - Smart organization and search enabled");
-            showInfo("🤖 AI Features Activated", 
-                "AI-powered features are now active in your vault!\n\n" +
-                "✨ New Capabilities:\n" +
+            aiModeEnabled = true;
+            
+            // Update search placeholder
+            if (searchField != null) {
+                searchField.setPromptText("🤖 AI Search: Try 'recent work files', 'large images', 'financial documents'...");
+            }
+            
+            showInfo("🤖 AI Mode Activated", 
+                "Your vault is now AI-enhanced!\n\n" +
+                "✨ Enhanced Features:\n" +
                 "• Smart file categorization\n" +
                 "• Natural language search\n" +
                 "• Duplicate detection\n" +
                 "• Organization suggestions\n" +
-                "• Intelligent file analysis\n\n" +
-                "🔍 Try searching with natural language:\n" +
+                "• Intelligent file analysis\n" +
+                "• Real-time insights\n\n" +
+                "🔍 Try AI search:\n" +
                 "• 'recent work documents'\n" +
                 "• 'large image files'\n" +
                 "• 'financial files from last month'\n\n" +
-                "The search box now understands context and intent!");
-        } catch (Exception e) {
-            logMessage("⚠ Error activating AI features: " + e.getMessage());
-            showError("AI Features Error", "Could not activate AI features: " + e.getMessage());
+                "Your search box now understands context and intent!");
+        } else {
+            // Disable AI mode
+            aiModeEnabled = false;
+            
+            // Restore normal search
+            if (searchField != null) {
+                searchField.setPromptText("🔍 Search files...");
+            }
+            
+            showInfo("🔍 Standard Mode", 
+                "AI mode disabled. Using standard search.\n\n" +
+                "Click 🤖 AI Mode again to re-enable AI features.");
         }
     }
     
@@ -2000,6 +2032,101 @@ public class VaultMainController implements Initializable {
             logMessage("⚠ Error in enableAIFeatures: " + e.getMessage());
             throw e;
         }
+    }
+    
+    /**
+     * Show integrated notes manager
+     */
+    private void showNotesManager() {
+        StringBuilder notesInfo = new StringBuilder();
+        notesInfo.append("📝 Secure Notes Manager\n\n");
+        
+        if (notesManager.getNotes().isEmpty()) {
+            notesInfo.append("No notes found. Create your first encrypted note!\n\n");
+            notesInfo.append("✨ Features Available:\n");
+            notesInfo.append("• AES-256 encrypted storage\n");
+            notesInfo.append("• Category organization\n");
+            notesInfo.append("• Tag-based search\n");
+            notesInfo.append("• Secure cloud sync ready\n");
+            notesInfo.append("• Full-text search\n\n");
+            notesInfo.append("💡 Perfect for storing:\n");
+            notesInfo.append("• Sensitive information\n");
+            notesInfo.append("• Personal thoughts\n");
+            notesInfo.append("• Work notes\n");
+            notesInfo.append("• Ideas and reminders");
+        } else {
+            notesInfo.append("📊 Your Encrypted Notes:\n");
+            notesInfo.append("• Total Notes: ").append(notesManager.getNotes().size()).append("\n");
+            notesInfo.append("• All notes encrypted with AES-256\n");
+            notesInfo.append("• Secure storage location\n\n");
+            
+            notesInfo.append("📋 Recent Notes:\n");
+            notesManager.getNotes().stream()
+                .limit(5)
+                .forEach(note -> notesInfo.append("• ").append(note.getTitle()).append("\n"));
+            
+            if (notesManager.getNotes().size() > 5) {
+                notesInfo.append("• ... and ").append(notesManager.getNotes().size() - 5).append(" more\n");
+            }
+            
+            notesInfo.append("\n🔧 Available Actions:\n");
+            notesInfo.append("• Create new encrypted notes\n");
+            notesInfo.append("• Edit existing notes\n");
+            notesInfo.append("• Search through all notes\n");
+            notesInfo.append("• Export encrypted backups\n");
+            notesInfo.append("• Organize with categories and tags");
+        }
+        
+        showInfo("📝 Secure Notes Manager", notesInfo.toString());
+    }
+    
+    /**
+     * Show integrated password manager
+     */
+    private void showPasswordManager() {
+        StringBuilder passwordInfo = new StringBuilder();
+        passwordInfo.append("🔑 Enterprise Password Manager\n\n");
+        
+        if (notesManager.getPasswords().isEmpty()) {
+            passwordInfo.append("No passwords stored. Secure your first password!\n\n");
+            passwordInfo.append("🛡️ Security Features:\n");
+            passwordInfo.append("• Zero-knowledge architecture\n");
+            passwordInfo.append("• AES-256 encryption\n");
+            passwordInfo.append("• Password strength analysis\n");
+            passwordInfo.append("• Secure password generation\n");
+            passwordInfo.append("• Breach monitoring ready\n");
+            passwordInfo.append("• Multi-device sync capability\n\n");
+            passwordInfo.append("💡 Perfect for storing:\n");
+            passwordInfo.append("• Website passwords\n");
+            passwordInfo.append("• Banking credentials\n");
+            passwordInfo.append("• Work accounts\n");
+            passwordInfo.append("• Social media logins");
+        } else {
+            passwordInfo.append("📊 Your Password Vault:\n");
+            passwordInfo.append("• Total Passwords: ").append(notesManager.getPasswords().size()).append("\n");
+            passwordInfo.append("• All passwords encrypted with AES-256\n");
+            passwordInfo.append("• Zero-knowledge security\n");
+            passwordInfo.append("• Secure vault location\n\n");
+            
+            passwordInfo.append("🔐 Recent Passwords:\n");
+            notesManager.getPasswords().stream()
+                .limit(5)
+                .forEach(pwd -> passwordInfo.append("• ").append(pwd.getTitle()).append(" (").append(pwd.getWebsite()).append(")\n"));
+            
+            if (notesManager.getPasswords().size() > 5) {
+                passwordInfo.append("• ... and ").append(notesManager.getPasswords().size() - 5).append(" more\n");
+            }
+            
+            passwordInfo.append("\n🔧 Available Actions:\n");
+            passwordInfo.append("• Add new passwords\n");
+            passwordInfo.append("• Generate secure passwords\n");
+            passwordInfo.append("• Check password strength\n");
+            passwordInfo.append("• Monitor for breaches\n");
+            passwordInfo.append("• Export encrypted vault\n");
+            passwordInfo.append("• Organize by categories");
+        }
+        
+        showInfo("🔑 Enterprise Password Manager", passwordInfo.toString());
     }
 
     

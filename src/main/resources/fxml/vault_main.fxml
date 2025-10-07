@@ -27,7 +27,7 @@
          <Button fx:id="dashboardButton" onAction="#handleDashboard" styleClass="button, primary-button" text="📊 Dashboard" />
          <Button fx:id="notesButton" onAction="#handleNotes" styleClass="button, success-button" text="📝 Notes" />
          <Button fx:id="passwordsButton" onAction="#handlePasswords" styleClass="button, success-button" text="🔑 Passwords" />
-         <Button fx:id="fileManagerButton" onAction="#handleFileManager" styleClass="button, primary-button" text="🤖 AI Mode" />
+         <Button fx:id="fileManagerButton" onAction="#handleFileManager" styleClass="button, primary-button" text="🤖 AI Enhanced" />
          
          <Separator />
          
