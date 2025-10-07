@@ -1782,7 +1782,7 @@ public class VaultMainController implements Initializable {
     private void handleDashboard() {
         if (securityDashboard != null) {
             securityDashboard.updateFileCount(allVaultFiles.size());
-            securityDashboard.showInParent(dashboardButton.getScene().getWindow());
+            securityDashboard.show(); // Use regular show instead of showInParent
             logMessage("📊 Security Dashboard opened - Real-time monitoring active");
         } else {
             showError("Dashboard Error", "Security dashboard is not available.");

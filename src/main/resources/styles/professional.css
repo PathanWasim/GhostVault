@@ -3,7 +3,7 @@
 
 .root {
     -fx-base: #0a0a0f;
-    -fx-background: linear-gradient(135deg, #0a0a0f 0%, #1a1a2e 50%, #16213e 100%);
+    -fx-background: #1a1a2e;
     -fx-control-inner-background: #1a1a2e;
     -fx-accent: #00d4ff;
     -fx-focus-color: #00d4ff;
@@ -18,23 +18,22 @@
 
 /* High-Tech Application Window */
 .main-container {
-    -fx-background-color: linear-gradient(135deg, #0a0a0f 0%, #1a1a2e 50%, #16213e 100%);
+    -fx-background-color: #1a1a2e;
     -fx-padding: 0;
 }
 
 /* Futuristic Toolbar */
 .toolbar {
-    -fx-background-color: linear-gradient(90deg, #1a1a2e 0%, #16213e 100%);
+    -fx-background-color: #16213e;
     -fx-border-color: #00d4ff;
     -fx-border-width: 0 0 2 0;
     -fx-padding: 12 20;
     -fx-spacing: 12;
-    -fx-effect: dropshadow(gaussian, #00d4ff, 8, 0.3, 0, 2);
 }
 
 /* High-Tech Neon Buttons */
 .button {
-    -fx-background-color: linear-gradient(135deg, #2a2a3e 0%, #1a1a2e 100%);
+    -fx-background-color: #2a2a3e;
     -fx-border-color: #4a4a5e;
     -fx-border-width: 1;
     -fx-border-radius: 6;
@@ -44,84 +43,73 @@
     -fx-text-fill: #b8c5d1;
     -fx-cursor: hand;
     -fx-font-size: 12px;
-    -fx-effect: dropshadow(gaussian, rgba(0, 212, 255, 0.2), 4, 0, 0, 0);
 }
 
 .button:hover {
-    -fx-background-color: linear-gradient(135deg, #3a3a4e 0%, #2a2a3e 100%);
+    -fx-background-color: #3a3a4e;
     -fx-border-color: #00d4ff;
     -fx-text-fill: #ffffff;
-    -fx-effect: dropshadow(gaussian, #00d4ff, 8, 0.5, 0, 0);
 }
 
 .button:pressed {
-    -fx-background-color: linear-gradient(135deg, #1a1a2e 0%, #0a0a1e 100%);
-    -fx-effect: innershadow(gaussian, #00d4ff, 4, 0.3, 0, 0);
+    -fx-background-color: #1a1a2e;
 }
 
 /* Neon Primary Buttons */
 .primary-button {
-    -fx-background-color: linear-gradient(135deg, #00d4ff 0%, #0099cc 100%);
+    -fx-background-color: #00d4ff;
     -fx-border-color: #00d4ff;
     -fx-text-fill: #0a0a0f;
     -fx-font-weight: 700;
-    -fx-effect: dropshadow(gaussian, #00d4ff, 12, 0.6, 0, 0);
 }
 
 .primary-button:hover {
-    -fx-background-color: linear-gradient(135deg, #33ddff 0%, #00b8e6 100%);
-    -fx-effect: dropshadow(gaussian, #00d4ff, 16, 0.8, 0, 0);
+    -fx-background-color: #33ddff;
 }
 
 .primary-button:pressed {
-    -fx-background-color: linear-gradient(135deg, #0099cc 0%, #007799 100%);
+    -fx-background-color: #0099cc;
 }
 
 /* Neon Success Buttons */
 .success-button {
-    -fx-background-color: linear-gradient(135deg, #00ff88 0%, #00cc66 100%);
+    -fx-background-color: #00ff88;
     -fx-border-color: #00ff88;
     -fx-text-fill: #0a0a0f;
     -fx-font-weight: 700;
-    -fx-effect: dropshadow(gaussian, #00ff88, 12, 0.6, 0, 0);
 }
 
 .success-button:hover {
-    -fx-background-color: linear-gradient(135deg, #33ff99 0%, #00e673 100%);
-    -fx-effect: dropshadow(gaussian, #00ff88, 16, 0.8, 0, 0);
+    -fx-background-color: #33ff99;
 }
 
 /* Neon Danger Buttons */
 .danger-button {
-    -fx-background-color: linear-gradient(135deg, #ff3366 0%, #cc1144 100%);
+    -fx-background-color: #ff3366;
     -fx-border-color: #ff3366;
     -fx-text-fill: #ffffff;
     -fx-font-weight: 700;
-    -fx-effect: dropshadow(gaussian, #ff3366, 12, 0.6, 0, 0);
 }
 
 .danger-button:hover {
-    -fx-background-color: linear-gradient(135deg, #ff5577 0%, #e62255 100%);
-    -fx-effect: dropshadow(gaussian, #ff3366, 16, 0.8, 0, 0);
+    -fx-background-color: #ff5577;
 }
 
 /* High-Tech Sections */
 .search-section {
-    -fx-background-color: linear-gradient(90deg, #1a1a2e 0%, #16213e 100%);
+    -fx-background-color: #16213e;
     -fx-border-color: transparent transparent #00d4ff transparent;
     -fx-border-width: 0 0 1 0;
-    -fx-effect: dropshadow(gaussian, rgba(0, 212, 255, 0.1), 4, 0, 0, 2);
 }
 
 .file-section {
-    -fx-background-color: linear-gradient(180deg, #0a0a0f 0%, #1a1a2e 100%);
+    -fx-background-color: #1a1a2e;
 }
 
 .log-section {
-    -fx-background-color: linear-gradient(90deg, #16213e 0%, #1a1a2e 100%);
+    -fx-background-color: #16213e;
     -fx-border-color: #00d4ff transparent transparent transparent;
     -fx-border-width: 1 0 0 0;
-    -fx-effect: dropshadow(gaussian, rgba(0, 212, 255, 0.1), 4, 0, 0, -2);
 }
 
 /* Futuristic File List */
@@ -265,12 +253,11 @@
 
 /* Cyberpunk Status Bar */
 .status-bar {
-    -fx-background-color: linear-gradient(90deg, #16213e 0%, #1a1a2e 100%);
+    -fx-background-color: #16213e;
     -fx-border-color: #00d4ff;
     -fx-border-width: 2 0 0 0;
     -fx-padding: 10 20;
     -fx-spacing: 20;
-    -fx-effect: dropshadow(gaussian, rgba(0, 212, 255, 0.2), 6, 0, 0, -2);
 }
 
 .status-label {
@@ -278,7 +265,6 @@
     -fx-font-size: 11px;
     -fx-font-weight: 600;
     -fx-font-family: "JetBrains Mono", "Fira Code", monospace;
-    -fx-effect: dropshadow(gaussian, rgba(0, 212, 255, 0.5), 2, 0, 0, 0);
 }
 
 /* Cyberpunk Terminal (Activity Log) */
@@ -323,12 +309,11 @@
 /* Cyberpunk Progress Indicators */
 .progress-indicator {
     -fx-progress-color: #00d4ff;
-    -fx-effect: dropshadow(gaussian, rgba(0, 212, 255, 0.4), 4, 0, 0, 0);
 }
 
 .progress-bar {
     -fx-accent: #00d4ff;
-    -fx-background-color: rgba(26, 26, 46, 0.8);
+    -fx-background-color: #1a1a2e;
     -fx-border-color: #4a4a5e;
     -fx-border-width: 1;
     -fx-border-radius: 4;
@@ -336,19 +321,18 @@
 }
 
 .progress-bar .bar {
-    -fx-background-color: linear-gradient(90deg, #00d4ff 0%, #00ff88 100%);
+    -fx-background-color: #00d4ff;
     -fx-background-radius: 3;
-    -fx-effect: dropshadow(gaussian, rgba(0, 212, 255, 0.6), 4, 0, 0, 0);
 }
 
 .progress-bar .track {
-    -fx-background-color: rgba(74, 74, 94, 0.3);
+    -fx-background-color: #4a4a5e;
     -fx-background-radius: 3;
 }
 
 /* Cyberpunk Tooltips */
 .tooltip {
-    -fx-background-color: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    -fx-background-color: #1a1a2e;
     -fx-text-fill: #00d4ff;
     -fx-font-size: 11px;
     -fx-font-family: "JetBrains Mono", "Fira Code", monospace;
@@ -357,37 +341,32 @@
     -fx-background-radius: 6;
     -fx-border-color: #00d4ff;
     -fx-border-width: 1;
-    -fx-effect: dropshadow(gaussian, rgba(0, 212, 255, 0.4), 6, 0, 0, 2);
 }
 
 /* Cyberpunk Notifications */
 .notification {
-    -fx-background-color: linear-gradient(135deg, rgba(26, 26, 46, 0.95) 0%, rgba(22, 33, 62, 0.95) 100%);
+    -fx-background-color: #1a1a2e;
     -fx-border-color: #4a4a5e;
     -fx-border-width: 1;
     -fx-border-radius: 8;
     -fx-background-radius: 8;
     -fx-padding: 16;
-    -fx-effect: dropshadow(gaussian, rgba(0, 212, 255, 0.2), 8, 0, 0, 4);
     -fx-text-fill: #e0e6ed;
 }
 
 .notification-success {
     -fx-border-color: #00ff88;
-    -fx-background-color: linear-gradient(135deg, rgba(0, 255, 136, 0.1) 0%, rgba(26, 26, 46, 0.95) 100%);
-    -fx-effect: dropshadow(gaussian, rgba(0, 255, 136, 0.3), 8, 0, 0, 4);
+    -fx-background-color: #1a1a2e;
 }
 
 .notification-error {
     -fx-border-color: #ff3366;
-    -fx-background-color: linear-gradient(135deg, rgba(255, 51, 102, 0.1) 0%, rgba(26, 26, 46, 0.95) 100%);
-    -fx-effect: dropshadow(gaussian, rgba(255, 51, 102, 0.3), 8, 0, 0, 4);
+    -fx-background-color: #1a1a2e;
 }
 
 .notification-warning {
     -fx-border-color: #ffaa00;
-    -fx-background-color: linear-gradient(135deg, rgba(255, 170, 0, 0.1) 0%, rgba(26, 26, 46, 0.95) 100%);
-    -fx-effect: dropshadow(gaussian, rgba(255, 170, 0, 0.3), 8, 0, 0, 4);
+    -fx-background-color: #1a1a2e;
 }
 
 /* Dashboard Overlay */
@@ -398,17 +377,15 @@
 
 /* Cyberpunk Dashboard Cards */
 .dashboard-card {
-    -fx-background-color: linear-gradient(135deg, rgba(26, 26, 46, 0.9) 0%, rgba(22, 33, 62, 0.9) 100%);
+    -fx-background-color: #1a1a2e;
     -fx-border-color: #00d4ff;
     -fx-border-width: 1;
     -fx-border-radius: 12;
     -fx-background-radius: 12;
     -fx-padding: 24;
-    -fx-effect: dropshadow(gaussian, rgba(0, 212, 255, 0.3), 12, 0, 0, 4);
 }
 
 .dashboard-card:hover {
-    -fx-effect: dropshadow(gaussian, rgba(0, 212, 255, 0.5), 16, 0, 0, 6);
     -fx-border-color: #33ddff;
 }
 
@@ -430,22 +407,18 @@
 /* Neon Security Score Colors */
 .security-score-excellent {
     -fx-text-fill: #00ff88;
-    -fx-effect: dropshadow(gaussian, rgba(0, 255, 136, 0.6), 4, 0, 0, 0);
 }
 
 .security-score-good {
     -fx-text-fill: #00d4ff;
-    -fx-effect: dropshadow(gaussian, rgba(0, 212, 255, 0.6), 4, 0, 0, 0);
 }
 
 .security-score-fair {
     -fx-text-fill: #ffaa00;
-    -fx-effect: dropshadow(gaussian, rgba(255, 170, 0, 0.6), 4, 0, 0, 0);
 }
 
 .security-score-poor {
     -fx-text-fill: #ff3366;
-    -fx-effect: dropshadow(gaussian, rgba(255, 51, 102, 0.6), 4, 0, 0, 0);
 }
 
 /* High-Tech Animations */
