@@ -73,14 +73,14 @@
 
 /* Neon Success Buttons */
 .success-button {
-    -fx-background-color: #00ff88;
-    -fx-border-color: #00ff88;
-    -fx-text-fill: #0a0a0f;
+    -fx-background-color: #28a745;
+    -fx-border-color: #28a745;
+    -fx-text-fill: #ffffff;
     -fx-font-weight: 700;
 }
 
 .success-button:hover {
-    -fx-background-color: #33ff99;
+    -fx-background-color: #218838;
 }
 
 /* Neon Danger Buttons */
@@ -263,26 +263,30 @@
 
 /* Cyberpunk Terminal (Activity Log) */
 .text-area {
-    -fx-control-inner-background: #0a0a0f;
-    -fx-text-fill: #00ff88;
+    -fx-control-inner-background: #1a1a2e;
+    -fx-text-fill: #e0e6ed;
     -fx-border-color: #4a4a5e;
     -fx-border-width: 1;
     -fx-border-radius: 8;
     -fx-background-radius: 8;
     -fx-font-family: "JetBrains Mono", "Fira Code", "SF Mono", monospace;
-    -fx-font-size: 11px;
+    -fx-font-size: 13px;
 }
 
 .text-area .content {
-    -fx-background-color: #0a0a0f;
+    -fx-background-color: #1a1a2e;
 }
 
 .text-area .scroll-pane {
-    -fx-background-color: #0a0a0f;
+    -fx-background-color: #1a1a2e;
 }
 
 .text-area .scroll-pane .viewport {
-    -fx-background-color: #0a0a0f;
+    -fx-background-color: #1a1a2e;
+}
+
+.text-area .text {
+    -fx-fill: #e0e6ed;
 }
 
 /* Scrollbars */

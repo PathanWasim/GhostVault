@@ -251,31 +251,88 @@ public class CompactAIWindow {
         }
         
         if (organizer != null && !vaultFiles.isEmpty()) {
-            List<VaultFile> results = organizer.smartSearch(vaultFiles, query);
-            
-            StringBuilder searchResults = new StringBuilder();
-            searchResults.append("🧠 AI Search Results for: '").append(query).append("'\n\n");
-            searchResults.append("Found ").append(results.size()).append(" matching files:\n\n");
-            
-            results.stream().limit(10).forEach(file -> {
-                SmartFileOrganizer.FileCategory category = organizer.categorizeFile(file);
-                searchResults.append("• ").append(category.getIcon()).append(" ")
-                    .append(file.getOriginalName()).append("\n");
-            });
-            
-            if (results.size() > 10) {
-                searchResults.append("• ... and ").append(results.size() - 10).append(" more files\n");
+            try {
+                // Perform actual AI search
+                List<VaultFile> results = organizer.smartSearch(vaultFiles, query);
+                
+                StringBuilder searchResults = new StringBuilder();
+                searchResults.append("🧠 AI Search Results for: '").append(query).append("'\n\n");
+                
+                if (results.isEmpty()) {
+                    searchResults.append("No files found matching your query.\n\n");
+                    searchResults.append("💡 Try different search terms:\n");
+                    searchResults.append("• Use broader terms (e.g., 'document' instead of 'report')\n");
+                    searchResults.append("• Try file extensions (e.g., 'pdf', 'jpg', 'docx')\n");
+                    searchResults.append("• Use descriptive words (e.g., 'work', 'personal', 'photo')\n");
+                } else {
+                    searchResults.append("Found ").append(results.size()).append(" matching files:\n\n");
+                    
+                    // Show results with details
+                    results.stream().limit(15).forEach(file -> {
+                        SmartFileOrganizer.FileCategory category = organizer.categorizeFile(file);
+                        searchResults.append("📄 ").append(file.getOriginalName()).append("\n");
+                        searchResults.append("   ").append(category.getIcon()).append(" Category: ").append(category.getDisplayName()).append("\n");
+                        searchResults.append("   📏 Size: ").append(formatFileSize(file.getSize())).append("\n");
+                        searchResults.append("   🔐 Encrypted: Yes\n\n");
+                    });
+                    
+                    if (results.size() > 15) {
+                        searchResults.append("... and ").append(results.size() - 15).append(" more files\n\n");
+                    }
+                }
+                
+                searchResults.append("🎯 AI Search Technology:\n");
+                searchResults.append("• Natural language processing\n");
+                searchResults.append("• Semantic understanding\n");
+                searchResults.append("• Context-aware filtering\n");
+                searchResults.append("• Relevance scoring\n");
+                searchResults.append("• File content analysis\n");
+                
+                analysisArea.setText(searchResults.toString());
+                
+                // Update suggestions based on search
+                updateSearchSuggestions(query, results);
+                
+            } catch (Exception e) {
+                showAlert("Search Error", "Error performing AI search: " + e.getMessage());
+                analysisArea.setText("⚠️ Search Error: " + e.getMessage() + "\n\n" +
+                    "Please try a different search query.");
             }
-            
-            searchResults.append("\n🎯 Search used:\n");
-            searchResults.append("• Natural language processing\n");
-            searchResults.append("• Semantic understanding\n");
-            searchResults.append("• Context-aware filtering\n");
-            searchResults.append("• Relevance scoring\n");
-            
-            analysisArea.setText(searchResults.toString());
         } else {
             showAlert("AI Search", "No files available for search.\n\nUpload some files first!");
+        }
+    }
+    
+    /**
+     * Update suggestions based on search results
+     */
+    private void updateSearchSuggestions(String query, List<VaultFile> results) {
+        suggestionsView.getItems().clear();
+        
+        if (!results.isEmpty()) {
+            // Add search-based suggestions
+            suggestionsView.getItems().add("🔍 Organize files matching '" + query + "' into a folder");
+            suggestionsView.getItems().add("📁 Create category for similar files");
+            suggestionsView.getItems().add("🏷️ Auto-tag files with '" + query + "'");
+            
+            // Add category-based suggestions
+            Map<SmartFileOrganizer.FileCategory, Long> categories = results.stream()
+                .collect(java.util.stream.Collectors.groupingBy(
+                    file -> organizer.categorizeFile(file),
+                    java.util.stream.Collectors.counting()));
+            
+            categories.entrySet().stream()
+                .sorted(Map.Entry.<SmartFileOrganizer.FileCategory, Long>comparingByValue().reversed())
+                .limit(2)
+                .forEach(entry -> {
+                    suggestionsView.getItems().add(
+                        "📂 Create " + entry.getKey().getDisplayName() + " folder (" + entry.getValue() + " files)");
+                });
+        } else {
+            // Add general suggestions when no results
+            suggestionsView.getItems().add("💡 Try broader search terms");
+            suggestionsView.getItems().add("🔍 Search by file extension (pdf, jpg, docx)");
+            suggestionsView.getItems().add("📝 Search by category (work, personal, photos)");
         }
     }
     
