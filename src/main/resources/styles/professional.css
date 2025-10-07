@@ -114,19 +114,18 @@
 
 /* Futuristic File List */
 .list-view {
-    -fx-background-color: rgba(26, 26, 46, 0.8);
+    -fx-background-color: #1a1a2e;
     -fx-border-color: #4a4a5e;
     -fx-border-width: 1;
     -fx-border-radius: 8;
     -fx-background-radius: 8;
     -fx-padding: 4;
-    -fx-effect: innershadow(gaussian, rgba(0, 212, 255, 0.1), 8, 0, 0, 0);
 }
 
 .list-cell {
     -fx-background-color: transparent;
     -fx-padding: 14 18;
-    -fx-border-color: transparent transparent rgba(74, 74, 94, 0.3) transparent;
+    -fx-border-color: transparent transparent #4a4a5e transparent;
     -fx-border-width: 0 0 1 0;
     -fx-font-size: 13px;
     -fx-text-fill: #b8c5d1;
@@ -135,24 +134,22 @@
 }
 
 .list-cell:selected {
-    -fx-background-color: linear-gradient(90deg, rgba(0, 212, 255, 0.2) 0%, rgba(0, 212, 255, 0.1) 100%);
+    -fx-background-color: #003366;
     -fx-text-fill: #00d4ff;
     -fx-font-weight: 600;
     -fx-border-color: #00d4ff;
     -fx-border-width: 0 0 0 3;
-    -fx-effect: dropshadow(gaussian, rgba(0, 212, 255, 0.3), 4, 0, 0, 0);
 }
 
 .list-cell:hover {
-    -fx-background-color: rgba(42, 42, 62, 0.6);
+    -fx-background-color: #2a2a3e;
     -fx-text-fill: #ffffff;
-    -fx-effect: dropshadow(gaussian, rgba(0, 212, 255, 0.2), 2, 0, 0, 0);
 }
 
 /* High-Tech Text Fields */
 .text-field,
 .password-field {
-    -fx-background-color: rgba(26, 26, 46, 0.7);
+    -fx-background-color: #1a1a2e;
     -fx-border-color: #4a4a5e;
     -fx-border-width: 1;
     -fx-border-radius: 6;
@@ -161,14 +158,12 @@
     -fx-font-size: 13px;
     -fx-text-fill: #e0e6ed;
     -fx-font-family: "JetBrains Mono", "Fira Code", monospace;
-    -fx-effect: innershadow(gaussian, rgba(0, 0, 0, 0.3), 4, 0, 0, 0);
 }
 
 .text-field:focused,
 .password-field:focused {
     -fx-border-color: #00d4ff;
-    -fx-background-color: rgba(26, 26, 46, 0.9);
-    -fx-effect: dropshadow(gaussian, #00d4ff, 8, 0.4, 0, 0);
+    -fx-background-color: #16213e;
 }
 
 /* Futuristic Labels */
@@ -237,7 +232,7 @@
 
 /* Neon Search Field */
 .search-field {
-    -fx-background-color: rgba(26, 26, 46, 0.8);
+    -fx-background-color: #1a1a2e;
     -fx-border-color: #4a4a5e;
     -fx-prompt-text-fill: #6a7a8a;
     -fx-font-style: normal;
@@ -246,9 +241,8 @@
 }
 
 .search-field:focused {
-    -fx-background-color: rgba(26, 26, 46, 1.0);
+    -fx-background-color: #16213e;
     -fx-border-color: #00d4ff;
-    -fx-effect: dropshadow(gaussian, #00d4ff, 12, 0.5, 0, 0);
 }
 
 /* Cyberpunk Status Bar */
@@ -269,7 +263,7 @@
 
 /* Cyberpunk Terminal (Activity Log) */
 .text-area {
-    -fx-control-inner-background: rgba(10, 10, 15, 0.9);
+    -fx-control-inner-background: #0a0a0f;
     -fx-text-fill: #00ff88;
     -fx-border-color: #4a4a5e;
     -fx-border-width: 1;
@@ -277,19 +271,18 @@
     -fx-background-radius: 8;
     -fx-font-family: "JetBrains Mono", "Fira Code", "SF Mono", monospace;
     -fx-font-size: 11px;
-    -fx-effect: innershadow(gaussian, rgba(0, 255, 136, 0.1), 8, 0, 0, 0);
 }
 
 .text-area .content {
-    -fx-background-color: rgba(10, 10, 15, 0.9);
+    -fx-background-color: #0a0a0f;
 }
 
 .text-area .scroll-pane {
-    -fx-background-color: rgba(10, 10, 15, 0.9);
+    -fx-background-color: #0a0a0f;
 }
 
 .text-area .scroll-pane .viewport {
-    -fx-background-color: rgba(10, 10, 15, 0.9);
+    -fx-background-color: #0a0a0f;
 }
 
 /* Scrollbars */
@@ -488,9 +481,5 @@
 }
 
 .holographic {
-    -fx-background-color: linear-gradient(45deg,
-            rgba(0, 212, 255, 0.1) 0%,
-            rgba(0, 255, 136, 0.1) 50%,
-            rgba(255, 51, 102, 0.1) 100%);
-    -fx-effect: dropshadow(gaussian, rgba(0, 212, 255, 0.3), 8, 0, 0, 0);
+    -fx-background-color: #1a1a2e;
 }

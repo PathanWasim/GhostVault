@@ -51,6 +51,7 @@ public class VaultMainController implements Initializable {
     @FXML private Button dashboardButton;
     @FXML private Button notesButton;
     @FXML private Button passwordsButton;
+    @FXML private Button fileManagerButton;
     @FXML private Label sessionLabel;
     
     // Dashboard Components
@@ -402,6 +403,10 @@ public class VaultMainController implements Initializable {
                         handlePasswords();
                         event.consume();
                         break;
+                    case M: // Ctrl+M - File Manager
+                        handleFileManager();
+                        event.consume();
+                        break;
                 }
             } else {
                 switch (event.getCode()) {
@@ -422,7 +427,8 @@ public class VaultMainController implements Initializable {
                                 "Advanced Features:\n" +
                                 "• Ctrl+D - Security Dashboard\n" +
                                 "• Ctrl+N - Secure Notes\n" +
-                                "• Ctrl+P - Password Manager\n\n" +
+                                "• Ctrl+P - Password Manager\n" +
+                                "• Ctrl+M - AI File Manager\n\n" +
                                 "Navigation:\n" +
                                 "• Ctrl+F - Focus search box\n" +
                                 "• Ctrl+Q - Logout\n" +
@@ -1797,10 +1803,14 @@ public class VaultMainController implements Initializable {
     @FXML
     private void handleNotes() {
         if (notesManager != null) {
-            showInfo("Secure Notes", "Secure Notes feature is ready!\n\n" +
-                "Current notes: " + notesManager.getNotes().size() + "\n" +
-                "This feature allows you to store encrypted notes securely.");
-            logMessage("📝 Secure notes accessed");
+            try {
+                SecureNotesWindow notesWindow = new SecureNotesWindow(notesManager);
+                notesWindow.show();
+                logMessage("📝 Secure Notes Manager opened - " + notesManager.getNotes().size() + " encrypted notes available");
+            } catch (Exception e) {
+                logMessage("⚠ Error opening notes manager: " + e.getMessage());
+                showError("Notes Error", "Could not open secure notes manager: " + e.getMessage());
+            }
         } else {
             showError("Notes Error", "Secure notes manager is not available.");
         }
@@ -1812,12 +1822,31 @@ public class VaultMainController implements Initializable {
     @FXML
     private void handlePasswords() {
         if (notesManager != null) {
-            showInfo("Password Manager", "Password Manager feature is ready!\n\n" +
-                "Stored passwords: " + notesManager.getPasswords().size() + "\n" +
-                "This feature allows you to store passwords securely with encryption.");
-            logMessage("🔑 Password manager accessed");
+            try {
+                PasswordManagerWindow passwordWindow = new PasswordManagerWindow(notesManager);
+                passwordWindow.show();
+                logMessage("🔑 Password Manager opened - " + notesManager.getPasswords().size() + " passwords secured");
+            } catch (Exception e) {
+                logMessage("⚠ Error opening password manager: " + e.getMessage());
+                showError("Password Manager Error", "Could not open password manager: " + e.getMessage());
+            }
         } else {
             showError("Password Manager Error", "Password manager is not available.");
+        }
+    }
+    
+    /**
+     * Handle AI-powered file manager
+     */
+    @FXML
+    private void handleFileManager() {
+        try {
+            FileManagerWindow fileManagerWindow = new FileManagerWindow();
+            fileManagerWindow.show();
+            logMessage("🗂️ AI File Manager opened - Smart organization and search available");
+        } catch (Exception e) {
+            logMessage("⚠ Error opening file manager: " + e.getMessage());
+            showError("File Manager Error", "Could not open AI file manager: " + e.getMessage());
         }
     }
     
