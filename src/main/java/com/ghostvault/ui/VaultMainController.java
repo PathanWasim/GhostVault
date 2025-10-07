@@ -30,6 +30,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.ResourceBundle;
 import java.util.stream.Collectors;
 
@@ -403,8 +404,12 @@ public class VaultMainController implements Initializable {
                         handlePasswords();
                         event.consume();
                         break;
-                    case M: // Ctrl+M - File Manager
+                    case M: // Ctrl+M - AI Mode
                         handleFileManager();
+                        event.consume();
+                        break;
+                    case I: // Ctrl+I - AI Analysis
+                        showAIAnalysis();
                         event.consume();
                         break;
                 }
@@ -428,7 +433,7 @@ public class VaultMainController implements Initializable {
                                 "• Ctrl+D - Security Dashboard\n" +
                                 "• Ctrl+N - Secure Notes\n" +
                                 "• Ctrl+P - Password Manager\n" +
-                                "• Ctrl+M - AI File Manager\n\n" +
+                                "• Ctrl+M - AI Mode (Smart Search)\n\n" +
                                 "Navigation:\n" +
                                 "• Ctrl+F - Focus search box\n" +
                                 "• Ctrl+Q - Logout\n" +
@@ -1797,6 +1802,10 @@ public class VaultMainController implements Initializable {
     
 
     
+    // Singleton windows to prevent duplicate creation
+    private SecureNotesWindow notesWindow;
+    private PasswordManagerWindow passwordWindow;
+    
     /**
      * Handle secure notes
      */
@@ -1804,7 +1813,9 @@ public class VaultMainController implements Initializable {
     private void handleNotes() {
         if (notesManager != null) {
             try {
-                SecureNotesWindow notesWindow = new SecureNotesWindow(notesManager);
+                if (notesWindow == null) {
+                    notesWindow = new SecureNotesWindow(notesManager);
+                }
                 notesWindow.show();
                 logMessage("📝 Secure Notes Manager opened - " + notesManager.getNotes().size() + " encrypted notes available");
             } catch (Exception e) {
@@ -1823,7 +1834,9 @@ public class VaultMainController implements Initializable {
     private void handlePasswords() {
         if (notesManager != null) {
             try {
-                PasswordManagerWindow passwordWindow = new PasswordManagerWindow(notesManager);
+                if (passwordWindow == null) {
+                    passwordWindow = new PasswordManagerWindow(notesManager);
+                }
                 passwordWindow.show();
                 logMessage("🔑 Password Manager opened - " + notesManager.getPasswords().size() + " passwords secured");
             } catch (Exception e) {
@@ -1836,17 +1849,159 @@ public class VaultMainController implements Initializable {
     }
     
     /**
-     * Handle AI-powered file manager
+     * Handle AI-powered file organization
      */
     @FXML
     private void handleFileManager() {
         try {
-            FileManagerWindow fileManagerWindow = new FileManagerWindow();
-            fileManagerWindow.show();
-            logMessage("🗂️ AI File Manager opened - Smart organization and search available");
+            // Enable AI features in the main vault
+            enableAIFeatures();
+            logMessage("🤖 AI features activated - Smart organization and search enabled");
+            showInfo("🤖 AI Features Activated", 
+                "AI-powered features are now active in your vault!\n\n" +
+                "✨ New Capabilities:\n" +
+                "• Smart file categorization\n" +
+                "• Natural language search\n" +
+                "• Duplicate detection\n" +
+                "• Organization suggestions\n" +
+                "• Intelligent file analysis\n\n" +
+                "🔍 Try searching with natural language:\n" +
+                "• 'recent work documents'\n" +
+                "• 'large image files'\n" +
+                "• 'financial files from last month'\n\n" +
+                "The search box now understands context and intent!");
         } catch (Exception e) {
-            logMessage("⚠ Error opening file manager: " + e.getMessage());
-            showError("File Manager Error", "Could not open AI file manager: " + e.getMessage());
+            logMessage("⚠ Error activating AI features: " + e.getMessage());
+            showError("AI Features Error", "Could not activate AI features: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Enable AI features in the main vault
+     */
+    private void enableAIFeatures() {
+        // Update search field placeholder to show AI capabilities
+        searchField.setPromptText("🤖 AI Search: Try 'recent work files', 'large images', 'financial documents'...");
+        
+        // Enable smart search functionality
+        searchField.textProperty().removeListener(searchListener); // Remove old listener
+        searchListener = (obs, oldVal, newVal) -> performAISearch(newVal);
+        searchField.textProperty().addListener(searchListener);
+        
+        // Show AI organization suggestions
+        showAIOrganizationSuggestions();
+        
+        logMessage("🧠 AI search engine activated");
+        logMessage("🗂️ Smart file categorization enabled");
+        logMessage("🔍 Natural language processing ready");
+    }
+    
+    // Store the listener reference to avoid duplicates
+    private javafx.beans.value.ChangeListener<String> searchListener;
+    
+    /**
+     * Perform AI-powered search
+     */
+    private void performAISearch(String query) {
+        if (query == null || query.trim().isEmpty()) {
+            filteredFileList.setAll(fileList);
+            return;
+        }
+        
+        // Use SmartFileOrganizer for intelligent search
+        if (smartOrganizer != null && !allVaultFiles.isEmpty()) {
+            List<VaultFile> results = smartOrganizer.smartSearch(allVaultFiles, query);
+            
+            // Convert VaultFile results back to display strings
+            List<String> displayResults = results.stream()
+                .map(vf -> {
+                    String category = smartOrganizer.categorizeFile(vf).getIcon();
+                    return category + " " + vf.getOriginalName();
+                })
+                .collect(java.util.stream.Collectors.toList());
+            
+            filteredFileList.setAll(displayResults);
+            
+            if (!results.isEmpty()) {
+                logMessage("🧠 AI found " + results.size() + " files matching: '" + query + "'");
+            }
+        } else {
+            // Fallback to regular search
+            filterFileList(query);
+        }
+    }
+    
+    /**
+     * Show AI organization suggestions
+     */
+    private void showAIOrganizationSuggestions() {
+        if (smartOrganizer != null && !allVaultFiles.isEmpty()) {
+            List<String> suggestions = smartOrganizer.getOrganizationSuggestions(allVaultFiles);
+            
+            if (!suggestions.isEmpty()) {
+                StringBuilder suggestionText = new StringBuilder("🤖 AI Organization Suggestions:\n\n");
+                suggestions.stream().limit(3).forEach(suggestion -> 
+                    suggestionText.append("• ").append(suggestion).append("\n"));
+                
+                logMessage("💡 AI generated " + suggestions.size() + " organization suggestions");
+                
+                // Show suggestions in a non-blocking way
+                Platform.runLater(() -> {
+                    showInfo("🤖 AI Organization Suggestions", suggestionText.toString());
+                });
+            }
+        }
+    }
+    
+    /**
+     * Show AI analysis of current vault files
+     */
+    private void showAIAnalysis() {
+        if (smartOrganizer != null && !allVaultFiles.isEmpty()) {
+            Map<String, Object> stats = smartOrganizer.getFileStatistics(allVaultFiles);
+            
+            int totalFiles = (Integer) stats.get("totalFiles");
+            long totalSize = (Long) stats.get("totalSize");
+            
+            @SuppressWarnings("unchecked")
+            Map<com.ghostvault.ai.SmartFileOrganizer.FileCategory, Long> categoryStats = 
+                (Map<com.ghostvault.ai.SmartFileOrganizer.FileCategory, Long>) stats.get("categoryDistribution");
+            
+            StringBuilder analysis = new StringBuilder();
+            analysis.append("🤖 AI Vault Analysis\n\n");
+            analysis.append("📊 Overview:\n");
+            analysis.append("• Total Files: ").append(totalFiles).append("\n");
+            analysis.append("• Total Size: ").append(formatFileSize(totalSize)).append("\n\n");
+            
+            analysis.append("📁 File Categories:\n");
+            categoryStats.entrySet().stream()
+                .sorted(Map.Entry.<com.ghostvault.ai.SmartFileOrganizer.FileCategory, Long>comparingByValue().reversed())
+                .limit(5)
+                .forEach(entry -> {
+                    analysis.append("• ").append(entry.getKey().getIcon()).append(" ")
+                        .append(entry.getKey().getDisplayName()).append(": ")
+                        .append(entry.getValue()).append(" files\n");
+                });
+            
+            // Find duplicates
+            Map<String, List<VaultFile>> duplicates = smartOrganizer.findDuplicates(allVaultFiles);
+            analysis.append("\n🔍 Duplicate Analysis:\n");
+            if (duplicates.isEmpty()) {
+                analysis.append("• ✅ No duplicates found\n");
+            } else {
+                analysis.append("• ⚠️ Found ").append(duplicates.size()).append(" potential duplicate groups\n");
+            }
+            
+            // Organization suggestions
+            List<String> suggestions = smartOrganizer.getOrganizationSuggestions(allVaultFiles);
+            analysis.append("\n💡 AI Recommendations:\n");
+            suggestions.stream().limit(3).forEach(suggestion -> 
+                analysis.append("• ").append(suggestion).append("\n"));
+            
+            showInfo("🤖 AI Vault Analysis", analysis.toString());
+            logMessage("🧠 AI analysis completed for " + totalFiles + " files");
+        } else {
+            showInfo("🤖 AI Analysis", "No files in vault to analyze.\n\nUpload some files first to see AI-powered insights!");
         }
     }
     
