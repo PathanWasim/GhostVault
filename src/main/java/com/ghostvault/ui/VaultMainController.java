@@ -1972,78 +1972,40 @@ public class VaultMainController implements Initializable {
      * Enable AI features in the main vault
      */
     private void enableAIFeatures() {
-        // Update search field placeholder to show AI capabilities
-        searchField.setPromptText("🤖 AI Search: Try 'recent work files', 'large images', 'financial documents'...");
-        
-        // Enable smart search functionality
-        searchField.textProperty().removeListener(searchListener); // Remove old listener
-        searchListener = (obs, oldVal, newVal) -> performAISearch(newVal);
-        searchField.textProperty().addListener(searchListener);
-        
-        // Show AI organization suggestions
-        showAIOrganizationSuggestions();
-        
-        logMessage("🧠 AI search engine activated");
-        logMessage("🗂️ Smart file categorization enabled");
-        logMessage("🔍 Natural language processing ready");
-    }
-    
-    // Store the listener reference to avoid duplicates
-    private javafx.beans.value.ChangeListener<String> searchListener;
-    
-    /**
-     * Perform AI-powered search
-     */
-    private void performAISearch(String query) {
-        if (query == null || query.trim().isEmpty()) {
-            filteredFileList.setAll(fileList);
-            return;
-        }
-        
-        // Use SmartFileOrganizer for intelligent search
-        if (smartOrganizer != null && !allVaultFiles.isEmpty()) {
-            List<VaultFile> results = smartOrganizer.smartSearch(allVaultFiles, query);
-            
-            // Convert VaultFile results back to display strings
-            List<String> displayResults = results.stream()
-                .map(vf -> {
-                    String category = smartOrganizer.categorizeFile(vf).getIcon();
-                    return category + " " + vf.getOriginalName();
-                })
-                .collect(java.util.stream.Collectors.toList());
-            
-            filteredFileList.setAll(displayResults);
-            
-            if (!results.isEmpty()) {
-                logMessage("🧠 AI found " + results.size() + " files matching: '" + query + "'");
+        try {
+            // Update search field placeholder to show AI capabilities
+            if (searchField != null) {
+                searchField.setPromptText("🤖 AI Search: Try 'recent work files', 'large images', 'financial documents'...");
+                logMessage("🧠 AI search engine activated");
             }
-        } else {
-            // Fallback to regular search
-            filterFileList(query);
-        }
-    }
-    
-    /**
-     * Show AI organization suggestions
-     */
-    private void showAIOrganizationSuggestions() {
-        if (smartOrganizer != null && !allVaultFiles.isEmpty()) {
-            List<String> suggestions = smartOrganizer.getOrganizationSuggestions(allVaultFiles);
             
-            if (!suggestions.isEmpty()) {
-                StringBuilder suggestionText = new StringBuilder("🤖 AI Organization Suggestions:\n\n");
-                suggestions.stream().limit(3).forEach(suggestion -> 
-                    suggestionText.append("• ").append(suggestion).append("\n"));
+            // Show AI analysis if available
+            if (smartOrganizer != null && !allVaultFiles.isEmpty()) {
+                logMessage("🗂️ Smart file categorization enabled for " + allVaultFiles.size() + " files");
+                logMessage("🔍 Natural language processing ready");
                 
-                logMessage("💡 AI generated " + suggestions.size() + " organization suggestions");
-                
-                // Show suggestions in a non-blocking way
+                // Show quick AI analysis
                 Platform.runLater(() -> {
-                    showInfo("🤖 AI Organization Suggestions", suggestionText.toString());
+                    try {
+                        showAIAnalysis();
+                    } catch (Exception e) {
+                        logMessage("⚠ Error showing AI analysis: " + e.getMessage());
+                    }
                 });
+            } else {
+                logMessage("💡 AI features ready - upload files to see smart organization");
             }
+            
+        } catch (Exception e) {
+            logMessage("⚠ Error in enableAIFeatures: " + e.getMessage());
+            throw e;
         }
     }
+
+    
+
+    
+
     
     /**
      * Show AI analysis of current vault files
