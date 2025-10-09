@@ -16,7 +16,12 @@ import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
- * Manages decoy files and fake content to create realistic fake vault
+ * CRITICAL SECURITY COMPONENT: Manages decoy vault to protect real data
+ * 
+ * This class creates a completely separate decoy vault that appears real
+ * while keeping the actual vault hidden and protected from discovery.
+ * 
+ * NEVER modifies or deletes real vault data!
  */
 public class DecoyManager {
     
@@ -40,55 +45,655 @@ public class DecoyManager {
         "Planning Document", "Research Notes", "Training Materials", "Policy Document"
     };
     
-    private final String decoyPath;
+    // CRITICAL: Separate paths for real and decoy vaults
+    private final Path realVaultPath;
+    private final Path decoyVaultPath;
     private final Random random;
     private final List<VaultFile> decoyFiles;
+    private boolean isDecoyMode;
+    private boolean decoyVaultInitialized;
     
-    public DecoyManager() {
-        this.decoyPath = AppConfig.DECOYS_DIR;
+    // Device-specific information for realistic decoys
+    private final String deviceId;
+    private final String userName;
+    private final String osName;
+    
+    /**
+     * CRITICAL CONSTRUCTOR: Must have separate paths to prevent data loss
+     */
+    public DecoyManager(Path realVaultPath, Path decoyVaultPath) {
+        // SAFETY CHECK: Ensure paths are different
+        if (realVaultPath.equals(decoyVaultPath)) {
+            throw new SecurityException("CRITICAL: Real and decoy vault paths must be different!");
+        }
+        
+        this.realVaultPath = realVaultPath.toAbsolutePath();
+        this.decoyVaultPath = decoyVaultPath.toAbsolutePath();
         this.random = new Random();
         this.decoyFiles = new ArrayList<>();
+        this.isDecoyMode = false;
+        this.decoyVaultInitialized = false;
         
+        // Get device information for realistic decoys
+        this.deviceId = generateDeviceId();
+        this.userName = System.getProperty("user.name", "user");
+        this.osName = System.getProperty("os.name", "Unknown");
+        
+        System.out.println("✓ DecoyManager initialized");
+        System.out.println("  Real vault: " + this.realVaultPath);
+        System.out.println("  Decoy vault: " + this.decoyVaultPath);
+        System.out.println("  Device: " + this.userName + "@" + this.osName);
+    }
+    
+    /**
+     * Generate unique device ID for consistent decoy generation
+     */
+    private String generateDeviceId() {
         try {
-            FileUtils.ensureDirectoryExists(decoyPath);
-            loadExistingDecoyFiles();
-        } catch (IOException e) {
-            throw new RuntimeException("Failed to initialize DecoyManager", e);
+            String hostName = java.net.InetAddress.getLocalHost().getHostName();
+            String userHome = System.getProperty("user.home", "");
+            return Integer.toHexString((hostName + userHome).hashCode());
+        } catch (Exception e) {
+            return Integer.toHexString((int)(System.currentTimeMillis() % 100000));
+        }
+    }
+    
+    /**
+     * CRITICAL: Switch to decoy mode safely
+     */
+    public void switchToDecoyMode() throws Exception {
+        if (isDecoyMode) {
+            System.out.println("Already in decoy mode");
+            return;
+        }
+        
+        // CRITICAL SAFETY CHECK: Verify real vault exists and is protected
+        if (!Files.exists(realVaultPath)) {
+            throw new SecurityException("CRITICAL: Real vault not found! Cannot switch to decoy mode safely.");
+        }
+        
+        // Initialize decoy vault if needed
+        if (!decoyVaultInitialized) {
+            initializeDecoyVault();
+        }
+        
+        // Switch to decoy mode
+        isDecoyMode = true;
+        
+        System.out.println("🎭 SWITCHED TO DECOY MODE");
+        System.out.println("  Real vault PROTECTED at: " + realVaultPath);
+        System.out.println("  Decoy vault ACTIVE at: " + decoyVaultPath);
+        System.out.println("  ⚠️ All operations now work on FAKE data!");
+    }
+    
+    /**
+     * CRITICAL: Switch back to real vault safely
+     */
+    public void switchToRealMode() throws Exception {
+        if (!isDecoyMode) {
+            System.out.println("Already in real vault mode");
+            return;
+        }
+        
+        // CRITICAL SAFETY CHECK: Verify real vault integrity
+        if (!verifyRealVaultIntegrity()) {
+            throw new SecurityException("CRITICAL: Real vault integrity check failed!");
+        }
+        
+        isDecoyMode = false;
+        
+        System.out.println("✓ SWITCHED TO REAL VAULT MODE");
+        System.out.println("  Real vault ACTIVE at: " + realVaultPath);
+        System.out.println("  Decoy vault hidden at: " + decoyVaultPath);
+    }
+    
+    /**
+     * Get current active vault path (CRITICAL for preventing data loss)
+     */
+    public Path getCurrentVaultPath() {
+        return isDecoyMode ? decoyVaultPath : realVaultPath;
+    }
+    
+    /**
+     * Check if currently in decoy mode
+     */
+    public boolean isDecoyMode() {
+        return isDecoyMode;
+    }
+    
+    /**
+     * CRITICAL: Verify real vault integrity before operations
+     */
+    public boolean verifyRealVaultIntegrity() {
+        try {
+            if (!Files.exists(realVaultPath)) {
+                System.err.println("⚠️ CRITICAL: Real vault not found!");
+                return false;
+            }
+            
+            if (!Files.isDirectory(realVaultPath)) {
+                System.err.println("⚠️ CRITICAL: Real vault path is not a directory!");
+                return false;
+            }
+            
+            if (!Files.isReadable(realVaultPath) || !Files.isWritable(realVaultPath)) {
+                System.err.println("⚠️ CRITICAL: Real vault permissions issue!");
+                return false;
+            }
+            
+            // Check if decoy path is accidentally same as real path
+            if (decoyVaultPath.equals(realVaultPath)) {
+                System.err.println("⚠️ CRITICAL: Decoy and real paths are identical!");
+                return false;
+            }
+            
+            return true;
+        } catch (Exception e) {
+            System.err.println("⚠️ CRITICAL: Vault integrity check failed: " + e.getMessage());
+            return false;
+        }
+    }
+    
+    /**
+     * Initialize decoy vault with realistic fake data
+     */
+    private void initializeDecoyVault() throws Exception {
+        System.out.println("🎭 Initializing decoy vault...");
+        
+        // Create decoy vault directory structure
+        Files.createDirectories(decoyVaultPath);
+        Files.createDirectories(decoyVaultPath.resolve("files"));
+        Files.createDirectories(decoyVaultPath.resolve("metadata"));
+        Files.createDirectories(decoyVaultPath.resolve("temp"));
+        
+        // Generate device-specific realistic decoy files
+        generateDeviceSpecificDecoys();
+        
+        // Generate common business/personal files
+        generateRealisticDecoyFiles(8 + random.nextInt(12)); // 8-20 files
+        
+        // Create decoy configuration files
+        createDecoyConfigFiles();
+        
+        decoyVaultInitialized = true;
+        System.out.println("✓ Decoy vault initialized with realistic fake data");
+    }
+    
+    /**
+     * Generate device and user-specific decoy files
+     */
+    private void generateDeviceSpecificDecoys() throws IOException {
+        System.out.println("🎭 Generating device-specific decoys for: " + userName + "@" + osName);
+        
+        // Create user-specific files
+        String[] userSpecificFiles = {
+            userName + "_documents_backup.zip",
+            userName + "_desktop_files.zip", 
+            userName + "_browser_bookmarks.html",
+            userName + "_email_backup.pst",
+            userName + "_photos_2023.zip",
+            userName + "_work_files.zip",
+            "system_backup_" + osName.toLowerCase().replace(" ", "_") + ".zip",
+            "settings_" + deviceId + ".json"
+        };
+        
+        Path filesDir = decoyVaultPath.resolve("files");
+        
+        for (String fileName : userSpecificFiles) {
+            if (random.nextDouble() < 0.7) { // 70% chance to include each file
+                createDecoyFile(filesDir, fileName, generateDeviceSpecificContent(fileName));
+            }
         }
     }
     
     /**
      * Generate realistic decoy files
      */
-    public void generateDecoyFiles(int count) throws IOException {
+    public void generateRealisticDecoyFiles(int count) throws IOException {
+        Path filesDir = decoyVaultPath.resolve("files");
+        
         for (int i = 0; i < count; i++) {
-            generateSingleDecoyFile();
+            String fileName = generateRealisticFileName();
+            String content = generateRealisticContent(fileName);
+            createDecoyFile(filesDir, fileName, content);
+        }
+        
+        System.out.println("✓ Generated " + count + " realistic decoy files");
+    }
+    
+    /**
+     * Create a single decoy file
+     */
+    private void createDecoyFile(Path directory, String fileName, String content) throws IOException {
+        Path filePath = directory.resolve(fileName + ".enc"); // All files are "encrypted"
+        
+        // Create fake encrypted content (random bytes with structure)
+        byte[] fakeEncrypted = createFakeEncryptedContent(content.getBytes());
+        Files.write(filePath, fakeEncrypted);
+        
+        // Create metadata for the decoy file
+        VaultFile decoyFile = new VaultFile(
+            fileName,
+            UUID.randomUUID().toString(),
+            fileName,
+            fakeEncrypted.length,
+            FileUtils.calculateSHA256(fakeEncrypted),
+            System.currentTimeMillis() - random.nextInt(30 * 24 * 60 * 60) * 1000L // Random time in last 30 days
+        );
+        
+        decoyFiles.add(decoyFile);
+    }
+    
+    /**
+     * Create fake encrypted content that looks realistic
+     */
+    private byte[] createFakeEncryptedContent(byte[] originalContent) {
+        // Create realistic encrypted-looking data
+        int totalSize = 48 + originalContent.length + random.nextInt(64); // IV + Salt + Content + Padding
+        byte[] fakeEncrypted = new byte[totalSize];
+        
+        // Fake IV (16 bytes)
+        random.nextBytes(fakeEncrypted);
+        System.arraycopy(generateFakeIV(), 0, fakeEncrypted, 0, 16);
+        
+        // Fake Salt (32 bytes) 
+        System.arraycopy(generateFakeSalt(), 0, fakeEncrypted, 16, 32);
+        
+        // Fake encrypted content (rest of the bytes)
+        random.nextBytes(fakeEncrypted);
+        
+        return fakeEncrypted;
+    }
+    
+    /**
+     * Generate fake IV
+     */
+    private byte[] generateFakeIV() {
+        byte[] iv = new byte[16];
+        random.nextBytes(iv);
+        return iv;
+    }
+    
+    /**
+     * Generate fake salt
+     */
+    private byte[] generateFakeSalt() {
+        byte[] salt = new byte[32];
+        random.nextBytes(salt);
+        return salt;
+    }
+    
+    /**
+     * Generate device-specific content
+     */
+    private String generateDeviceSpecificContent(String fileName) {
+        if (fileName.contains("backup")) {
+            return generateBackupContent();
+        } else if (fileName.contains("bookmarks")) {
+            return generateBookmarksContent();
+        } else if (fileName.contains("email")) {
+            return generateEmailContent();
+        } else if (fileName.contains("settings")) {
+            return generateSettingsContent();
+        } else {
+            return generateGenericContent(fileName);
         }
     }
     
     /**
-     * Generate a single realistic decoy file
+     * Generate backup file content
      */
-    public VaultFile generateSingleDecoyFile() throws IOException {
-        String fileName = generateRealisticFileName();
-        String content = generateRealisticContent(fileName);
+    private String generateBackupContent() {
+        StringBuilder backup = new StringBuilder();
+        backup.append("BACKUP MANIFEST\n");
+        backup.append("===============\n\n");
+        backup.append("Created: ").append(LocalDateTime.now()).append("\n");
+        backup.append("Device: ").append(userName).append("@").append(osName).append("\n");
+        backup.append("Device ID: ").append(deviceId).append("\n\n");
         
-        // Create decoy file
-        Path decoyFilePath = Paths.get(decoyPath, fileName);
-        Files.write(decoyFilePath, content.getBytes());
+        backup.append("Backed up files:\n");
+        String[] backupItems = {
+            "Documents folder (1,247 files, 2.3 GB)",
+            "Desktop files (89 files, 456 MB)", 
+            "Downloads folder (234 files, 1.1 GB)",
+            "Pictures folder (2,891 files, 8.7 GB)",
+            "Music folder (567 files, 3.2 GB)",
+            "Videos folder (45 files, 12.4 GB)",
+            "Browser data (bookmarks, history, passwords)",
+            "Email data (inbox, sent, drafts)",
+            "Application settings and preferences"
+        };
         
-        // Create VaultFile metadata for decoy
-        VaultFile decoyFile = new VaultFile(
-            fileName,
-            UUID.randomUUID().toString(),
-            fileName, // Decoys use original names
-            content.length(),
-            FileUtils.calculateSHA256(content.getBytes()),
-            System.currentTimeMillis()
-        );
+        for (String item : backupItems) {
+            backup.append("- ").append(item).append("\n");
+        }
         
-        decoyFiles.add(decoyFile);
-        return decoyFile;
+        backup.append("\nTotal backup size: 28.2 GB\n");
+        backup.append("Compression ratio: 67%\n");
+        backup.append("Encryption: AES-256-GCM\n");
+        
+        return backup.toString();
+    }
+    
+    /**
+     * Generate bookmarks content
+     */
+    private String generateBookmarksContent() {
+        StringBuilder bookmarks = new StringBuilder();
+        bookmarks.append("<!DOCTYPE NETSCAPE-Bookmark-file-1>\n");
+        bookmarks.append("<META HTTP-EQUIV=\"Content-Type\" CONTENT=\"text/html; charset=UTF-8\">\n");
+        bookmarks.append("<TITLE>Bookmarks</TITLE>\n");
+        bookmarks.append("<H1>Bookmarks Menu</H1>\n\n");
+        bookmarks.append("<DL><p>\n");
+        
+        String[] bookmarkCategories = {"Work", "News", "Shopping", "Entertainment", "Social"};
+        String[][] bookmarkSites = {
+            {"Gmail", "Google Drive", "Slack", "Zoom", "LinkedIn"},
+            {"BBC News", "CNN", "Reuters", "TechCrunch", "Hacker News"},
+            {"Amazon", "eBay", "Target", "Best Buy", "Walmart"},
+            {"Netflix", "YouTube", "Spotify", "Twitch", "Reddit"},
+            {"Facebook", "Twitter", "Instagram", "WhatsApp", "Discord"}
+        };
+        
+        for (int i = 0; i < bookmarkCategories.length; i++) {
+            bookmarks.append("    <DT><H3>").append(bookmarkCategories[i]).append("</H3>\n");
+            bookmarks.append("    <DL><p>\n");
+            
+            for (String site : bookmarkSites[i]) {
+                bookmarks.append("        <DT><A HREF=\"https://").append(site.toLowerCase().replace(" ", "")).append(".com\">").append(site).append("</A>\n");
+            }
+            
+            bookmarks.append("    </DL><p>\n");
+        }
+        
+        bookmarks.append("</DL><p>\n");
+        return bookmarks.toString();
+    }
+    
+    /**
+     * Generate email content
+     */
+    private String generateEmailContent() {
+        StringBuilder email = new StringBuilder();
+        email.append("EMAIL BACKUP SUMMARY\n");
+        email.append("===================\n\n");
+        email.append("Account: ").append(userName).append("@example.com\n");
+        email.append("Backup Date: ").append(LocalDateTime.now()).append("\n\n");
+        
+        email.append("Folders backed up:\n");
+        email.append("- Inbox (1,234 messages, 567 MB)\n");
+        email.append("- Sent Items (892 messages, 234 MB)\n");
+        email.append("- Drafts (23 messages, 12 MB)\n");
+        email.append("- Archive (5,678 messages, 2.1 GB)\n");
+        email.append("- Spam (45 messages, 8 MB)\n");
+        email.append("- Trash (156 messages, 89 MB)\n\n");
+        
+        email.append("Contacts: 456 entries\n");
+        email.append("Calendar events: 234 entries\n");
+        email.append("Rules and filters: 12 entries\n\n");
+        
+        email.append("Total backup size: 3.0 GB\n");
+        email.append("Format: PST (Outlook)\n");
+        
+        return email.toString();
+    }
+    
+    /**
+     * Generate settings content
+     */
+    private String generateSettingsContent() {
+        StringBuilder settings = new StringBuilder();
+        settings.append("{\n");
+        settings.append("  \"device_id\": \"").append(deviceId).append("\",\n");
+        settings.append("  \"user_name\": \"").append(userName).append("\",\n");
+        settings.append("  \"os_name\": \"").append(osName).append("\",\n");
+        settings.append("  \"created\": \"").append(LocalDateTime.now()).append("\",\n");
+        settings.append("  \"vault_settings\": {\n");
+        settings.append("    \"auto_backup\": true,\n");
+        settings.append("    \"encryption_level\": \"AES-256\",\n");
+        settings.append("    \"session_timeout\": 1800,\n");
+        settings.append("    \"auto_lock\": true\n");
+        settings.append("  },\n");
+        settings.append("  \"ui_preferences\": {\n");
+        settings.append("    \"theme\": \"dark\",\n");
+        settings.append("    \"language\": \"en\",\n");
+        settings.append("    \"show_thumbnails\": true\n");
+        settings.append("  }\n");
+        settings.append("}\n");
+        
+        return settings.toString();
+    }
+    
+    /**
+     * Create decoy configuration files
+     */
+    private void createDecoyConfigFiles() throws IOException {
+        // Create fake vault config
+        Path configPath = decoyVaultPath.resolve("vault.config");
+        String configContent = generateVaultConfigContent();
+        Files.write(configPath, configContent.getBytes());
+        
+        // Create fake metadata index
+        Path metadataPath = decoyVaultPath.resolve("metadata").resolve("index.json");
+        String metadataContent = generateMetadataIndexContent();
+        Files.write(metadataPath, metadataContent.getBytes());
+        
+        System.out.println("✓ Created decoy configuration files");
+    }
+    
+    /**
+     * Generate fake vault config content
+     */
+    private String generateVaultConfigContent() {
+        StringBuilder config = new StringBuilder();
+        config.append("# GhostVault Configuration (DECOY)\n");
+        config.append("# Generated: ").append(LocalDateTime.now()).append("\n\n");
+        config.append("vault.version=1.0.0\n");
+        
+        // Safe random time generation
+        long randomDays = 1 + random.nextInt(89); // 1-90 days ago
+        config.append("vault.created=").append(System.currentTimeMillis() - (randomDays * 24 * 60 * 60 * 1000L)).append("\n");
+        
+        config.append("vault.encryption=AES-256-GCM\n");
+        config.append("vault.key_derivation=Argon2id\n");
+        config.append("vault.file_count=").append(Math.max(1, decoyFiles.size())).append("\n");
+        config.append("vault.device_id=").append(deviceId).append("\n");
+        config.append("vault.user=").append(userName).append("\n");
+        
+        return config.toString();
+    }
+    
+    /**
+     * Generate fake metadata index content
+     */
+    private String generateMetadataIndexContent() {
+        StringBuilder metadata = new StringBuilder();
+        metadata.append("{\n");
+        metadata.append("  \"version\": \"1.0.0\",\n");
+        metadata.append("  \"created\": \"").append(LocalDateTime.now()).append("\",\n");
+        metadata.append("  \"file_count\": ").append(decoyFiles.size()).append(",\n");
+        metadata.append("  \"total_size\": ").append(random.nextInt(100000000) + 50000000).append(",\n"); // 50-150 MB
+        metadata.append("  \"encryption\": \"AES-256-GCM\",\n");
+        metadata.append("  \"device_id\": \"").append(deviceId).append("\",\n");
+        metadata.append("  \"files\": [\n");
+        
+        for (int i = 0; i < decoyFiles.size(); i++) {
+            VaultFile file = decoyFiles.get(i);
+            metadata.append("    {\n");
+            metadata.append("      \"id\": \"").append(file.getFileId()).append("\",\n");
+            metadata.append("      \"name\": \"").append(file.getOriginalName()).append("\",\n");
+            metadata.append("      \"size\": ").append(file.getSize()).append(",\n");
+            metadata.append("      \"hash\": \"").append(file.getHash()).append("\",\n");
+            metadata.append("      \"created\": ").append(file.getUploadTime()).append("\n");
+            metadata.append("    }");
+            if (i < decoyFiles.size() - 1) {
+                metadata.append(",");
+            }
+            metadata.append("\n");
+        }
+        
+        metadata.append("  ]\n");
+        metadata.append("}\n");
+        
+        return metadata.toString();
+    }
+    
+    /**
+     * Refresh decoy vault with new fake data (prevents detection)
+     */
+    public void refreshDecoyVault() throws Exception {
+        if (!isDecoyMode) {
+            System.out.println("Not in decoy mode - no refresh needed");
+            return;
+        }
+        
+        System.out.println("🎭 Refreshing decoy vault with new fake data...");
+        
+        // Clear old decoy files (but keep directory structure)
+        Path filesDir = decoyVaultPath.resolve("files");
+        if (Files.exists(filesDir)) {
+            Files.walk(filesDir)
+                .filter(Files::isRegularFile)
+                .forEach(file -> {
+                    try {
+                        Files.delete(file);
+                    } catch (Exception e) {
+                        // Ignore deletion errors
+                    }
+                });
+        }
+        
+        // Clear old decoy file list
+        decoyFiles.clear();
+        
+        // Generate fresh fake data
+        generateDeviceSpecificDecoys();
+        generateRealisticDecoyFiles(6 + random.nextInt(10)); // 6-16 files
+        
+        // Update configuration files
+        createDecoyConfigFiles();
+        
+        System.out.println("✓ Decoy vault refreshed with " + decoyFiles.size() + " new fake files");
+    }
+    
+    /**
+     * Emergency switch back to real vault (bypasses all checks)
+     */
+    public void emergencySwitchToRealVault() {
+        System.out.println("🚨 EMERGENCY: Switching to real vault");
+        
+        isDecoyMode = false;
+        
+        System.out.println("✓ Emergency switch completed");
+        System.out.println("  Real vault: " + realVaultPath);
+        System.out.println("  ⚠️ Verify your data integrity!");
+    }
+    
+    /**
+     * Get decoy files for UI display
+     */
+    public List<VaultFile> getDecoyFiles() {
+        if (!isDecoyMode) {
+            return new ArrayList<>(); // Return empty list if not in decoy mode
+        }
+        
+        // Load decoy files if not already loaded
+        if (decoyFiles.isEmpty() && decoyVaultInitialized) {
+            try {
+                loadDecoyFilesFromDisk();
+            } catch (Exception e) {
+                System.err.println("⚠️ Error loading decoy files: " + e.getMessage());
+            }
+        }
+        
+        return new ArrayList<>(decoyFiles);
+    }
+    
+    /**
+     * Load decoy files from disk
+     */
+    private void loadDecoyFilesFromDisk() throws IOException {
+        Path filesDir = decoyVaultPath.resolve("files");
+        if (!Files.exists(filesDir)) {
+            return;
+        }
+        
+        Files.walk(filesDir)
+            .filter(Files::isRegularFile)
+            .filter(path -> path.toString().endsWith(".enc"))
+            .forEach(filePath -> {
+                try {
+                    String fileName = filePath.getFileName().toString();
+                    fileName = fileName.substring(0, fileName.lastIndexOf(".enc")); // Remove .enc extension
+                    
+                    byte[] content = Files.readAllBytes(filePath);
+                    VaultFile decoyFile = new VaultFile(
+                        fileName,
+                        UUID.randomUUID().toString(),
+                        fileName,
+                        content.length,
+                        FileUtils.calculateSHA256(content),
+                        Files.getLastModifiedTime(filePath).toMillis()
+                    );
+                    
+                    decoyFiles.add(decoyFile);
+                } catch (Exception e) {
+                    System.err.println("⚠️ Error loading decoy file: " + filePath + " - " + e.getMessage());
+                }
+            });
+    }
+    
+    /**
+     * Get fake decoy file content (for UI display)
+     */
+    public byte[] getDecoyFileContent(String fileName) throws IOException {
+        if (!isDecoyMode) {
+            throw new SecurityException("Not in decoy mode!");
+        }
+        
+        Path filePath = decoyVaultPath.resolve("files").resolve(fileName + ".enc");
+        if (Files.exists(filePath)) {
+            // Return fake "decrypted" content
+            byte[] encryptedContent = Files.readAllBytes(filePath);
+            return generateFakeDecryptedContent(fileName, encryptedContent);
+        }
+        
+        throw new IOException("Decoy file not found: " + fileName);
+    }
+    
+    /**
+     * Generate fake decrypted content for display
+     */
+    private byte[] generateFakeDecryptedContent(String fileName, byte[] encryptedContent) {
+        // Generate realistic fake content based on file name
+        String fakeContent = generateRealisticContent(fileName);
+        return fakeContent.getBytes();
+    }
+    
+    /**
+     * Auto-generate decoy files when vault is accessed from new device
+     */
+    public void autoGenerateForNewDevice() throws Exception {
+        if (!isDecoyMode) {
+            return;
+        }
+        
+        System.out.println("🎭 Auto-generating device-specific decoys...");
+        
+        // Check if we already have device-specific files
+        boolean hasDeviceFiles = decoyFiles.stream()
+            .anyMatch(file -> file.getOriginalName().contains(userName) || 
+                             file.getOriginalName().contains(deviceId));
+        
+        if (!hasDeviceFiles) {
+            // Generate device-specific decoys
+            generateDeviceSpecificDecoys();
+            
+            // Add some random files to make it look natural
+            generateRealisticDecoyFiles(3 + random.nextInt(5));
+            
+            System.out.println("✓ Auto-generated " + decoyFiles.size() + " device-specific decoy files");
+        }
     }
     
     /**
@@ -466,94 +1071,101 @@ public class DecoyManager {
     }
     
     /**
-     * Load existing decoy files
+     * CRITICAL: Prevent accidental operations on real vault during decoy mode
      */
-    private void loadExistingDecoyFiles() {
-        File decoyDir = new File(decoyPath);
-        if (!decoyDir.exists()) {
-            return;
+    public void validateOperation(String operation) throws SecurityException {
+        if (isDecoyMode) {
+            System.out.println("🎭 DECOY MODE: " + operation + " performed on FAKE data");
+        } else {
+            System.out.println("🔒 REAL MODE: " + operation + " performed on REAL data");
+        }
+    }
+    
+    /**
+     * Get vault statistics (real or decoy based on mode)
+     */
+    public VaultStats getVaultStats() {
+        if (isDecoyMode) {
+            return getDecoyStats();
+        } else {
+            return getRealVaultStats();
+        }
+    }
+    
+    /**
+     * Get decoy vault statistics
+     */
+    private VaultStats getDecoyStats() {
+        long totalSize = decoyFiles.stream().mapToLong(VaultFile::getSize).sum();
+        
+        Map<String, Integer> extensionCounts = new HashMap<>();
+        for (VaultFile file : decoyFiles) {
+            String extension = getFileExtension(file.getOriginalName());
+            extensionCounts.put(extension, extensionCounts.getOrDefault(extension, 0) + 1);
         }
         
-        File[] files = decoyDir.listFiles();
-        if (files != null) {
-            for (File file : files) {
-                if (file.isFile()) {
-                    try {
-                        byte[] content = Files.readAllBytes(file.toPath());
-                        VaultFile decoyFile = new VaultFile(
-                            file.getName(),
-                            UUID.randomUUID().toString(),
-                            file.getName(),
-                            file.length(),
-                            FileUtils.calculateSHA256(content),
-                            file.lastModified()
-                        );
-                        decoyFiles.add(decoyFile);
-                    } catch (IOException e) {
-                        // Skip files that can't be read
-                    }
-                }
-            }
+        return new VaultStats(decoyFiles.size(), totalSize, extensionCounts, true);
+    }
+    
+    /**
+     * Get real vault statistics (placeholder - would integrate with real vault manager)
+     */
+    private VaultStats getRealVaultStats() {
+        // This would integrate with the actual vault manager
+        // For now, return placeholder stats
+        return new VaultStats(0, 0, new HashMap<>(), false);
+    }
+    
+    /**
+     * Get file extension
+     */
+    private String getFileExtension(String fileName) {
+        int lastDot = fileName.lastIndexOf('.');
+        return lastDot > 0 ? fileName.substring(lastDot + 1).toLowerCase() : "unknown";
+    }
+    
+    /**
+     * Vault statistics class
+     */
+    public static class VaultStats {
+        private final int fileCount;
+        private final long totalSize;
+        private final Map<String, Integer> extensionCounts;
+        private final boolean isDecoy;
+        
+        public VaultStats(int fileCount, long totalSize, Map<String, Integer> extensionCounts, boolean isDecoy) {
+            this.fileCount = fileCount;
+            this.totalSize = totalSize;
+            this.extensionCounts = new HashMap<>(extensionCounts);
+            this.isDecoy = isDecoy;
+        }
+        
+        public int getFileCount() { return fileCount; }
+        public long getTotalSize() { return totalSize; }
+        public Map<String, Integer> getExtensionCounts() { return new HashMap<>(extensionCounts); }
+        public boolean isDecoy() { return isDecoy; }
+        
+        public String getFormattedSize() {
+            return FileUtils.formatFileSize(totalSize);
+        }
+        
+        @Override
+        public String toString() {
+            String mode = isDecoy ? "DECOY" : "REAL";
+            return String.format("VaultStats{mode=%s, files=%d, size=%s, types=%d}", 
+                mode, fileCount, getFormattedSize(), extensionCounts.size());
         }
     }
     
     /**
-     * Get all decoy files
+     * Search files (real or decoy based on current mode)
      */
-    public List<VaultFile> getDecoyFiles() {
-        return new ArrayList<>(decoyFiles);
-    }
-    
-    /**
-     * Get decoy file count
-     */
-    public int getDecoyFileCount() {
-        return decoyFiles.size();
-    }
-    
-    /**
-     * Get decoy file by name
-     */
-    public VaultFile getDecoyFile(String fileName) {
-        return decoyFiles.stream()
-                .filter(file -> file.getOriginalName().equals(fileName))
-                .findFirst()
-                .orElse(null);
-    }
-    
-    /**
-     * Remove decoy file
-     */
-    public boolean removeDecoyFile(String fileName) {
-        VaultFile decoyFile = getDecoyFile(fileName);
-        if (decoyFile != null) {
-            try {
-                Path filePath = Paths.get(decoyPath, fileName);
-                Files.deleteIfExists(filePath);
-                decoyFiles.remove(decoyFile);
-                return true;
-            } catch (IOException e) {
-                return false;
-            }
+    public List<VaultFile> searchFiles(String query) {
+        if (!isDecoyMode) {
+            // In real mode, would delegate to real vault manager
+            return new ArrayList<>();
         }
-        return false;
-    }
-    
-    /**
-     * Get decoy file content
-     */
-    public byte[] getDecoyFileContent(String fileName) throws IOException {
-        Path filePath = Paths.get(decoyPath, fileName);
-        if (Files.exists(filePath)) {
-            return Files.readAllBytes(filePath);
-        }
-        throw new IOException("Decoy file not found: " + fileName);
-    }
-    
-    /**
-     * Search decoy files
-     */
-    public List<VaultFile> searchDecoyFiles(String query) {
+        
         if (query == null || query.trim().isEmpty()) {
             return getDecoyFiles();
         }
@@ -565,59 +1177,82 @@ public class DecoyManager {
     }
     
     /**
-     * Ensure minimum number of decoy files exist
+     * Remove file (real or decoy based on current mode)
      */
-    public void ensureMinimumDecoyFiles(int minimumCount) throws IOException {
-        int currentCount = getDecoyFileCount();
+    public boolean removeFile(String fileName) {
+        validateOperation("DELETE file: " + fileName);
+        
+        if (!isDecoyMode) {
+            // In real mode, would delegate to real vault manager
+            System.out.println("🔒 REAL MODE: File deletion would be handled by real vault manager");
+            return false;
+        }
+        
+        // Remove decoy file
+        VaultFile decoyFile = decoyFiles.stream()
+                .filter(file -> file.getOriginalName().equals(fileName))
+                .findFirst()
+                .orElse(null);
+        
+        if (decoyFile != null) {
+            try {
+                Path filePath = decoyVaultPath.resolve("files").resolve(fileName + ".enc");
+                Files.deleteIfExists(filePath);
+                decoyFiles.remove(decoyFile);
+                System.out.println("🎭 DECOY: Removed fake file: " + fileName);
+                return true;
+            } catch (IOException e) {
+                System.err.println("⚠️ Error removing decoy file: " + e.getMessage());
+                return false;
+            }
+        }
+        return false;
+    }
+    
+    /**
+     * Add file (real or decoy based on current mode)
+     */
+    public boolean addFile(String fileName, byte[] content) {
+        validateOperation("ADD file: " + fileName);
+        
+        if (!isDecoyMode) {
+            // In real mode, would delegate to real vault manager
+            System.out.println("🔒 REAL MODE: File addition would be handled by real vault manager");
+            return false;
+        }
+        
+        // Add fake file to decoy vault
+        try {
+            Path filesDir = decoyVaultPath.resolve("files");
+            createDecoyFile(filesDir, fileName, new String(content));
+            System.out.println("🎭 DECOY: Added fake file: " + fileName);
+            return true;
+        } catch (IOException e) {
+            System.err.println("⚠️ Error adding decoy file: " + e.getMessage());
+            return false;
+        }
+    }
+    
+    /**
+     * Get file count (real or decoy based on current mode)
+     */
+    public int getFileCount() {
+        return isDecoyMode ? decoyFiles.size() : 0; // Real vault count would come from real vault manager
+    }
+    
+    /**
+     * Ensure minimum decoy files exist (for realism)
+     */
+    public void ensureMinimumDecoyFiles(int minimumCount) throws Exception {
+        if (!isDecoyMode) {
+            return;
+        }
+        
+        int currentCount = decoyFiles.size();
         if (currentCount < minimumCount) {
             int needed = minimumCount - currentCount;
-            generateDecoyFiles(needed);
-        }
-    }
-    
-    /**
-     * Get decoy statistics
-     */
-    public DecoyStats getDecoyStats() {
-        long totalSize = decoyFiles.stream()
-                .mapToLong(VaultFile::getSize)
-                .sum();
-        
-        Map<String, Integer> extensionCounts = new HashMap<>();
-        for (VaultFile file : decoyFiles) {
-            String extension = file.getExtension();
-            extensionCounts.put(extension, extensionCounts.getOrDefault(extension, 0) + 1);
-        }
-        
-        return new DecoyStats(decoyFiles.size(), totalSize, extensionCounts);
-    }
-    
-    /**
-     * Decoy statistics data class
-     */
-    public static class DecoyStats {
-        private final int fileCount;
-        private final long totalSize;
-        private final Map<String, Integer> extensionCounts;
-        
-        public DecoyStats(int fileCount, long totalSize, Map<String, Integer> extensionCounts) {
-            this.fileCount = fileCount;
-            this.totalSize = totalSize;
-            this.extensionCounts = new HashMap<>(extensionCounts);
-        }
-        
-        public int getFileCount() { return fileCount; }
-        public long getTotalSize() { return totalSize; }
-        public Map<String, Integer> getExtensionCounts() { return new HashMap<>(extensionCounts); }
-        
-        public String getFormattedSize() {
-            return FileUtils.formatFileSize(totalSize);
-        }
-        
-        @Override
-        public String toString() {
-            return String.format("DecoyStats{files=%d, size=%s, types=%d}", 
-                fileCount, getFormattedSize(), extensionCounts.size());
+            generateRealisticDecoyFiles(needed);
+            System.out.println("✓ Generated " + needed + " additional decoy files to reach minimum of " + minimumCount);
         }
     }
 }

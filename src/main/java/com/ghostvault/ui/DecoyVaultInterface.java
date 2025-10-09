@@ -45,14 +45,24 @@ public class DecoyVaultInterface {
     
     public DecoyVaultInterface(Stage primaryStage) {
         this.primaryStage = primaryStage;
-        this.decoyManager = new DecoyManager();
+        // Initialize DecoyManager with default paths
+        try {
+            java.nio.file.Path realVault = java.nio.file.Paths.get(System.getProperty("user.home"), ".ghostvault");
+            java.nio.file.Path decoyVault = java.nio.file.Paths.get(System.getProperty("user.home"), ".ghostvault_decoy");
+            this.decoyManager = new DecoyManager(realVault, decoyVault);
+        } catch (Exception e) {
+            showAlert("Error", "Could not initialize decoy manager: " + e.getMessage(), Alert.AlertType.ERROR);
+            this.decoyManager = null;
+        }
         this.fileList = FXCollections.observableArrayList();
         
         // Ensure minimum decoy files exist
-        try {
-            decoyManager.ensureMinimumDecoyFiles(8);
-        } catch (IOException e) {
-            showAlert("Warning", "Could not create decoy files: " + e.getMessage(), Alert.AlertType.WARNING);
+        if (decoyManager != null) {
+            try {
+                decoyManager.ensureMinimumDecoyFiles(8);
+            } catch (Exception e) {
+                showAlert("Warning", "Could not create decoy files: " + e.getMessage(), Alert.AlertType.WARNING);
+            }
         }
         
         refreshFileList();
@@ -231,18 +241,18 @@ public class DecoyVaultInterface {
     private void addDecoyFile() {
         try {
             // Generate a new decoy file
-            VaultFile newDecoyFile = decoyManager.generateSingleDecoyFile();
+            decoyManager.generateRealisticDecoyFiles(1);
             
-            // Add to list and refresh
-            fileList.add(newDecoyFile);
+            // Refresh the file list to show the new file
+            refreshFileList();
             updateStatsLabel();
             
-            statusLabel.setText("Document added: " + newDecoyFile.getOriginalName());
+            statusLabel.setText("New document added to vault");
             
             // Show success message
-            showAlert("Success", "Document '" + newDecoyFile.getOriginalName() + "' has been added to your vault.", Alert.AlertType.INFORMATION);
+            showAlert("Success", "A new document has been added to your vault.", Alert.AlertType.INFORMATION);
             
-        } catch (IOException e) {
+        } catch (Exception e) {
             showAlert("Error", "Failed to add document: " + e.getMessage(), Alert.AlertType.ERROR);
         }
     }
@@ -286,7 +296,7 @@ public class DecoyVaultInterface {
         
         Optional<ButtonType> result = confirmAlert.showAndWait();
         if (result.isPresent() && result.get() == ButtonType.OK) {
-            if (decoyManager.removeDecoyFile(selectedFile.getOriginalName())) {
+            if (decoyManager.removeFile(selectedFile.getOriginalName())) {
                 fileList.remove(selectedFile);
                 updateStatsLabel();
                 statusLabel.setText("Document deleted: " + selectedFile.getOriginalName());
@@ -316,7 +326,7 @@ public class DecoyVaultInterface {
             return;
         }
         
-        List<VaultFile> filteredFiles = decoyManager.searchDecoyFiles(searchText);
+        List<VaultFile> filteredFiles = decoyManager.searchFiles(searchText);
         fileList.clear();
         fileList.addAll(filteredFiles);
         
@@ -360,7 +370,7 @@ public class DecoyVaultInterface {
      * Update statistics label
      */
     private void updateStatsLabel() {
-        DecoyManager.DecoyStats stats = decoyManager.getDecoyStats();
+        DecoyManager.VaultStats stats = decoyManager.getVaultStats();
         statsLabel.setText(String.format("Total: %d documents, %s", 
             stats.getFileCount(), stats.getFormattedSize()));
     }

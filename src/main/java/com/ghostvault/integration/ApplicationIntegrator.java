@@ -30,7 +30,7 @@ public class ApplicationIntegrator {
     private FileManager fileManager;
     private MetadataManager metadataManager;
     private AuditManager auditManager;
-    private SessionManager sessionManager;
+    private BasicSessionManager sessionManager;
     private DecoyManager decoyManager;
     private PanicModeExecutor panicModeExecutor;
     private VaultBackupManager backupManager;
@@ -125,10 +125,19 @@ public class ApplicationIntegrator {
         
         // Audit and session management
         auditManager = new AuditManager();
-        sessionManager = new SessionManager();
+        sessionManager = new BasicSessionManager(AppConfig.SESSION_TIMEOUT_MINUTES, AppConfig.VAULT_DIR);
         
         // Special modes
-        decoyManager = new DecoyManager();
+        // Initialize DecoyManager with vault paths
+        try {
+            java.nio.file.Path realVaultPath = java.nio.file.Paths.get(AppConfig.VAULT_DIR);
+            java.nio.file.Path decoyVaultPath = java.nio.file.Paths.get(AppConfig.VAULT_DIR + "_decoy");
+            decoyManager = new DecoyManager(realVaultPath, decoyVaultPath);
+            System.out.println("✓ DecoyManager initialized");
+        } catch (Exception e) {
+            System.err.println("⚠️ Warning: Could not initialize DecoyManager: " + e.getMessage());
+            decoyManager = null;
+        }
         panicModeExecutor = new PanicModeExecutor();
         
         // Backup management
@@ -227,7 +236,7 @@ public class ApplicationIntegrator {
      */
     private void setupComponentIntegrations() {
         // Session manager integration
-        sessionManager.setTimeoutCallback(() -> {
+        sessionManager.addTimeoutListener(() -> {
             Platform.runLater(() -> {
                 handleSessionTimeout();
             });
@@ -371,10 +380,30 @@ public class ApplicationIntegrator {
      */
     private void handleDecoyPasswordLogin(String password) {
         try {
+            // Check if DecoyManager is available
+            if (decoyManager == null) {
+                System.err.println("⚠️ DecoyManager not available - initializing now");
+                try {
+                    java.nio.file.Path realVaultPath = java.nio.file.Paths.get(AppConfig.VAULT_DIR);
+                    java.nio.file.Path decoyVaultPath = java.nio.file.Paths.get(AppConfig.VAULT_DIR + "_decoy");
+                    decoyManager = new DecoyManager(realVaultPath, decoyVaultPath);
+                } catch (Exception e) {
+                    System.err.println("⚠️ Failed to initialize DecoyManager: " + e.getMessage());
+                    handleInvalidPassword();
+                    return;
+                }
+            }
+            
+            // Activate decoy mode
+            decoyManager.switchToDecoyMode();
+            
             // Initialize decoy vault with minimum files
             decoyManager.ensureMinimumDecoyFiles(8);
             
-            // Create decoy security context
+            // Generate device-specific decoys
+            decoyManager.autoGenerateForNewDevice();
+            
+            // Create decoy security context (no real key)
             securityContext = new SecurityContext(null, PasswordManager.PasswordType.DECOY);
             
             // Start session
@@ -401,7 +430,7 @@ public class ApplicationIntegrator {
      */
     private void handleInvalidPassword() {
         // Record failed attempt
-        sessionManager.recordFailedLogin("user");
+        sessionManager.recordFailedLogin("user", "localhost");
         
         // Log failed login
         auditManager.logSecurityEvent("LOGIN_FAILED", 
@@ -412,7 +441,7 @@ public class ApplicationIntegrator {
         showLoginError("Invalid password. Please try again.");
         
         // Check for too many failed attempts
-        if (sessionManager.isAccountLocked("user")) {
+        if (sessionManager.getFailedLoginAttempts() >= AppConfig.MAX_LOGIN_ATTEMPTS) {
             showLoginError("Too many failed attempts. Please wait before trying again.");
         }
     }
