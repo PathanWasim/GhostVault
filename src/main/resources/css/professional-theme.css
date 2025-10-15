@@ -1764,3 +1764,779 @@
 .button-animate-shake {
     -fx-animation: buttonShake 0.5s;
 }
+
+/*
+ ===== PROFESSIONAL HEADER STYLING ===== */
+
+/* Main Header Container */
+.professional-header {
+    -fx-background-color: linear-gradient(to bottom, #2d2d2d, #1a1a1a);
+    -fx-border-color: #404040;
+    -fx-border-width: 0 0 1px 0;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.3), 4, 0, 0, 2);
+    -fx-padding: 12px 20px;
+    -fx-alignment: center;
+    -fx-spacing: 20px;
+}
+
+/* App Branding */
+.app-title {
+    -fx-text-fill: -fx-text-primary;
+    -fx-font-size: 18px;
+    -fx-font-weight: bold;
+    -fx-font-family: 'Segoe UI', Arial, sans-serif;
+}
+
+.app-subtitle {
+    -fx-text-fill: -fx-text-muted;
+    -fx-font-size: 11px;
+    -fx-font-style: italic;
+}
+
+/* Mode Indicator */
+.mode-indicator {
+    -fx-font-weight: bold;
+    -fx-font-size: 13px;
+    -fx-padding: 4px 8px;
+    -fx-background-color: rgba(255, 255, 255, 0.05);
+    -fx-background-radius: 12px;
+    -fx-border-radius: 12px;
+}
+
+/* Session Info */
+.session-time {
+    -fx-text-fill: -fx-text-secondary;
+    -fx-font-size: 12px;
+    -fx-font-family: 'Consolas', monospace;
+}
+
+.user-name {
+    -fx-text-fill: -fx-text-primary;
+    -fx-font-size: 12px;
+    -fx-font-weight: 500;
+}
+
+.connection-status {
+    -fx-font-size: 12px;
+    -fx-font-weight: 500;
+}
+
+/* Security Level Bar */
+.security-level-bar {
+    -fx-background-color: rgba(255, 255, 255, 0.1);
+    -fx-background-radius: 3px;
+    -fx-border-radius: 3px;
+}
+
+.security-level-bar .bar {
+    -fx-background-color: linear-gradient(to right, #107c10, #4caf50);
+    -fx-background-radius: 3px;
+    -fx-border-radius: 3px;
+    -fx-background-insets: 0;
+    -fx-border-insets: 0;
+}
+
+.security-level-bar .track {
+    -fx-background-color: rgba(255, 255, 255, 0.1);
+    -fx-background-radius: 3px;
+    -fx-border-radius: 3px;
+}
+
+.security-label {
+    -fx-text-fill: -fx-text-muted;
+    -fx-font-size: 10px;
+    -fx-font-weight: 500;
+}
+
+/* Header Buttons */
+.header-button {
+    -fx-background-color: transparent;
+    -fx-text-fill: -fx-text-secondary;
+    -fx-border-color: transparent;
+    -fx-border-radius: 6px;
+    -fx-background-radius: 6px;
+    -fx-padding: 8px 12px;
+    -fx-font-size: 14px;
+    -fx-cursor: hand;
+    -fx-effect: null;
+}
+
+.header-button:hover {
+    -fx-background-color: rgba(255, 255, 255, 0.1);
+    -fx-text-fill: -fx-text-primary;
+    -fx-scale-x: 1.05;
+    -fx-scale-y: 1.05;
+}
+
+.header-button:pressed {
+    -fx-background-color: rgba(255, 255, 255, 0.15);
+    -fx-scale-x: 0.95;
+    -fx-scale-y: 0.95;
+}
+
+.header-button.icon-button {
+    -fx-padding: 6px 8px;
+    -fx-min-width: 32px;
+    -fx-min-height: 32px;
+    -fx-pref-width: 32px;
+    -fx-pref-height: 32px;
+}
+
+/* Logout Button Specific Styling */
+.logout-button {
+    -fx-text-fill: #ff6b6b;
+}
+
+.logout-button:hover {
+    -fx-background-color: rgba(255, 107, 107, 0.2);
+    -fx-text-fill: #ff4757;
+}
+
+/* Panic Button Styling */
+.panic-button {
+    -fx-background-color: rgba(209, 52, 56, 0.2);
+    -fx-text-fill: #d13438;
+    -fx-border-color: #d13438;
+    -fx-border-width: 1px;
+}
+
+.panic-button:hover {
+    -fx-background-color: rgba(209, 52, 56, 0.3);
+    -fx-text-fill: #ff4757;
+    -fx-border-color: #ff4757;
+}
+
+.panic-button:pressed {
+    -fx-background-color: rgba(209, 52, 56, 0.4);
+}
+
+/* Notification Badge */
+.header-button.has-notification {
+    -fx-text-fill: #ff8c00;
+    -fx-background-color: rgba(255, 140, 0, 0.1);
+}
+
+.header-button.has-notification:hover {
+    -fx-background-color: rgba(255, 140, 0, 0.2);
+    -fx-text-fill: #ffa500;
+}
+
+/* Status Section */
+.status-section {
+    -fx-alignment: center;
+    -fx-spacing: 10px;
+}
+
+.status-message {
+    -fx-font-size: 12px;
+    -fx-font-weight: 500;
+    -fx-padding: 4px 8px;
+    -fx-background-color: rgba(255, 255, 255, 0.05);
+    -fx-background-radius: 8px;
+    -fx-border-radius: 8px;
+}
+
+/* Header Separators */
+.professional-header .separator {
+    -fx-background-color: #555555;
+    -fx-pref-width: 1px;
+    -fx-pref-height: 20px;
+}
+
+/* Header Animations */
+.professional-header .mode-indicator {
+    -fx-transition: all 0.3s ease;
+}
+
+.professional-header .header-button {
+    -fx-transition: all 0.2s ease;
+}
+
+.professional-header .status-message {
+    -fx-transition: opacity 0.3s ease;
+}
+
+/* Responsive Header */
+@media (max-width: 1200px) {
+    .professional-header {
+        -fx-spacing: 15px;
+        -fx-padding: 10px 15px;
+    }
+
+    .app-title {
+        -fx-font-size: 16px;
+    }
+
+    .session-time,
+    .user-name,
+    .connection-status {
+        -fx-font-size: 11px;
+    }
+}
+
+@media (max-width: 800px) {
+    .professional-header {
+        -fx-spacing: 10px;
+        -fx-padding: 8px 12px;
+    }
+
+    .app-subtitle {
+        -fx-font-size: 10px;
+    }
+
+    .header-button.icon-button {
+        -fx-min-width: 28px;
+        -fx-min-height: 28px;
+        -fx-pref-width: 28px;
+        -fx-pref-height: 28px;
+        -fx-padding: 4px 6px;
+    }
+}
+
+/* Dark Mode Enhancements */
+.professional-header.dark-mode {
+    -fx-background-color: linear-gradient(to bottom, #1a1a1a, #0d0d0d);
+    -fx-border-color: #333333;
+}
+
+.professional-header.dark-mode .header-button:hover {
+    -fx-background-color: rgba(255, 255, 255, 0.08);
+}
+
+/* High Contrast Mode */
+.professional-header.high-contrast {
+    -fx-background-color: #000000;
+    -fx-border-color: #ffffff;
+    -fx-border-width: 0 0 2px 0;
+}
+
+.professional-header.high-contrast .app-title {
+    -fx-text-fill: #ffffff;
+}
+
+.professional-header.high-contrast .header-button {
+    -fx-text-fill: #ffffff;
+    -fx-border-color: #ffffff;
+    -fx-border-width: 1px;
+}
+
+.professional-header.high-contrast .header-button:hover {
+    -fx-background-color: #ffffff;
+    -fx-text-fill: #000000;
+}
+
+/* =
+==== MODERN BUTTON STYLES WITH HOVER EFFECTS ===== */
+
+/* Base Button Styling */
+.professional-button {
+    -fx-background-color: linear-gradient(to bottom, #0078d4, #106ebe);
+    -fx-text-fill: white;
+    -fx-border-color: transparent;
+    -fx-border-radius: 6px;
+    -fx-background-radius: 6px;
+    -fx-padding: 10px 20px;
+    -fx-font-size: 13px;
+    -fx-font-weight: 500;
+    -fx-cursor: hand;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.2), 2, 0, 0, 1);
+    -fx-transition: all 0.2s ease-in-out;
+}
+
+.professional-button:hover {
+    -fx-background-color: linear-gradient(to bottom, #106ebe, #005a9e);
+    -fx-scale-x: 1.02;
+    -fx-scale-y: 1.02;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.3), 4, 0, 0, 2);
+}
+
+.professional-button:pressed {
+    -fx-background-color: linear-gradient(to bottom, #005a9e, #004578);
+    -fx-scale-x: 0.98;
+    -fx-scale-y: 0.98;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.1), 1, 0, 0, 0);
+}
+
+.professional-button:focused {
+    -fx-border-color: #ffffff;
+    -fx-border-width: 2px;
+    -fx-background-insets: 2px;
+}
+
+.professional-button:disabled {
+    -fx-background-color: #666666;
+    -fx-text-fill: #999999;
+    -fx-opacity: 0.6;
+    -fx-cursor: default;
+    -fx-effect: none;
+}
+
+/* Button Variants */
+
+/* Primary Button (Default) */
+.button-primary {
+    -fx-background-color: linear-gradient(to bottom, #0078d4, #106ebe);
+}
+
+.button-primary:hover {
+    -fx-background-color: linear-gradient(to bottom, #106ebe, #005a9e);
+}
+
+.button-primary:pressed {
+    -fx-background-color: linear-gradient(to bottom, #005a9e, #004578);
+}
+
+/* Secondary Button */
+.button-secondary {
+    -fx-background-color: linear-gradient(to bottom, #6c757d, #5a6268);
+    -fx-text-fill: white;
+}
+
+.button-secondary:hover {
+    -fx-background-color: linear-gradient(to bottom, #5a6268, #495057);
+}
+
+.button-secondary:pressed {
+    -fx-background-color: linear-gradient(to bottom, #495057, #343a40);
+}
+
+/* Success Button */
+.button-success {
+    -fx-background-color: linear-gradient(to bottom, #28a745, #218838);
+}
+
+.button-success:hover {
+    -fx-background-color: linear-gradient(to bottom, #218838, #1e7e34);
+}
+
+.button-success:pressed {
+    -fx-background-color: linear-gradient(to bottom, #1e7e34, #155724);
+}
+
+/* Warning Button */
+.button-warning {
+    -fx-background-color: linear-gradient(to bottom, #ffc107, #e0a800);
+    -fx-text-fill: #212529;
+}
+
+.button-warning:hover {
+    -fx-background-color: linear-gradient(to bottom, #e0a800, #d39e00);
+}
+
+.button-warning:pressed {
+    -fx-background-color: linear-gradient(to bottom, #d39e00, #b69500);
+}
+
+/* Danger Button */
+.button-danger {
+    -fx-background-color: linear-gradient(to bottom, #dc3545, #c82333);
+}
+
+.button-danger:hover {
+    -fx-background-color: linear-gradient(to bottom, #c82333, #bd2130);
+}
+
+.button-danger:pressed {
+    -fx-background-color: linear-gradient(to bottom, #bd2130, #a71e2a);
+}
+
+/* Info Button */
+.button-info {
+    -fx-background-color: linear-gradient(to bottom, #17a2b8, #138496);
+}
+
+.button-info:hover {
+    -fx-background-color: linear-gradient(to bottom, #138496, #117a8b);
+}
+
+.button-info:pressed {
+    -fx-background-color: linear-gradient(to bottom, #117a8b, #0c5460);
+}
+
+/* Light Button */
+.button-light {
+    -fx-background-color: linear-gradient(to bottom, #f8f9fa, #e9ecef);
+    -fx-text-fill: #212529;
+    -fx-border-color: #dee2e6;
+    -fx-border-width: 1px;
+}
+
+.button-light:hover {
+    -fx-background-color: linear-gradient(to bottom, #e9ecef, #dee2e6);
+    -fx-border-color: #adb5bd;
+}
+
+.button-light:pressed {
+    -fx-background-color: linear-gradient(to bottom, #dee2e6, #ced4da);
+}
+
+/* Dark Button */
+.button-dark {
+    -fx-background-color: linear-gradient(to bottom, #343a40, #23272b);
+}
+
+.button-dark:hover {
+    -fx-background-color: linear-gradient(to bottom, #23272b, #1d2124);
+}
+
+.button-dark:pressed {
+    -fx-background-color: linear-gradient(to bottom, #1d2124, #171a1d);
+}
+
+/* Outline Buttons */
+.button-outline {
+    -fx-background-color: transparent;
+    -fx-border-width: 2px;
+    -fx-background-insets: 0;
+    -fx-border-insets: 0;
+}
+
+.button-outline-primary {
+    -fx-border-color: #0078d4;
+    -fx-text-fill: #0078d4;
+}
+
+.button-outline-primary:hover {
+    -fx-background-color: #0078d4;
+    -fx-text-fill: white;
+}
+
+.button-outline-secondary {
+    -fx-border-color: #6c757d;
+    -fx-text-fill: #6c757d;
+}
+
+.button-outline-secondary:hover {
+    -fx-background-color: #6c757d;
+    -fx-text-fill: white;
+}
+
+.button-outline-success {
+    -fx-border-color: #28a745;
+    -fx-text-fill: #28a745;
+}
+
+.button-outline-success:hover {
+    -fx-background-color: #28a745;
+    -fx-text-fill: white;
+}
+
+.button-outline-danger {
+    -fx-border-color: #dc3545;
+    -fx-text-fill: #dc3545;
+}
+
+.button-outline-danger:hover {
+    -fx-background-color: #dc3545;
+    -fx-text-fill: white;
+}
+
+.button-outline-warning {
+    -fx-border-color: #ffc107;
+    -fx-text-fill: #ffc107;
+}
+
+.button-outline-warning:hover {
+    -fx-background-color: #ffc107;
+    -fx-text-fill: #212529;
+}
+
+.button-outline-info {
+    -fx-border-color: #17a2b8;
+    -fx-text-fill: #17a2b8;
+}
+
+.button-outline-info:hover {
+    -fx-background-color: #17a2b8;
+    -fx-text-fill: white;
+}
+
+/* Button Sizes */
+.button-small {
+    -fx-padding: 6px 12px;
+    -fx-font-size: 11px;
+}
+
+.button-large {
+    -fx-padding: 14px 28px;
+    -fx-font-size: 15px;
+}
+
+.button-extra-large {
+    -fx-padding: 18px 36px;
+    -fx-font-size: 17px;
+}
+
+/* Icon Buttons */
+.icon-button {
+    -fx-padding: 8px;
+    -fx-min-width: 36px;
+    -fx-min-height: 36px;
+    -fx-pref-width: 36px;
+    -fx-pref-height: 36px;
+    -fx-background-radius: 18px;
+    -fx-border-radius: 18px;
+}
+
+.icon-button-small {
+    -fx-padding: 6px;
+    -fx-min-width: 28px;
+    -fx-min-height: 28px;
+    -fx-pref-width: 28px;
+    -fx-pref-height: 28px;
+    -fx-background-radius: 14px;
+    -fx-border-radius: 14px;
+    -fx-font-size: 12px;
+}
+
+.icon-button-large {
+    -fx-padding: 12px;
+    -fx-min-width: 48px;
+    -fx-min-height: 48px;
+    -fx-pref-width: 48px;
+    -fx-pref-height: 48px;
+    -fx-background-radius: 24px;
+    -fx-border-radius: 24px;
+    -fx-font-size: 18px;
+}
+
+/* Floating Action Button */
+.fab-button {
+    -fx-background-color: linear-gradient(to bottom, #0078d4, #106ebe);
+    -fx-background-radius: 28px;
+    -fx-border-radius: 28px;
+    -fx-min-width: 56px;
+    -fx-min-height: 56px;
+    -fx-pref-width: 56px;
+    -fx-pref-height: 56px;
+    -fx-font-size: 20px;
+    -fx-text-fill: white;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.3), 6, 0, 0, 3);
+}
+
+.fab-button:hover {
+    -fx-scale-x: 1.1;
+    -fx-scale-y: 1.1;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.4), 8, 0, 0, 4);
+}
+
+.fab-button:pressed {
+    -fx-scale-x: 0.95;
+    -fx-scale-y: 0.95;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.2), 3, 0, 0, 1);
+}
+
+/* Toggle Buttons */
+.toggle-button {
+    -fx-background-color: linear-gradient(to bottom, #6c757d, #5a6268);
+    -fx-text-fill: white;
+}
+
+.toggle-button:selected {
+    -fx-background-color: linear-gradient(to bottom, #0078d4, #106ebe);
+}
+
+.toggle-button:selected:hover {
+    -fx-background-color: linear-gradient(to bottom, #106ebe, #005a9e);
+}
+
+/* Button Groups */
+.button-group .professional-button {
+    -fx-background-radius: 0;
+    -fx-border-radius: 0;
+    -fx-border-width: 0 1px 0 0;
+    -fx-border-color: rgba(255, 255, 255, 0.2);
+}
+
+.button-group .professional-button:first-child {
+    -fx-background-radius: 6px 0 0 6px;
+    -fx-border-radius: 6px 0 0 6px;
+}
+
+.button-group .professional-button:last-child {
+    -fx-background-radius: 0 6px 6px 0;
+    -fx-border-radius: 0 6px 6px 0;
+    -fx-border-width: 0;
+}
+
+/* Loading Button State */
+.button-loading {
+    -fx-text-fill: transparent;
+    -fx-background-color: #666666;
+    -fx-cursor: wait;
+}
+
+.button-loading:hover {
+    -fx-background-color: #666666;
+    -fx-scale-x: 1.0;
+    -fx-scale-y: 1.0;
+}
+
+/* Pulse Animation for Loading */
+@keyframes button-pulse {
+    0% {
+        -fx-opacity: 1.0;
+    }
+
+    50% {
+        -fx-opacity: 0.7;
+    }
+
+    100% {
+        -fx-opacity: 1.0;
+    }
+}
+
+.button-loading {
+    -fx-animation: button-pulse 1.5s infinite;
+}
+
+/* Glass Effect Buttons */
+.button-glass {
+    -fx-background-color: rgba(255, 255, 255, 0.1);
+    -fx-border-color: rgba(255, 255, 255, 0.2);
+    -fx-border-width: 1px;
+    -fx-text-fill: white;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.1), 2, 0, 0, 1);
+}
+
+.button-glass:hover {
+    -fx-background-color: rgba(255, 255, 255, 0.2);
+    -fx-border-color: rgba(255, 255, 255, 0.3);
+}
+
+.button-glass:pressed {
+    -fx-background-color: rgba(255, 255, 255, 0.15);
+}
+
+/* Gradient Buttons */
+.button-gradient-blue {
+    -fx-background-color: linear-gradient(45deg, #667eea 0%, #764ba2 100%);
+}
+
+.button-gradient-green {
+    -fx-background-color: linear-gradient(45deg, #56ab2f 0%, #a8e6cf 100%);
+}
+
+.button-gradient-orange {
+    -fx-background-color: linear-gradient(45deg, #f093fb 0%, #f5576c 100%);
+}
+
+.button-gradient-purple {
+    -fx-background-color: linear-gradient(45deg, #4facfe 0%, #00f2fe 100%);
+}
+
+/* Neumorphism Style Buttons */
+.button-neumorphism {
+    -fx-background-color: #2d2d2d;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.3), 8, 0, 4, 4),
+        innershadow(gaussian, rgba(255, 255, 255, 0.1), 8, 0, -4, -4);
+    -fx-text-fill: #ffffff;
+}
+
+.button-neumorphism:hover {
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.2), 4, 0, 2, 2),
+        innershadow(gaussian, rgba(255, 255, 255, 0.15), 4, 0, -2, -2);
+}
+
+.button-neumorphism:pressed {
+    -fx-effect: innershadow(gaussian, rgba(0, 0, 0, 0.3), 8, 0, 4, 4),
+        innershadow(gaussian, rgba(255, 255, 255, 0.05), 8, 0, -4, -4);
+}
+
+/* Ripple Effect (Simulated with scaling) */
+.button-ripple {
+    -fx-transition: all 0.1s ease-out;
+}
+
+.button-ripple:pressed {
+    -fx-scale-x: 1.05;
+    -fx-scale-y: 1.05;
+    -fx-transition: all 0.05s ease-in;
+}
+
+/* Accessibility Enhancements */
+.professional-button:focused {
+    -fx-border-color: #ffffff;
+    -fx-border-width: 2px;
+    -fx-background-insets: 2px;
+}
+
+/* High Contrast Mode */
+.professional-button.high-contrast {
+    -fx-background-color: #000000;
+    -fx-text-fill: #ffffff;
+    -fx-border-color: #ffffff;
+    -fx-border-width: 2px;
+}
+
+.professional-button.high-contrast:hover {
+    -fx-background-color: #ffffff;
+    -fx-text-fill: #000000;
+}
+
+/* Responsive Button Sizing */
+@media (max-width: 800px) {
+    .professional-button {
+        -fx-padding: 8px 16px;
+        -fx-font-size: 12px;
+    }
+
+    .button-large {
+        -fx-padding: 12px 24px;
+        -fx-font-size: 14px;
+    }
+
+    .fab-button {
+        -fx-min-width: 48px;
+        -fx-min-height: 48px;
+        -fx-pref-width: 48px;
+        -fx-pref-height: 48px;
+        -fx-background-radius: 24px;
+        -fx-border-radius: 24px;
+        -fx-font-size: 18px;
+    }
+}
+
+/* Button Animations */
+.professional-button {
+    -fx-transition: -fx-background-color 0.2s ease-in-out,
+        -fx-scale-x 0.1s ease-in-out,
+        -fx-scale-y 0.1s ease-in-out,
+        -fx-effect 0.2s ease-in-out;
+}
+
+/* Custom Button States */
+.button-active {
+    -fx-background-color: linear-gradient(to bottom, #005a9e, #004578);
+    -fx-effect: innershadow(gaussian, rgba(0, 0, 0, 0.2), 4, 0, 0, 2);
+}
+
+.button-processing {
+    -fx-background-color: #666666;
+    -fx-text-fill: #999999;
+    -fx-cursor: wait;
+}
+
+/* Special Security Buttons */
+.security-button {
+    -fx-background-color: linear-gradient(to bottom, #d4af37, #b8941f);
+    -fx-text-fill: #000000;
+    -fx-font-weight: bold;
+}
+
+.security-button:hover {
+    -fx-background-color: linear-gradient(to bottom, #b8941f, #9c7c1a);
+}
+
+.emergency-button {
+    -fx-background-color: linear-gradient(to bottom, #ff4757, #ff3742);
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+    -fx-effect: dropshadow(gaussian, rgba(255, 71, 87, 0.4), 4, 0, 0, 2);
+}
+
+.emergency-button:hover {
+    -fx-background-color: linear-gradient(to bottom, #ff3742, #ff2f3a);
+    -fx-effect: dropshadow(gaussian, rgba(255, 71, 87, 0.6), 6, 0, 0, 3);
+}

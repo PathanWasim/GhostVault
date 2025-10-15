@@ -1,369 +1,494 @@
 package com.ghostvault.ui.components;
 
 import javafx.animation.FadeTransition;
+import javafx.animation.Timeline;
+import javafx.animation.KeyFrame;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
-import javafx.scene.control.Label;
-import javafx.scene.control.Tooltip;
-import javafx.scene.layout.HBox;
-import javafx.scene.layout.Priority;
-import javafx.scene.layout.Region;
-import javafx.scene.layout.VBox;
+import javafx.scene.control.*;
+import javafx.scene.layout.*;
+import javafx.scene.paint.Color;
+import javafx.scene.text.Font;
+import javafx.scene.text.FontWeight;
 import javafx.util.Duration;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.function.Consumer;
 
 /**
- * Professional header component with branding and session information
+ * Professional header component with branding, session info, and user controls
  */
 public class ProfessionalHeader extends HBox {
     
-    private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm:ss");
-    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("MMM dd, yyyy");
+    // Header sections
+    private VBox brandingSection;
+    private HBox sessionInfoSection;
+    private HBox userControlsSection;
+    private HBox statusSection;
     
-    // Header components
-    private final Label brandingLabel;
-    private final Label versionLabel;
-    private final Label sessionStatusLabel;
-    private final Label userInfoLabel;
-    private final Label timeLabel;
-    private final Label securityStatusLabel;
+    // Components
+    private Label appTitleLabel;
+    private Label appSubtitleLabel;
+    private Label modeIndicator;
+    private Label sessionTimeLabel;
+    private Label userNameLabel;
+    private Label connectionStatusLabel;
+    private Button settingsButton;
+    private Button logoutButton;
+    private Button minimizeButton;
+    private ProgressBar securityLevelBar;
     
-    // Session information
-    private String currentUser = "User";
-    private String sessionMode = "MASTER";
-    private boolean isSecure = true;
+    // Session data
+    private String currentMode = "Master";
+    private String userName = "User";
     private LocalDateTime sessionStart;
+    private Timeline clockTimer;
+    private boolean isConnected = true;
     
-    // Animation components
-    private FadeTransition securityBlink;
+    // Callbacks
+    private Consumer<String> onModeChange;
+    private Runnable onSettingsClick;
+    private Runnable onLogoutClick;
+    private Runnable onMinimizeClick;
     
     public ProfessionalHeader() {
-        super(20);
-        setPadding(new Insets(12, 20, 12, 20));
-        setAlignment(Pos.CENTER_LEFT);
-        getStyleClass().add("professional-header");
-        
-        sessionStart = LocalDateTime.now();
-        
-        // Left side - Branding
-        VBox brandingBox = createBrandingSection();
-        
-        // Center spacer
-        Region spacer = new Region();
-        HBox.setHgrow(spacer, Priority.ALWAYS);
-        
-        // Right side - Session info
-        HBox sessionBox = createSessionInfoSection();
-        
-        getChildren().addAll(brandingBox, spacer, sessionBox);
-        
-        // Start time updates
-        startTimeUpdates();
-        
-        // Apply professional styling
-        setStyle("""
-            -fx-background-color: linear-gradient(to bottom, #2d2d2d, #252525);
-            -fx-border-color: #404040;
-            -fx-border-width: 0 0 1px 0;
-            -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.2), 4, 0, 0, 2);
-            """);
+        this.sessionStart = LocalDateTime.now();
+        initializeComponents();
+        setupLayout();
+        setupStyling();
+        startClock();
     }
     
     /**
-     * Create branding section with logo and version
+     * Initialize all header components
      */
-    private VBox createBrandingSection() {
-        VBox brandingBox = new VBox(2);
-        brandingBox.setAlignment(Pos.CENTER_LEFT);
+    private void initializeComponents() {
+        // Branding section
+        appTitleLabel = new Label("👻 GhostVault");
+        appTitleLabel.getStyleClass().add("app-title");
         
-        // Main brand label
-        brandingLabel = new Label("🔒 GhostVault");
-        brandingLabel.setStyle("""
-            -fx-font-size: 20px;
-            -fx-font-weight: bold;
-            -fx-text-fill: linear-gradient(to right, #0078d4, #00bcf2);
-            """);
+        appSubtitleLabel = new Label("Secure File Management");
+        appSubtitleLabel.getStyleClass().add("app-subtitle");
         
-        // Version label
-        versionLabel = new Label("Professional Edition v1.0.0");
-        versionLabel.setStyle("""
-            -fx-font-size: 11px;
-            -fx-text-fill: #888888;
-            -fx-font-style: italic;
-            """);
+        brandingSection = new VBox(2);
+        brandingSection.getChildren().addAll(appTitleLabel, appSubtitleLabel);
+        brandingSection.setAlignment(Pos.CENTER_LEFT);
         
-        brandingBox.getChildren().addAll(brandingLabel, versionLabel);
+        // Session info section
+        modeIndicator = new Label();
+        updateModeIndicator();
         
-        return brandingBox;
+        sessionTimeLabel = new Label();
+        sessionTimeLabel.getStyleClass().add("session-time");
+        
+        userNameLabel = new Label("👤 " + userName);
+        userNameLabel.getStyleClass().add("user-name");
+        
+        connectionStatusLabel = new Label();
+        updateConnectionStatus();
+        
+        sessionInfoSection = new HBox(15);
+        sessionInfoSection.setAlignment(Pos.CENTER);
+        sessionInfoSection.getChildren().addAll(
+            modeIndicator,
+            createSeparator(),
+            sessionTimeLabel,
+            createSeparator(),
+            userNameLabel,
+            createSeparator(),
+            connectionStatusLabel
+        );
+        
+        // Security level indicator
+        securityLevelBar = new ProgressBar(0.85);
+        securityLevelBar.getStyleClass().add("security-level-bar");
+        securityLevelBar.setPrefWidth(100);
+        securityLevelBar.setPrefHeight(6);
+        
+        Label securityLabel = new Label("Security Level");
+        securityLabel.getStyleClass().add("security-label");
+        
+        VBox securitySection = new VBox(2);
+        securitySection.setAlignment(Pos.CENTER);
+        securitySection.getChildren().addAll(securityLabel, securityLevelBar);
+        
+        // User controls section
+        settingsButton = new Button();
+        settingsButton.setText(ModernIcons.SETTINGS);
+        settingsButton.getStyleClass().addAll("header-button", "icon-button");
+        settingsButton.setTooltip(new Tooltip("Settings"));
+        settingsButton.setOnAction(e -> {
+            if (onSettingsClick != null) onSettingsClick.run();
+        });
+        
+        logoutButton = new Button();
+        logoutButton.setText(ModernIcons.LOGOUT);
+        logoutButton.getStyleClass().addAll("header-button", "icon-button", "logout-button");
+        logoutButton.setTooltip(new Tooltip("Logout"));
+        logoutButton.setOnAction(e -> {
+            if (onLogoutClick != null) onLogoutClick.run();
+        });
+        
+        minimizeButton = new Button();
+        minimizeButton.setText("➖");
+        minimizeButton.getStyleClass().addAll("header-button", "icon-button");
+        minimizeButton.setTooltip(new Tooltip("Minimize"));
+        minimizeButton.setOnAction(e -> {
+            if (onMinimizeClick != null) onMinimizeClick.run();
+        });
+        
+        userControlsSection = new HBox(5);
+        userControlsSection.setAlignment(Pos.CENTER_RIGHT);
+        userControlsSection.getChildren().addAll(
+            securitySection,
+            createSeparator(),
+            settingsButton,
+            logoutButton,
+            minimizeButton
+        );
+        
+        // Status section for notifications
+        statusSection = new HBox(10);
+        statusSection.setAlignment(Pos.CENTER);
+        statusSection.getStyleClass().add("status-section");
     }
     
     /**
-     * Create session information section
+     * Setup the main layout
      */
-    private HBox createSessionInfoSection() {
-        HBox sessionBox = new HBox(15);
-        sessionBox.setAlignment(Pos.CENTER_RIGHT);
+    private void setupLayout() {
+        this.setAlignment(Pos.CENTER);
+        this.setPadding(new Insets(12, 20, 12, 20));
+        this.setSpacing(20);
         
-        // Security status indicator
-        securityStatusLabel = new Label("🛡️ SECURE");
-        securityStatusLabel.getStyleClass().add("status-badge");
-        securityStatusLabel.getStyleClass().add("status-online");
-        securityStatusLabel.setTooltip(new Tooltip("Vault is encrypted and secure"));
+        // Create spacers for proper alignment
+        Region leftSpacer = new Region();
+        HBox.setHgrow(leftSpacer, Priority.SOMETIMES);
         
-        // Session mode indicator
-        sessionStatusLabel = new Label("🔐 MASTER");
-        sessionStatusLabel.getStyleClass().add("status-badge");
-        sessionStatusLabel.setStyle("-fx-background-color: #0078d4; -fx-text-fill: white;");
-        sessionStatusLabel.setTooltip(new Tooltip("Current session mode"));
+        Region rightSpacer = new Region();
+        HBox.setHgrow(rightSpacer, Priority.SOMETIMES);
         
-        // User information
-        userInfoLabel = new Label("👤 " + currentUser);
-        userInfoLabel.setStyle("""
-            -fx-text-fill: #cccccc;
-            -fx-font-size: 13px;
-            -fx-font-weight: 500;
-            """);
-        userInfoLabel.setTooltip(new Tooltip("Current user"));
-        
-        // Time display
-        timeLabel = new Label();
-        timeLabel.setStyle("""
-            -fx-text-fill: #cccccc;
-            -fx-font-size: 13px;
-            -fx-font-family: 'Consolas', monospace;
-            """);
-        updateTimeDisplay();
-        
-        sessionBox.getChildren().addAll(securityStatusLabel, sessionStatusLabel, userInfoLabel, timeLabel);
-        
-        return sessionBox;
+        // Add all sections to header
+        this.getChildren().addAll(
+            brandingSection,
+            leftSpacer,
+            sessionInfoSection,
+            statusSection,
+            rightSpacer,
+            userControlsSection
+        );
     }
     
     /**
-     * Update session mode (MASTER, DECOY, PANIC)
+     * Setup component styling
      */
-    public void setSessionMode(String mode) {
-        this.sessionMode = mode.toUpperCase();
+    private void setupStyling() {
+        this.getStyleClass().add("professional-header");
         
+        // Apply modern styling
+        this.setStyle(
+            "-fx-background-color: linear-gradient(to bottom, #2d2d2d, #1a1a1a);" +
+            "-fx-border-color: #404040;" +
+            "-fx-border-width: 0 0 1px 0;" +
+            "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.3), 4, 0, 0, 2);"
+        );
+    }
+    
+    /**
+     * Create a visual separator
+     */
+    private Region createSeparator() {
+        Region separator = new Region();
+        separator.setPrefWidth(1);
+        separator.setPrefHeight(20);
+        separator.setStyle("-fx-background-color: #555555;");
+        return separator;
+    }
+    
+    /**
+     * Start the clock timer
+     */
+    private void startClock() {
+        clockTimer = new Timeline(new KeyFrame(Duration.seconds(1), e -> updateSessionTime()));
+        clockTimer.setCycleCount(Timeline.INDEFINITE);
+        clockTimer.play();
+        updateSessionTime(); // Initial update
+    }
+    
+    /**
+     * Update session time display
+     */
+    private void updateSessionTime() {
         Platform.runLater(() -> {
-            switch (sessionMode) {
-                case "MASTER":
-                    sessionStatusLabel.setText("🔐 MASTER");
-                    sessionStatusLabel.setStyle("-fx-background-color: #0078d4; -fx-text-fill: white;");
-                    sessionStatusLabel.setTooltip(new Tooltip("Master vault - Full access"));
-                    break;
-                    
-                case "DECOY":
-                    sessionStatusLabel.setText("🎭 DECOY");
-                    sessionStatusLabel.setStyle("-fx-background-color: #ff8c00; -fx-text-fill: white;");
-                    sessionStatusLabel.setTooltip(new Tooltip("Decoy mode - Showing fake data"));
-                    break;
-                    
-                case "PANIC":
-                    sessionStatusLabel.setText("🚨 PANIC");
-                    sessionStatusLabel.setStyle("-fx-background-color: #d13438; -fx-text-fill: white;");
-                    sessionStatusLabel.setTooltip(new Tooltip("Panic mode - Data destruction"));
-                    break;
-                    
-                default:
-                    sessionStatusLabel.setText("❓ UNKNOWN");
-                    sessionStatusLabel.setStyle("-fx-background-color: #888888; -fx-text-fill: white;");
-                    sessionStatusLabel.setTooltip(new Tooltip("Unknown session mode"));
-            }
+            LocalDateTime now = LocalDateTime.now();
+            Duration sessionDuration = Duration.between(sessionStart, now);
+            
+            long hours = sessionDuration.toHours();
+            long minutes = sessionDuration.toMinutes() % 60;
+            long seconds = sessionDuration.getSeconds() % 60;
+            
+            String timeText = String.format("🕐 Session: %02d:%02d:%02d", hours, minutes, seconds);
+            sessionTimeLabel.setText(timeText);
         });
     }
     
     /**
-     * Update security status
+     * Update mode indicator
      */
-    public void setSecurityStatus(boolean secure) {
-        this.isSecure = secure;
+    private void updateModeIndicator() {
+        String modeIcon;
+        String modeColor;
         
-        Platform.runLater(() -> {
-            if (secure) {
-                securityStatusLabel.setText("🛡️ SECURE");
-                securityStatusLabel.getStyleClass().removeAll("status-warning", "status-error");
-                securityStatusLabel.getStyleClass().add("status-online");
-                securityStatusLabel.setTooltip(new Tooltip("Vault is encrypted and secure"));
-                stopSecurityBlink();
-            } else {
-                securityStatusLabel.setText("⚠️ UNSECURE");
-                securityStatusLabel.getStyleClass().removeAll("status-online");
-                securityStatusLabel.getStyleClass().add("status-warning");
-                securityStatusLabel.setTooltip(new Tooltip("Security warning detected"));
-                startSecurityBlink();
-            }
-        });
-    }
-    
-    /**
-     * Update user information
-     */
-    public void setUserInfo(String username) {
-        this.currentUser = username != null ? username : "User";
-        
-        Platform.runLater(() -> {
-            userInfoLabel.setText("👤 " + currentUser);
-            userInfoLabel.setTooltip(new Tooltip("Current user: " + currentUser));
-        });
-    }
-    
-    /**
-     * Show session duration
-     */
-    public void showSessionDuration(long durationMinutes) {
-        Platform.runLater(() -> {
-            String durationText = formatDuration(durationMinutes);
-            userInfoLabel.setTooltip(new Tooltip(String.format("Session duration: %s", durationText)));
-        });
-    }
-    
-    /**
-     * Show threat level indicator
-     */
-    public void setThreatLevel(String level) {
-        Platform.runLater(() -> {
-            switch (level.toUpperCase()) {
-                case "LOW":
-                    securityStatusLabel.setText("🛡️ SECURE");
-                    securityStatusLabel.getStyleClass().removeAll("status-warning", "status-error");
-                    securityStatusLabel.getStyleClass().add("status-online");
-                    stopSecurityBlink();
-                    break;
-                    
-                case "MEDIUM":
-                    securityStatusLabel.setText("⚠️ CAUTION");
-                    securityStatusLabel.getStyleClass().removeAll("status-online", "status-error");
-                    securityStatusLabel.getStyleClass().add("status-warning");
-                    startSecurityBlink();
-                    break;
-                    
-                case "HIGH":
-                    securityStatusLabel.setText("🚨 THREAT");
-                    securityStatusLabel.getStyleClass().removeAll("status-online", "status-warning");
-                    securityStatusLabel.getStyleClass().add("status-error");
-                    startSecurityBlink();
-                    break;
-            }
-        });
-    }
-    
-    /**
-     * Update time display
-     */
-    private void updateTimeDisplay() {
-        LocalDateTime now = LocalDateTime.now();
-        String timeText = now.format(TIME_FORMATTER);
-        String dateText = now.format(DATE_FORMATTER);
-        
-        timeLabel.setText(timeText);
-        timeLabel.setTooltip(new Tooltip(dateText));
-    }
-    
-    /**
-     * Start automatic time updates
-     */
-    private void startTimeUpdates() {
-        Thread timeThread = new Thread(() -> {
-            while (true) {
-                try {
-                    Thread.sleep(1000); // Update every second
-                    Platform.runLater(this::updateTimeDisplay);
-                } catch (InterruptedException e) {
-                    break;
-                }
-            }
-        });
-        timeThread.setDaemon(true);
-        timeThread.start();
-    }
-    
-    /**
-     * Start security status blinking animation
-     */
-    private void startSecurityBlink() {
-        if (securityBlink != null) {
-            securityBlink.stop();
+        switch (currentMode.toLowerCase()) {
+            case "master":
+                modeIcon = ModernIcons.MASTER_MODE;
+                modeColor = "#107c10"; // Green
+                break;
+            case "decoy":
+                modeIcon = ModernIcons.DECOY_MODE;
+                modeColor = "#ff8c00"; // Orange
+                break;
+            case "panic":
+                modeIcon = ModernIcons.PANIC_MODE;
+                modeColor = "#d13438"; // Red
+                break;
+            default:
+                modeIcon = ModernIcons.SECURE;
+                modeColor = "#0078d4"; // Blue
         }
         
-        securityBlink = new FadeTransition(Duration.seconds(0.8), securityStatusLabel);
-        securityBlink.setFromValue(1.0);
-        securityBlink.setToValue(0.3);
-        securityBlink.setCycleCount(FadeTransition.INDEFINITE);
-        securityBlink.setAutoReverse(true);
-        securityBlink.play();
+        modeIndicator.setText(modeIcon + " " + currentMode + " Mode");
+        modeIndicator.setStyle(String.format(
+            "-fx-text-fill: %s; -fx-font-weight: bold; -fx-font-size: 13px;", 
+            modeColor
+        ));
+        modeIndicator.getStyleClass().add("mode-indicator");
     }
     
     /**
-     * Stop security status blinking animation
+     * Update connection status
      */
-    private void stopSecurityBlink() {
-        if (securityBlink != null) {
-            securityBlink.stop();
-            securityStatusLabel.setOpacity(1.0);
-        }
-    }
-    
-    /**
-     * Format duration for display
-     */
-    private String formatDuration(long minutes) {
-        if (minutes < 60) {
-            return minutes + " minutes";
-        } else if (minutes < 1440) { // Less than 24 hours
-            long hours = minutes / 60;
-            long remainingMinutes = minutes % 60;
-            return String.format("%d hours, %d minutes", hours, remainingMinutes);
+    private void updateConnectionStatus() {
+        if (isConnected) {
+            connectionStatusLabel.setText(ModernIcons.CONNECTED + " Online");
+            connectionStatusLabel.setStyle("-fx-text-fill: #107c10; -fx-font-size: 12px;");
         } else {
-            long days = minutes / 1440;
-            long remainingHours = (minutes % 1440) / 60;
-            return String.format("%d days, %d hours", days, remainingHours);
+            connectionStatusLabel.setText(ModernIcons.DISCONNECTED + " Offline");
+            connectionStatusLabel.setStyle("-fx-text-fill: #d13438; -fx-font-size: 12px;");
         }
+        connectionStatusLabel.getStyleClass().add("connection-status");
     }
     
     /**
-     * Show connection status
+     * Show a temporary status message
      */
-    public void setConnectionStatus(boolean connected) {
+    public void showStatusMessage(String message, String type, Duration duration) {
         Platform.runLater(() -> {
-            if (connected) {
-                versionLabel.setText("Professional Edition v1.0.0 • Online");
-                versionLabel.setStyle("""
-                    -fx-font-size: 11px;
-                    -fx-text-fill: #107c10;
-                    -fx-font-style: italic;
-                    """);
-            } else {
-                versionLabel.setText("Professional Edition v1.0.0 • Offline");
-                versionLabel.setStyle("""
-                    -fx-font-size: 11px;
-                    -fx-text-fill: #888888;
-                    -fx-font-style: italic;
-                    """);
+            Label statusLabel = new Label(message);
+            statusLabel.getStyleClass().add("status-message");
+            
+            // Set color based on type
+            String color;
+            switch (type.toLowerCase()) {
+                case "success":
+                    color = "#107c10";
+                    statusLabel.setText(ModernIcons.SUCCESS + " " + message);
+                    break;
+                case "error":
+                    color = "#d13438";
+                    statusLabel.setText(ModernIcons.ERROR + " " + message);
+                    break;
+                case "warning":
+                    color = "#ff8c00";
+                    statusLabel.setText(ModernIcons.WARNING + " " + message);
+                    break;
+                default:
+                    color = "#0078d4";
+                    statusLabel.setText(ModernIcons.INFO + " " + message);
             }
+            
+            statusLabel.setStyle(String.format("-fx-text-fill: %s; -fx-font-size: 12px;", color));
+            
+            // Add to status section
+            statusSection.getChildren().clear();
+            statusSection.getChildren().add(statusLabel);
+            
+            // Fade in
+            FadeTransition fadeIn = new FadeTransition(Duration.millis(300), statusLabel);
+            fadeIn.setFromValue(0);
+            fadeIn.setToValue(1);
+            fadeIn.play();
+            
+            // Auto-remove after duration
+            Timeline removeTimer = new Timeline(new KeyFrame(duration, e -> {
+                FadeTransition fadeOut = new FadeTransition(Duration.millis(300), statusLabel);
+                fadeOut.setFromValue(1);
+                fadeOut.setToValue(0);
+                fadeOut.setOnFinished(event -> statusSection.getChildren().remove(statusLabel));
+                fadeOut.play();
+            }));
+            removeTimer.play();
         });
     }
     
     /**
-     * Show notification badge
+     * Update security level (0.0 to 1.0)
+     */
+    public void updateSecurityLevel(double level) {
+        Platform.runLater(() -> {
+            securityLevelBar.setProgress(level);
+            
+            // Change color based on level
+            String color;
+            if (level >= 0.8) {
+                color = "#107c10"; // Green - High security
+            } else if (level >= 0.5) {
+                color = "#ff8c00"; // Orange - Medium security
+            } else {
+                color = "#d13438"; // Red - Low security
+            }
+            
+            securityLevelBar.setStyle(String.format(
+                "-fx-accent: %s; -fx-background-color: rgba(255,255,255,0.1);", 
+                color
+            ));
+        });
+    }
+    
+    /**
+     * Add notification badge to settings button
      */
     public void showNotificationBadge(int count) {
         Platform.runLater(() -> {
             if (count > 0) {
-                brandingLabel.setText(String.format("🔒 GhostVault (%d)", count));
+                settingsButton.setText(ModernIcons.SETTINGS + " (" + count + ")");
+                settingsButton.getStyleClass().add("has-notification");
             } else {
-                brandingLabel.setText("🔒 GhostVault");
+                settingsButton.setText(ModernIcons.SETTINGS);
+                settingsButton.getStyleClass().remove("has-notification");
             }
         });
+    }
+    
+    // Getters and Setters
+    
+    public String getCurrentMode() {
+        return currentMode;
+    }
+    
+    public void setCurrentMode(String mode) {
+        this.currentMode = mode;
+        updateModeIndicator();
+        if (onModeChange != null) {
+            onModeChange.accept(mode);
+        }
+    }
+    
+    public String getUserName() {
+        return userName;
+    }
+    
+    public void setUserName(String userName) {
+        this.userName = userName;
+        userNameLabel.setText("👤 " + userName);
+    }
+    
+    public boolean isConnected() {
+        return isConnected;
+    }
+    
+    public void setConnected(boolean connected) {
+        this.isConnected = connected;
+        updateConnectionStatus();
+    }
+    
+    public void setAppTitle(String title) {
+        appTitleLabel.setText("👻 " + title);
+    }
+    
+    public void setAppSubtitle(String subtitle) {
+        appSubtitleLabel.setText(subtitle);
+    }
+    
+    // Event handlers
+    
+    public void setOnModeChange(Consumer<String> callback) {
+        this.onModeChange = callback;
+    }
+    
+    public void setOnSettingsClick(Runnable callback) {
+        this.onSettingsClick = callback;
+    }
+    
+    public void setOnLogoutClick(Runnable callback) {
+        this.onLogoutClick = callback;
+    }
+    
+    public void setOnMinimizeClick(Runnable callback) {
+        this.onMinimizeClick = callback;
     }
     
     /**
      * Cleanup resources
      */
     public void cleanup() {
-        stopSecurityBlink();
+        if (clockTimer != null) {
+            clockTimer.stop();
+        }
+    }
+    
+    /**
+     * Reset session timer
+     */
+    public void resetSessionTimer() {
+        this.sessionStart = LocalDateTime.now();
+        updateSessionTime();
+    }
+    
+    /**
+     * Get session duration in seconds
+     */
+    public long getSessionDurationSeconds() {
+        return Duration.between(sessionStart, LocalDateTime.now()).getSeconds();
+    }
+    
+    /**
+     * Show quick action buttons for emergency situations
+     */
+    public void showEmergencyControls(boolean show) {
+        Platform.runLater(() -> {
+            if (show) {
+                Button panicButton = new Button(ModernIcons.PANIC_MODE);
+                panicButton.getStyleClass().addAll("header-button", "panic-button");
+                panicButton.setTooltip(new Tooltip("Emergency Mode"));
+                panicButton.setOnAction(e -> setCurrentMode("Panic"));
+                
+                if (!userControlsSection.getChildren().contains(panicButton)) {
+                    userControlsSection.getChildren().add(0, panicButton);
+                }
+            } else {
+                userControlsSection.getChildren().removeIf(node -> 
+                    node instanceof Button && ((Button) node).getStyleClass().contains("panic-button"));
+            }
+        });
+    }
+    
+    /**
+     * Animate mode change
+     */
+    public void animateModeChange(String newMode) {
+        FadeTransition fadeOut = new FadeTransition(Duration.millis(200), modeIndicator);
+        fadeOut.setFromValue(1);
+        fadeOut.setToValue(0);
+        fadeOut.setOnFinished(e -> {
+            setCurrentMode(newMode);
+            FadeTransition fadeIn = new FadeTransition(Duration.millis(200), modeIndicator);
+            fadeIn.setFromValue(0);
+            fadeIn.setToValue(1);
+            fadeIn.play();
+        });
+        fadeOut.play();
     }
 }
