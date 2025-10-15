@@ -3,27 +3,27 @@ package com.ghostvault.ui.components;
 import javafx.application.Platform;
 import javafx.concurrent.Task;
 import javafx.geometry.Insets;
+import javafx.geometry.Pos;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
-import javafx.scene.paint.Color;
-import javafx.scene.text.Font;
 import javafx.scene.text.Text;
 import javafx.scene.text.TextFlow;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
+import java.io.IOException;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Professional code preview component with syntax highlighting
+ * Advanced code preview component with syntax highlighting and line numbers
  */
 public class CodePreviewPane extends VBox {
     
-    private static final Font CODE_FONT = Font.font("Consolas", 13);
-    private static final int MAX_LINES_PREVIEW = 1000;
-    
     // Language detection patterns
+    private static final Map<Strns
     private static final Map<String, String> LANGUAGE_EXTENSIONS = new HashMap<>();
     static {
         LANGUAGE_EXTENSIONS.put(".py", "python");
