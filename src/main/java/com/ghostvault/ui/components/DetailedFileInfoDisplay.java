@@ -51,4 +51,295 @@ public class DetailedFileInfoDisplay extends VBox {
         applyStyles();
     }
     
-    private void initializeComponents() {\n        thumbnailView = new ImageView();\n        thumbnailView.setFitWidth(THUMBNAIL_SIZE);\n        thumbnailView.setFitHeight(THUMBNAIL_SIZE);\n        thumbnailView.setPreserveRatio(true);\n        thumbnailView.setSmooth(true);\n        \n        fileNameLabel = new Label();\n        fileSizeLabel = new Label();\n        fileTypeLabel = new Label();\n        createdDateLabel = new Label();\n        modifiedDateLabel = new Label();\n        accessedDateLabel = new Label();\n        pathLabel = new Label();\n        permissionsLabel = new Label();\n        \n        loadingIndicator = new ProgressIndicator();\n        loadingIndicator.setVisible(false);\n        loadingIndicator.setMaxSize(30, 30);\n        \n        contentPane = new VBox(10);\n    }\n    \n    private void setupLayout() {\n        // Thumbnail section\n        VBox thumbnailSection = new VBox(5);\n        thumbnailSection.setAlignment(Pos.CENTER);\n        thumbnailSection.getChildren().addAll(thumbnailView, loadingIndicator);\n        \n        // File info section\n        GridPane infoGrid = new GridPane();\n        infoGrid.setHgap(10);\n        infoGrid.setVgap(8);\n        infoGrid.setPadding(new Insets(10));\n        \n        // Add labels with descriptions\n        addInfoRow(infoGrid, 0, \"Name:\", fileNameLabel);\n        addInfoRow(infoGrid, 1, \"Size:\", fileSizeLabel);\n        addInfoRow(infoGrid, 2, \"Type:\", fileTypeLabel);\n        addInfoRow(infoGrid, 3, \"Created:\", createdDateLabel);\n        addInfoRow(infoGrid, 4, \"Modified:\", modifiedDateLabel);\n        addInfoRow(infoGrid, 5, \"Accessed:\", accessedDateLabel);\n        addInfoRow(infoGrid, 6, \"Location:\", pathLabel);\n        addInfoRow(infoGrid, 7, \"Permissions:\", permissionsLabel);\n        \n        // Main layout\n        contentPane.getChildren().addAll(thumbnailSection, new Separator(), infoGrid);\n        contentPane.setPadding(new Insets(15));\n        \n        this.getChildren().add(contentPane);\n    }\n    \n    private void addInfoRow(GridPane grid, int row, String labelText, Label valueLabel) {\n        Label descLabel = new Label(labelText);\n        descLabel.setFont(Font.font(descLabel.getFont().getFamily(), FontWeight.BOLD, 12));\n        \n        grid.add(descLabel, 0, row);\n        grid.add(valueLabel, 1, row);\n        \n        // Make value label wrap text\n        valueLabel.setWrapText(true);\n        valueLabel.setMaxWidth(250);\n    }\n    \n    private void applyStyles() {\n        this.getStyleClass().add(\"detailed-file-info\");\n        thumbnailView.getStyleClass().add(\"file-thumbnail\");\n        contentPane.getStyleClass().add(\"file-info-content\");\n        \n        // Style labels\n        fileNameLabel.getStyleClass().add(\"file-name-label\");\n        fileSizeLabel.getStyleClass().add(\"file-info-label\");\n        fileTypeLabel.getStyleClass().add(\"file-info-label\");\n        createdDateLabel.getStyleClass().add(\"file-info-label\");\n        modifiedDateLabel.getStyleClass().add(\"file-info-label\");\n        accessedDateLabel.getStyleClass().add(\"file-info-label\");\n        pathLabel.getStyleClass().add(\"file-path-label\");\n        permissionsLabel.getStyleClass().add(\"file-info-label\");\n        \n        // Add border to thumbnail\n        thumbnailView.setStyle(\"-fx-border-color: #ddd; -fx-border-width: 1px; -fx-border-radius: 4px;\");\n    }\n    \n    /**\n     * Display detailed information for a file\n     */\n    public void displayFileInfo(File file) {\n        if (file == null) {\n            clearDisplay();\n            return;\n        }\n        \n        this.currentFile = file;\n        \n        // Show loading for thumbnail\n        showThumbnailLoading(true);\n        \n        // Load basic file information immediately\n        loadBasicFileInfo(file);\n        \n        // Load thumbnail asynchronously\n        loadThumbnailAsync(file);\n    }\n    \n    private void loadBasicFileInfo(File file) {\n        try {\n            // Basic file information\n            fileNameLabel.setText(file.getName());\n            fileSizeLabel.setText(formatFileSize(file.length()));\n            fileTypeLabel.setText(getFileTypeDescription(file));\n            pathLabel.setText(file.getParent() != null ? file.getParent() : \"Root\");\n            \n            // File attributes\n            BasicFileAttributes attrs = Files.readAttributes(file.toPath(), BasicFileAttributes.class);\n            \n            DateTimeFormatter formatter = DateTimeFormatter.ofPattern(\"MMM dd, yyyy HH:mm\");\n            \n            LocalDateTime created = LocalDateTime.ofInstant(attrs.creationTime().toInstant(), ZoneId.systemDefault());\n            LocalDateTime modified = LocalDateTime.ofInstant(attrs.lastModifiedTime().toInstant(), ZoneId.systemDefault());\n            LocalDateTime accessed = LocalDateTime.ofInstant(attrs.lastAccessTime().toInstant(), ZoneId.systemDefault());\n            \n            createdDateLabel.setText(created.format(formatter));\n            modifiedDateLabel.setText(modified.format(formatter));\n            accessedDateLabel.setText(accessed.format(formatter));\n            \n            // Permissions\n            StringBuilder permissions = new StringBuilder();\n            if (file.canRead()) permissions.append(\"Read \");\n            if (file.canWrite()) permissions.append(\"Write \");\n            if (file.canExecute()) permissions.append(\"Execute\");\n            if (permissions.length() == 0) permissions.append(\"None\");\n            \n            permissionsLabel.setText(permissions.toString().trim());\n            \n        } catch (Exception e) {\n            // Handle errors gracefully\n            createdDateLabel.setText(\"Unknown\");\n            modifiedDateLabel.setText(\"Unknown\");\n            accessedDateLabel.setText(\"Unknown\");\n            permissionsLabel.setText(\"Unknown\");\n        }\n    }\n    \n    private void loadThumbnailAsync(File file) {\n        String cacheKey = file.getAbsolutePath() + \"_\" + file.lastModified();\n        \n        // Check cache first\n        if (thumbnailCache.containsKey(cacheKey)) {\n            Platform.runLater(() -> {\n                thumbnailView.setImage(thumbnailCache.get(cacheKey));\n                showThumbnailLoading(false);\n            });\n            return;\n        }\n        \n        Task<Image> thumbnailTask = new Task<Image>() {\n            @Override\n            protected Image call() throws Exception {\n                return generateThumbnail(file);\n            }\n            \n            @Override\n            protected void succeeded() {\n                Platform.runLater(() -> {\n                    Image thumbnail = getValue();\n                    if (thumbnail != null) {\n                        thumbnailView.setImage(thumbnail);\n                        thumbnailCache.put(cacheKey, thumbnail);\n                    } else {\n                        setDefaultThumbnail(file);\n                    }\n                    showThumbnailLoading(false);\n                });\n            }\n            \n            @Override\n            protected void failed() {\n                Platform.runLater(() -> {\n                    setDefaultThumbnail(file);\n                    showThumbnailLoading(false);\n                });\n            }\n        };\n        \n        Thread thumbnailThread = new Thread(thumbnailTask);\n        thumbnailThread.setDaemon(true);\n        thumbnailThread.start();\n    }\n    \n    private Image generateThumbnail(File file) {\n        try {\n            String extension = getFileExtension(file).toLowerCase();\n            \n            // Generate thumbnail for images\n            if (isImageFile(extension)) {\n                try (FileInputStream fis = new FileInputStream(file)) {\n                    Image image = new Image(fis, THUMBNAIL_SIZE, THUMBNAIL_SIZE, true, true);\n                    if (!image.isError()) {\n                        return image;\n                    }\n                }\n            }\n            \n            // For other file types, return null to use default icon\n            return null;\n            \n        } catch (Exception e) {\n            return null;\n        }\n    }\n    \n    private void setDefaultThumbnail(File file) {\n        // Use file icon as thumbnail\n        String iconPath = FileIconProvider.getIconPath(file);\n        if (iconPath != null && !iconPath.isEmpty()) {\n            try {\n                Image icon = new Image(getClass().getResourceAsStream(iconPath));\n                if (!icon.isError()) {\n                    thumbnailView.setImage(icon);\n                    return;\n                }\n            } catch (Exception e) {\n                // Ignore and use fallback\n            }\n        }\n        \n        // Fallback to generic file icon\n        setGenericThumbnail(file);\n    }\n    \n    private void setGenericThumbnail(File file) {\n        // Create a simple text-based thumbnail\n        String extension = getFileExtension(file).toUpperCase();\n        if (extension.isEmpty()) {\n            extension = file.isDirectory() ? \"DIR\" : \"FILE\";\n        }\n        \n        // This would ideally create a simple graphic with the file extension\n        // For now, we'll just clear the thumbnail\n        thumbnailView.setImage(null);\n    }\n    \n    private boolean isImageFile(String extension) {\n        return extension.matches(\"jpg|jpeg|png|gif|bmp|svg|tiff|tif|webp\");\n    }\n    \n    private String getFileExtension(File file) {\n        String name = file.getName();\n        int lastDot = name.lastIndexOf('.');\n        return lastDot > 0 ? name.substring(lastDot + 1) : \"\";\n    }\n    \n    private String getFileTypeDescription(File file) {\n        if (file.isDirectory()) {\n            return \"Folder\";\n        }\n        \n        String extension = getFileExtension(file).toLowerCase();\n        \n        // Common file type descriptions\n        switch (extension) {\n            case \"txt\": return \"Text Document\";\n            case \"pdf\": return \"PDF Document\";\n            case \"doc\": case \"docx\": return \"Word Document\";\n            case \"xls\": case \"xlsx\": return \"Excel Spreadsheet\";\n            case \"ppt\": case \"pptx\": return \"PowerPoint Presentation\";\n            case \"jpg\": case \"jpeg\": return \"JPEG Image\";\n            case \"png\": return \"PNG Image\";\n            case \"gif\": return \"GIF Image\";\n            case \"bmp\": return \"Bitmap Image\";\n            case \"svg\": return \"SVG Vector Image\";\n            case \"mp3\": return \"MP3 Audio\";\n            case \"wav\": return \"WAV Audio\";\n            case \"mp4\": return \"MP4 Video\";\n            case \"avi\": return \"AVI Video\";\n            case \"zip\": return \"ZIP Archive\";\n            case \"rar\": return \"RAR Archive\";\n            case \"7z\": return \"7-Zip Archive\";\n            case \"java\": return \"Java Source File\";\n            case \"cpp\": case \"cc\": case \"cxx\": return \"C++ Source File\";\n            case \"c\": return \"C Source File\";\n            case \"py\": return \"Python Script\";\n            case \"js\": return \"JavaScript File\";\n            case \"html\": case \"htm\": return \"HTML Document\";\n            case \"css\": return \"CSS Stylesheet\";\n            case \"xml\": return \"XML Document\";\n            case \"json\": return \"JSON Data\";\n            default:\n                if (extension.isEmpty()) {\n                    return \"File\";\n                }\n                return extension.toUpperCase() + \" File\";\n        }\n    }\n    \n    private String formatFileSize(long bytes) {\n        if (bytes < 1024) return bytes + \" bytes\";\n        if (bytes < 1024 * 1024) return new DecimalFormat(\"#.# KB\").format(bytes / 1024.0);\n        if (bytes < 1024 * 1024 * 1024) return new DecimalFormat(\"#.# MB\").format(bytes / (1024.0 * 1024.0));\n        return new DecimalFormat(\"#.# GB\").format(bytes / (1024.0 * 1024.0 * 1024.0));\n    }\n    \n    private void showThumbnailLoading(boolean show) {\n        loadingIndicator.setVisible(show);\n        if (show) {\n            thumbnailView.setImage(null);\n        }\n    }\n    \n    /**\n     * Clear the display\n     */\n    public void clearDisplay() {\n        currentFile = null;\n        thumbnailView.setImage(null);\n        fileNameLabel.setText(\"\");\n        fileSizeLabel.setText(\"\");\n        fileTypeLabel.setText(\"\");\n        createdDateLabel.setText(\"\");\n        modifiedDateLabel.setText(\"\");\n        accessedDateLabel.setText(\"\");\n        pathLabel.setText(\"\");\n        permissionsLabel.setText(\"\");\n        showThumbnailLoading(false);\n    }\n    \n    /**\n     * Get current file\n     */\n    public File getCurrentFile() {\n        return currentFile;\n    }\n    \n    /**\n     * Clear thumbnail cache\n     */\n    public static void clearThumbnailCache() {\n        thumbnailCache.clear();\n    }\n}"
+    private void initializeComponents() {
+        thumbnailView = new ImageView();
+        thumbnailView.setFitWidth(THUMBNAIL_SIZE);
+        thumbnailView.setFitHeight(THUMBNAIL_SIZE);
+        thumbnailView.setPreserveRatio(true);
+        thumbnailView.setSmooth(true);
+        
+        fileNameLabel = new Label();
+        fileSizeLabel = new Label();
+        fileTypeLabel = new Label();
+        createdDateLabel = new Label();
+        modifiedDateLabel = new Label();
+        accessedDateLabel = new Label();
+        pathLabel = new Label();
+        permissionsLabel = new Label();
+        
+        loadingIndicator = new ProgressIndicator();
+        loadingIndicator.setVisible(false);
+        loadingIndicator.setMaxSize(30, 30);
+        
+        contentPane = new VBox(10);
+    }
+    
+    private void setupLayout() {
+        // Thumbnail section
+        VBox thumbnailSection = new VBox(5);
+        thumbnailSection.setAlignment(Pos.CENTER);
+        thumbnailSection.getChildren().addAll(thumbnailView, loadingIndicator);
+        
+        // File info section
+        GridPane infoGrid = new GridPane();
+        infoGrid.setHgap(10);
+        infoGrid.setVgap(8);
+        infoGrid.setPadding(new Insets(10));
+        
+        // Add labels with descriptions
+        addInfoRow(infoGrid, 0, "Name:", fileNameLabel);
+        addInfoRow(infoGrid, 1, "Size:", fileSizeLabel);
+        addInfoRow(infoGrid, 2, "Type:", fileTypeLabel);
+        addInfoRow(infoGrid, 3, "Created:", createdDateLabel);
+        addInfoRow(infoGrid, 4, "Modified:", modifiedDateLabel);
+        addInfoRow(infoGrid, 5, "Accessed:", accessedDateLabel);
+        addInfoRow(infoGrid, 6, "Location:", pathLabel);
+        addInfoRow(infoGrid, 7, "Permissions:", permissionsLabel);
+        
+        // Main layout
+        contentPane.getChildren().addAll(thumbnailSection, new Separator(), infoGrid);
+        contentPane.setPadding(new Insets(15));
+        
+        this.getChildren().add(contentPane);
+    }
+    
+    private void addInfoRow(GridPane grid, int row, String labelText, Label valueLabel) {
+        Label descLabel = new Label(labelText);
+        descLabel.setFont(Font.font(descLabel.getFont().getFamily(), FontWeight.BOLD, 12));
+        
+        grid.add(descLabel, 0, row);
+        grid.add(valueLabel, 1, row);
+        
+        // Make value label wrap text
+        valueLabel.setWrapText(true);
+        valueLabel.setMaxWidth(250);
+    }
+    
+    private void applyStyles() {
+        this.getStyleClass().add("detailed-file-info");
+        thumbnailView.getStyleClass().add("file-thumbnail");
+        contentPane.getStyleClass().add("file-info-content");
+        
+        // Style labels
+        fileNameLabel.getStyleClass().add("file-name-label");
+        fileSizeLabel.getStyleClass().add("file-info-label");
+        fileTypeLabel.getStyleClass().add("file-info-label");
+        createdDateLabel.getStyleClass().add("file-info-label");
+        modifiedDateLabel.getStyleClass().add("file-info-label");
+        accessedDateLabel.getStyleClass().add("file-info-label");
+        pathLabel.getStyleClass().add("file-path-label");
+        permissionsLabel.getStyleClass().add("file-info-label");
+    }
+    
+    /**
+     * Display detailed information for a file
+     */
+    public void displayFileInfo(File file) {
+        if (file == null) {
+            clearDisplay();
+            return;
+        }
+        
+        this.currentFile = file;
+        
+        // Show loading for thumbnail
+        showThumbnailLoading(true);
+        
+        // Load basic file information immediately
+        loadBasicFileInfo(file);
+        
+        // Load thumbnail asynchronously
+        loadThumbnailAsync(file);
+    }
+    
+    private void loadBasicFileInfo(File file) {
+        try {
+            // Basic file information
+            fileNameLabel.setText(file.getName());
+            fileSizeLabel.setText(formatFileSize(file.length()));
+            fileTypeLabel.setText(getFileTypeDescription(file));
+            pathLabel.setText(file.getParent() != null ? file.getParent() : "Root");
+            
+            // File attributes
+            BasicFileAttributes attrs = Files.readAttributes(file.toPath(), BasicFileAttributes.class);
+            
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("MMM dd, yyyy HH:mm");
+            
+            LocalDateTime created = LocalDateTime.ofInstant(attrs.creationTime().toInstant(), ZoneId.systemDefault());
+            LocalDateTime modified = LocalDateTime.ofInstant(attrs.lastModifiedTime().toInstant(), ZoneId.systemDefault());
+            LocalDateTime accessed = LocalDateTime.ofInstant(attrs.lastAccessTime().toInstant(), ZoneId.systemDefault());
+            
+            createdDateLabel.setText(created.format(formatter));
+            modifiedDateLabel.setText(modified.format(formatter));
+            accessedDateLabel.setText(accessed.format(formatter));
+            
+            // Permissions
+            StringBuilder permissions = new StringBuilder();
+            if (file.canRead()) permissions.append("Read ");
+            if (file.canWrite()) permissions.append("Write ");
+            if (file.canExecute()) permissions.append("Execute");
+            if (permissions.length() == 0) permissions.append("None");
+            
+            permissionsLabel.setText(permissions.toString().trim());
+            
+        } catch (Exception e) {
+            // Handle errors gracefully
+            createdDateLabel.setText("Unknown");
+            modifiedDateLabel.setText("Unknown");
+            accessedDateLabel.setText("Unknown");
+            permissionsLabel.setText("Unknown");
+        }
+    }
+    
+    private void loadThumbnailAsync(File file) {
+        String cacheKey = file.getAbsolutePath() + "_" + file.lastModified();
+        
+        // Check cache first
+        if (thumbnailCache.containsKey(cacheKey)) {
+            Platform.runLater(() -> {
+                thumbnailView.setImage(thumbnailCache.get(cacheKey));
+                showThumbnailLoading(false);
+            });
+            return;
+        }
+        
+        Task<Image> thumbnailTask = new Task<Image>() {
+            @Override
+            protected Image call() throws Exception {
+                return generateThumbnail(file);
+            }
+            
+            @Override
+            protected void succeeded() {
+                Platform.runLater(() -> {
+                    Image thumbnail = getValue();
+                    if (thumbnail != null) {
+                        thumbnailView.setImage(thumbnail);
+                        thumbnailCache.put(cacheKey, thumbnail);
+                    } else {
+                        setDefaultThumbnail(file);
+                    }
+                    showThumbnailLoading(false);
+                });
+            }
+            
+            @Override
+            protected void failed() {
+                Platform.runLater(() -> {
+                    setDefaultThumbnail(file);
+                    showThumbnailLoading(false);
+                });
+            }
+        };
+        
+        Thread thumbnailThread = new Thread(thumbnailTask);
+        thumbnailThread.setDaemon(true);
+        thumbnailThread.start();
+    }
+    
+    private Image generateThumbnail(File file) {
+        try {
+            String extension = getFileExtension(file).toLowerCase();
+            
+            // Generate thumbnail for images
+            if (isImageFile(extension)) {
+                try (FileInputStream fis = new FileInputStream(file)) {
+                    Image image = new Image(fis, THUMBNAIL_SIZE, THUMBNAIL_SIZE, true, true);
+                    if (!image.isError()) {
+                        return image;
+                    }
+                }
+            }
+            
+            // For other file types, return null to use default icon
+            return null;
+            
+        } catch (Exception e) {
+            return null;
+        }
+    }
+    
+    private void setDefaultThumbnail(File file) {
+        // Clear thumbnail for now
+        thumbnailView.setImage(null);
+    }
+    
+    private boolean isImageFile(String extension) {
+        return extension.matches("jpg|jpeg|png|gif|bmp|svg|tiff|tif|webp");
+    }
+    
+    private String getFileExtension(File file) {
+        String name = file.getName();
+        int lastDot = name.lastIndexOf('.');
+        return lastDot > 0 ? name.substring(lastDot + 1) : "";
+    }
+    
+    private String getFileTypeDescription(File file) {
+        if (file.isDirectory()) {
+            return "Folder";
+        }
+        
+        String extension = getFileExtension(file).toLowerCase();
+        
+        // Common file type descriptions
+        switch (extension) {
+            case "txt": return "Text Document";
+            case "pdf": return "PDF Document";
+            case "jpg": case "jpeg": return "JPEG Image";
+            case "png": return "PNG Image";
+            case "java": return "Java Source File";
+            case "py": return "Python Script";
+            case "js": return "JavaScript File";
+            default:
+                if (extension.isEmpty()) {
+                    return "File";
+                }
+                return extension.toUpperCase() + " File";
+        }
+    }
+    
+    private String formatFileSize(long bytes) {
+        if (bytes < 1024) return bytes + " bytes";
+        if (bytes < 1024 * 1024) return new DecimalFormat("#.# KB").format(bytes / 1024.0);
+        if (bytes < 1024 * 1024 * 1024) return new DecimalFormat("#.# MB").format(bytes / (1024.0 * 1024.0));
+        return new DecimalFormat("#.# GB").format(bytes / (1024.0 * 1024.0 * 1024.0));
+    }
+    
+    private void showThumbnailLoading(boolean show) {
+        loadingIndicator.setVisible(show);
+        if (show) {
+            thumbnailView.setImage(null);
+        }
+    }
+    
+    /**
+     * Clear the display
+     */
+    public void clearDisplay() {
+        currentFile = null;
+        thumbnailView.setImage(null);
+        fileNameLabel.setText("");
+        fileSizeLabel.setText("");
+        fileTypeLabel.setText("");
+        createdDateLabel.setText("");
+        modifiedDateLabel.setText("");
+        accessedDateLabel.setText("");
+        pathLabel.setText("");
+        permissionsLabel.setText("");
+        showThumbnailLoading(false);
+    }
+    
+    /**
+     * Get current file
+     */
+    public File getCurrentFile() {
+        return currentFile;
+    }
+    
+    /**
+     * Clear thumbnail cache
+     */
+    public static void clearThumbnailCache() {
+        thumbnailCache.clear();
+    }
+}

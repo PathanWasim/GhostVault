@@ -491,4 +491,32 @@ public class ProfessionalHeader extends HBox {
         });
         fadeOut.play();
     }
+    
+    /**
+     * Add component to right section of header
+     */
+    public void addToRight(javafx.scene.Node node) {
+        userControlsSection.getChildren().add(0, node);
+    }
+    
+    /**
+     * Set title (for compatibility)
+     */
+    public void setTitle(String title) {
+        setAppTitle(title);
+    }
+    
+    /**
+     * Set user info (for compatibility)
+     */
+    public void setUserInfo(String userInfo) {
+        setUserName(userInfo);
+    }
+    
+    /**
+     * Set session info (for compatibility)
+     */
+    public void setSessionInfo(String sessionInfo) {
+        setCurrentMode(sessionInfo.replace(" Mode", ""));
+    }
 }

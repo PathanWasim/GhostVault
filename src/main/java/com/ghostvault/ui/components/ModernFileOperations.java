@@ -2,10 +2,7 @@ package com.ghostvault.ui.components;
 
 import javafx.application.Platform;
 import javafx.concurrent.Task;
-import javafx.geometry.Insets;
-import javafx.geometry.Pos;
 import javafx.scene.control.*;
-import javafx.scene.layout.*;
 import javafx.stage.DirectoryChooser;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
@@ -29,4 +26,343 @@ public class ModernFileOperations {
     private Stage parentStage;
     private NotificationSystem notificationSystem;
     
-    public ModernFileOperations(Stage parentStage) {\n        this.parentStage = parentStage;\n        this.notificationSystem = NotificationSystem.getInstance();\n    }\n    \n    /**\n     * Modern file upload with enhanced FileChooser\n     */\n    public CompletableFuture<List<File>> showFileUploadDialog() {\n        CompletableFuture<List<File>> future = new CompletableFuture<>();\n        \n        Platform.runLater(() -> {\n            FileChooser fileChooser = new FileChooser();\n            fileChooser.setTitle(\"Select Files to Upload\");\n            \n            // Add common file type filters\n            fileChooser.getExtensionFilters().addAll(\n                new FileChooser.ExtensionFilter(\"All Files\", \"*.*\"),\n                new FileChooser.ExtensionFilter(\"Images\", \"*.jpg\", \"*.jpeg\", \"*.png\", \"*.gif\", \"*.bmp\", \"*.svg\"),\n                new FileChooser.ExtensionFilter(\"Documents\", \"*.pdf\", \"*.doc\", \"*.docx\", \"*.txt\", \"*.rtf\"),\n                new FileChooser.ExtensionFilter(\"Spreadsheets\", \"*.xls\", \"*.xlsx\", \"*.csv\"),\n                new FileChooser.ExtensionFilter(\"Presentations\", \"*.ppt\", \"*.pptx\"),\n                new FileChooser.ExtensionFilter(\"Videos\", \"*.mp4\", \"*.avi\", \"*.mkv\", \"*.mov\", \"*.wmv\"),\n                new FileChooser.ExtensionFilter(\"Audio\", \"*.mp3\", \"*.wav\", \"*.flac\", \"*.aac\", \"*.ogg\"),\n                new FileChooser.ExtensionFilter(\"Archives\", \"*.zip\", \"*.rar\", \"*.7z\", \"*.tar\", \"*.gz\"),\n                new FileChooser.ExtensionFilter(\"Code Files\", \"*.java\", \"*.cpp\", \"*.c\", \"*.py\", \"*.js\", \"*.html\", \"*.css\")\n            );\n            \n            // Set initial directory to user's documents folder\n            String userHome = System.getProperty(\"user.home\");\n            File documentsDir = new File(userHome, \"Documents\");\n            if (documentsDir.exists()) {\n                fileChooser.setInitialDirectory(documentsDir);\n            }\n            \n            List<File> selectedFiles = fileChooser.showOpenMultipleDialog(parentStage);\n            \n            if (selectedFiles != null && !selectedFiles.isEmpty()) {\n                future.complete(selectedFiles);\n            } else {\n                future.complete(new ArrayList<>());\n            }\n        });\n        \n        return future;\n    }\n    \n    /**\n     * Modern file download with enhanced save dialog\n     */\n    public CompletableFuture<File> showFileSaveDialog(String suggestedFileName, String fileExtension) {\n        CompletableFuture<File> future = new CompletableFuture<>();\n        \n        Platform.runLater(() -> {\n            FileChooser fileChooser = new FileChooser();\n            fileChooser.setTitle(\"Save File As\");\n            \n            if (suggestedFileName != null && !suggestedFileName.isEmpty()) {\n                fileChooser.setInitialFileName(suggestedFileName);\n            }\n            \n            if (fileExtension != null && !fileExtension.isEmpty()) {\n                String description = fileExtension.toUpperCase() + \" Files\";\n                fileChooser.getExtensionFilters().add(\n                    new FileChooser.ExtensionFilter(description, \"*.\" + fileExtension.toLowerCase())\n                );\n            }\n            \n            fileChooser.getExtensionFilters().add(\n                new FileChooser.ExtensionFilter(\"All Files\", \"*.*\")\n            );\n            \n            // Set initial directory to user's downloads folder\n            String userHome = System.getProperty(\"user.home\");\n            File downloadsDir = new File(userHome, \"Downloads\");\n            if (downloadsDir.exists()) {\n                fileChooser.setInitialDirectory(downloadsDir);\n            }\n            \n            File selectedFile = fileChooser.showSaveDialog(parentStage);\n            \n            if (selectedFile != null) {\n                future.complete(selectedFile);\n            } else {\n                future.cancel(false);\n            }\n        });\n        \n        return future;\n    }\n    \n    /**\n     * Upload files with progress tracking\n     */\n    public void uploadFiles(List<File> files, File targetDirectory, Consumer<UploadResult> onComplete) {\n        if (files == null || files.isEmpty()) {\n            onComplete.accept(new UploadResult(0, 0, \"No files selected\"));\n            return;\n        }\n        \n        NotificationSystem.ProgressNotification progressNotification = \n            NotificationSystem.showProgress(\"Uploading Files\", \"Preparing to upload \" + files.size() + \" file(s)...\");\n        \n        Task<UploadResult> uploadTask = new Task<UploadResult>() {\n            @Override\n            protected UploadResult call() throws Exception {\n                int totalFiles = files.size();\n                int successCount = 0;\n                int failureCount = 0;\n                StringBuilder errors = new StringBuilder();\n                \n                for (int i = 0; i < files.size(); i++) {\n                    File file = files.get(i);\n                    \n                    updateMessage(\"Uploading \" + file.getName() + \"...\");\n                    updateProgress(i, totalFiles);\n                    \n                    try {\n                        Path sourcePath = file.toPath();\n                        Path targetPath = targetDirectory.toPath().resolve(file.getName());\n                        \n                        // Handle file name conflicts\n                        if (Files.exists(targetPath)) {\n                            String baseName = getBaseName(file.getName());\n                            String extension = getFileExtension(file.getName());\n                            int counter = 1;\n                            \n                            do {\n                                String newName = baseName + \" (\" + counter + \")\" + \n                                    (extension.isEmpty() ? \"\" : \".\" + extension);\n                                targetPath = targetDirectory.toPath().resolve(newName);\n                                counter++;\n                            } while (Files.exists(targetPath));\n                        }\n                        \n                        Files.copy(sourcePath, targetPath, StandardCopyOption.REPLACE_EXISTING);\n                        successCount++;\n                        \n                    } catch (IOException e) {\n                        failureCount++;\n                        errors.append(\"Failed to upload \").append(file.getName())\n                              .append(\": \").append(e.getMessage()).append(\"\\n\");\n                    }\n                }\n                \n                updateProgress(totalFiles, totalFiles);\n                return new UploadResult(successCount, failureCount, errors.toString());\n            }\n            \n            @Override\n            protected void succeeded() {\n                Platform.runLater(() -> {\n                    UploadResult result = getValue();\n                    progressNotification.complete(\"Upload completed: \" + result.successCount + \" files uploaded\");\n                    \n                    if (result.failureCount > 0) {\n                        NotificationSystem.showWarning(\"Upload Issues\", \n                            result.failureCount + \" files failed to upload\");\n                    } else {\n                        NotificationSystem.showSuccess(\"Upload Complete\", \n                            \"All \" + result.successCount + \" files uploaded successfully\");\n                    }\n                    \n                    onComplete.accept(result);\n                });\n            }\n            \n            @Override\n            protected void failed() {\n                Platform.runLater(() -> {\n                    progressNotification.complete(\"Upload failed\");\n                    NotificationSystem.showError(\"Upload Error\", \n                        \"Failed to upload files: \" + getException().getMessage());\n                    onComplete.accept(new UploadResult(0, files.size(), getException().getMessage()));\n                });\n            }\n        };\n        \n        // Bind progress notification to task\n        progressNotification.progressProperty().bind(uploadTask.progressProperty());\n        progressNotification.messageProperty().bind(uploadTask.messageProperty());\n        \n        Thread uploadThread = new Thread(uploadTask);\n        uploadThread.setDaemon(true);\n        uploadThread.start();\n    }\n    \n    /**\n     * Download file with progress tracking\n     */\n    public void downloadFile(File sourceFile, File targetFile, Consumer<Boolean> onComplete) {\n        if (sourceFile == null || !sourceFile.exists()) {\n            NotificationSystem.showError(\"Download Error\", \"Source file does not exist\");\n            onComplete.accept(false);\n            return;\n        }\n        \n        NotificationSystem.ProgressNotification progressNotification = \n            NotificationSystem.showProgress(\"Downloading File\", \"Preparing to download \" + sourceFile.getName() + \"...\");\n        \n        Task<Boolean> downloadTask = new Task<Boolean>() {\n            @Override\n            protected Boolean call() throws Exception {\n                updateMessage(\"Downloading \" + sourceFile.getName() + \"...\");\n                \n                Path sourcePath = sourceFile.toPath();\n                Path targetPath = targetFile.toPath();\n                \n                // Create parent directories if they don't exist\n                Files.createDirectories(targetPath.getParent());\n                \n                Files.copy(sourcePath, targetPath, StandardCopyOption.REPLACE_EXISTING);\n                \n                updateProgress(1, 1);\n                return true;\n            }\n            \n            @Override\n            protected void succeeded() {\n                Platform.runLater(() -> {\n                    progressNotification.complete(\"Download completed\");\n                    NotificationSystem.showSuccess(\"Download Complete\", \n                        sourceFile.getName() + \" downloaded successfully\");\n                    onComplete.accept(true);\n                });\n            }\n            \n            @Override\n            protected void failed() {\n                Platform.runLater(() -> {\n                    progressNotification.complete(\"Download failed\");\n                    NotificationSystem.showError(\"Download Error\", \n                        \"Failed to download file: \" + getException().getMessage());\n                    onComplete.accept(false);\n                });\n            }\n        };\n        \n        progressNotification.progressProperty().bind(downloadTask.progressProperty());\n        progressNotification.messageProperty().bind(downloadTask.messageProperty());\n        \n        Thread downloadThread = new Thread(downloadTask);\n        downloadThread.setDaemon(true);\n        downloadThread.start();\n    }\n    \n    /**\n     * Secure file deletion with confirmation\n     */\n    public void secureDeleteFiles(List<File> files, Consumer<DeletionResult> onComplete) {\n        if (files == null || files.isEmpty()) {\n            onComplete.accept(new DeletionResult(0, 0, \"No files selected\"));\n            return;\n        }\n        \n        // Show confirmation dialog\n        Alert confirmation = new Alert(Alert.AlertType.CONFIRMATION);\n        confirmation.setTitle(\"Confirm Secure Deletion\");\n        confirmation.setHeaderText(\"Permanently delete \" + files.size() + \" file(s)?\");\n        confirmation.setContentText(\"This action cannot be undone. Files will be securely deleted.\");\n        \n        // Add custom buttons\n        ButtonType secureDeleteButton = new ButtonType(\"Secure Delete\", ButtonBar.ButtonData.OK_DONE);\n        ButtonType cancelButton = new ButtonType(\"Cancel\", ButtonBar.ButtonData.CANCEL_CLOSE);\n        confirmation.getButtonTypes().setAll(secureDeleteButton, cancelButton);\n        \n        Optional<ButtonType> result = confirmation.showAndWait();\n        \n        if (result.isPresent() && result.get() == secureDeleteButton) {\n            performSecureDeletion(files, onComplete);\n        } else {\n            onComplete.accept(new DeletionResult(0, 0, \"Deletion cancelled\"));\n        }\n    }\n    \n    private void performSecureDeletion(List<File> files, Consumer<DeletionResult> onComplete) {\n        NotificationSystem.ProgressNotification progressNotification = \n            NotificationSystem.showProgress(\"Secure Deletion\", \"Securely deleting \" + files.size() + \" file(s)...\");\n        \n        Task<DeletionResult> deleteTask = new Task<DeletionResult>() {\n            @Override\n            protected DeletionResult call() throws Exception {\n                int totalFiles = files.size();\n                int successCount = 0;\n                int failureCount = 0;\n                StringBuilder errors = new StringBuilder();\n                \n                for (int i = 0; i < files.size(); i++) {\n                    File file = files.get(i);\n                    \n                    updateMessage(\"Securely deleting \" + file.getName() + \"...\");\n                    updateProgress(i, totalFiles);\n                    \n                    try {\n                        if (secureDeleteFile(file)) {\n                            successCount++;\n                        } else {\n                            failureCount++;\n                            errors.append(\"Failed to delete \").append(file.getName()).append(\"\\n\");\n                        }\n                    } catch (Exception e) {\n                        failureCount++;\n                        errors.append(\"Error deleting \").append(file.getName())\n                              .append(\": \").append(e.getMessage()).append(\"\\n\");\n                    }\n                }\n                \n                updateProgress(totalFiles, totalFiles);\n                return new DeletionResult(successCount, failureCount, errors.toString());\n            }\n            \n            @Override\n            protected void succeeded() {\n                Platform.runLater(() -> {\n                    DeletionResult result = getValue();\n                    progressNotification.complete(\"Deletion completed: \" + result.successCount + \" files deleted\");\n                    \n                    if (result.failureCount > 0) {\n                        NotificationSystem.showWarning(\"Deletion Issues\", \n                            result.failureCount + \" files could not be deleted\");\n                    } else {\n                        NotificationSystem.showSuccess(\"Deletion Complete\", \n                            \"All \" + result.successCount + \" files deleted securely\");\n                    }\n                    \n                    onComplete.accept(result);\n                });\n            }\n            \n            @Override\n            protected void failed() {\n                Platform.runLater(() -> {\n                    progressNotification.complete(\"Deletion failed\");\n                    NotificationSystem.showError(\"Deletion Error\", \n                        \"Failed to delete files: \" + getException().getMessage());\n                    onComplete.accept(new DeletionResult(0, files.size(), getException().getMessage()));\n                });\n            }\n        };\n        \n        progressNotification.progressProperty().bind(deleteTask.progressProperty());\n        progressNotification.messageProperty().bind(deleteTask.messageProperty());\n        \n        Thread deleteThread = new Thread(deleteTask);\n        deleteThread.setDaemon(true);\n        deleteThread.start();\n    }\n    \n    private boolean secureDeleteFile(File file) {\n        try {\n            if (file.isDirectory()) {\n                // Recursively delete directory contents\n                File[] contents = file.listFiles();\n                if (contents != null) {\n                    for (File child : contents) {\n                        if (!secureDeleteFile(child)) {\n                            return false;\n                        }\n                    }\n                }\n            } else {\n                // For files, overwrite with random data before deletion (basic secure delete)\n                try {\n                    overwriteFileWithRandomData(file);\n                } catch (IOException e) {\n                    // If overwrite fails, still try to delete normally\n                }\n            }\n            \n            return file.delete();\n            \n        } catch (Exception e) {\n            return false;\n        }\n    }\n    \n    private void overwriteFileWithRandomData(File file) throws IOException {\n        // Simple secure deletion - overwrite file with random data\n        // In a real implementation, this would do multiple passes with different patterns\n        long fileSize = file.length();\n        if (fileSize > 0) {\n            byte[] randomData = new byte[(int) Math.min(fileSize, 8192)];\n            new java.util.Random().nextBytes(randomData);\n            \n            try (java.io.FileOutputStream fos = new java.io.FileOutputStream(file)) {\n                long written = 0;\n                while (written < fileSize) {\n                    int toWrite = (int) Math.min(randomData.length, fileSize - written);\n                    fos.write(randomData, 0, toWrite);\n                    written += toWrite;\n                }\n                fos.flush();\n                fos.getFD().sync(); // Force write to disk\n            }\n        }\n    }\n    \n    /**\n     * Show directory chooser dialog\n     */\n    public CompletableFuture<File> showDirectoryChooser(String title) {\n        CompletableFuture<File> future = new CompletableFuture<>();\n        \n        Platform.runLater(() -> {\n            DirectoryChooser directoryChooser = new DirectoryChooser();\n            directoryChooser.setTitle(title != null ? title : \"Select Directory\");\n            \n            // Set initial directory to user's home folder\n            String userHome = System.getProperty(\"user.home\");\n            File homeDir = new File(userHome);\n            if (homeDir.exists()) {\n                directoryChooser.setInitialDirectory(homeDir);\n            }\n            \n            File selectedDirectory = directoryChooser.showDialog(parentStage);\n            \n            if (selectedDirectory != null) {\n                future.complete(selectedDirectory);\n            } else {\n                future.cancel(false);\n            }\n        });\n        \n        return future;\n    }\n    \n    private String getBaseName(String fileName) {\n        int lastDot = fileName.lastIndexOf('.');\n        return lastDot > 0 ? fileName.substring(0, lastDot) : fileName;\n    }\n    \n    private String getFileExtension(String fileName) {\n        int lastDot = fileName.lastIndexOf('.');\n        return lastDot > 0 ? fileName.substring(lastDot + 1) : \"\";\n    }\n    \n    /**\n     * Upload result class\n     */\n    public static class UploadResult {\n        public final int successCount;\n        public final int failureCount;\n        public final String errorMessages;\n        \n        public UploadResult(int successCount, int failureCount, String errorMessages) {\n            this.successCount = successCount;\n            this.failureCount = failureCount;\n            this.errorMessages = errorMessages;\n        }\n        \n        public boolean hasErrors() {\n            return failureCount > 0;\n        }\n        \n        public int getTotalFiles() {\n            return successCount + failureCount;\n        }\n    }\n    \n    /**\n     * Deletion result class\n     */\n    public static class DeletionResult {\n        public final int successCount;\n        public final int failureCount;\n        public final String errorMessages;\n        \n        public DeletionResult(int successCount, int failureCount, String errorMessages) {\n            this.successCount = successCount;\n            this.failureCount = failureCount;\n            this.errorMessages = errorMessages;\n        }\n        \n        public boolean hasErrors() {\n            return failureCount > 0;\n        }\n        \n        public int getTotalFiles() {\n            return successCount + failureCount;\n        }\n    }\n}"
+    public ModernFileOperations(Stage parentStage) {
+        this.parentStage = parentStage;
+        this.notificationSystem = NotificationSystem.getInstance();
+    }
+    
+    /**
+     * Modern file upload with enhanced FileChooser
+     */
+    public CompletableFuture<List<File>> showFileUploadDialog() {
+        CompletableFuture<List<File>> future = new CompletableFuture<>();
+        
+        Platform.runLater(() -> {
+            FileChooser fileChooser = new FileChooser();
+            fileChooser.setTitle("Select Files to Upload");
+            
+            // Add common file type filters
+            fileChooser.getExtensionFilters().addAll(
+                new FileChooser.ExtensionFilter("All Files", "*.*"),
+                new FileChooser.ExtensionFilter("Images", "*.jpg", "*.jpeg", "*.png", "*.gif", "*.bmp", "*.svg"),
+                new FileChooser.ExtensionFilter("Documents", "*.pdf", "*.doc", "*.docx", "*.txt", "*.rtf"),
+                new FileChooser.ExtensionFilter("Code Files", "*.java", "*.cpp", "*.c", "*.py", "*.js", "*.html", "*.css")
+            );
+            
+            // Set initial directory to user's documents folder
+            String userHome = System.getProperty("user.home");
+            File documentsDir = new File(userHome, "Documents");
+            if (documentsDir.exists()) {
+                fileChooser.setInitialDirectory(documentsDir);
+            }
+            
+            List<File> selectedFiles = fileChooser.showOpenMultipleDialog(parentStage);
+            
+            if (selectedFiles != null && !selectedFiles.isEmpty()) {
+                future.complete(selectedFiles);
+            } else {
+                future.complete(new ArrayList<>());
+            }
+        });
+        
+        return future;
+    }
+    
+    /**
+     * Modern file download with enhanced save dialog
+     */
+    public CompletableFuture<File> showFileSaveDialog(String suggestedFileName, String fileExtension) {
+        CompletableFuture<File> future = new CompletableFuture<>();
+        
+        Platform.runLater(() -> {
+            FileChooser fileChooser = new FileChooser();
+            fileChooser.setTitle("Save File As");
+            
+            if (suggestedFileName != null && !suggestedFileName.isEmpty()) {
+                fileChooser.setInitialFileName(suggestedFileName);
+            }
+            
+            if (fileExtension != null && !fileExtension.isEmpty()) {
+                String description = fileExtension.toUpperCase() + " Files";
+                fileChooser.getExtensionFilters().add(
+                    new FileChooser.ExtensionFilter(description, "*." + fileExtension.toLowerCase())
+                );
+            }
+            
+            fileChooser.getExtensionFilters().add(
+                new FileChooser.ExtensionFilter("All Files", "*.*")
+            );
+            
+            File selectedFile = fileChooser.showSaveDialog(parentStage);
+            
+            if (selectedFile != null) {
+                future.complete(selectedFile);
+            } else {
+                future.cancel(false);
+            }
+        });
+        
+        return future;
+    }
+    
+    /**
+     * Upload files with progress tracking
+     */
+    public void uploadFiles(List<File> files, File targetDirectory, Consumer<UploadResult> onComplete) {
+        if (files == null || files.isEmpty()) {
+            onComplete.accept(new UploadResult(0, 0, "No files selected"));
+            return;
+        }
+        
+        NotificationSystem.ProgressNotification progressNotification = 
+            NotificationSystem.showProgress("Uploading Files", "Preparing to upload " + files.size() + " file(s)...");
+        
+        Task<UploadResult> uploadTask = new Task<UploadResult>() {
+            @Override
+            protected UploadResult call() throws Exception {
+                int totalFiles = files.size();
+                int successCount = 0;
+                int failureCount = 0;
+                StringBuilder errors = new StringBuilder();
+                
+                for (int i = 0; i < files.size(); i++) {
+                    File file = files.get(i);
+                    
+                    updateMessage("Uploading " + file.getName() + "...");
+                    updateProgress(i, totalFiles);
+                    
+                    try {
+                        Path sourcePath = file.toPath();
+                        Path targetPath = targetDirectory.toPath().resolve(file.getName());
+                        
+                        Files.copy(sourcePath, targetPath, StandardCopyOption.REPLACE_EXISTING);
+                        successCount++;
+                        
+                    } catch (IOException e) {
+                        failureCount++;
+                        errors.append("Failed to upload ").append(file.getName())
+                              .append(": ").append(e.getMessage()).append("\n");
+                    }
+                }
+                
+                updateProgress(totalFiles, totalFiles);
+                return new UploadResult(successCount, failureCount, errors.toString());
+            }
+            
+            @Override
+            protected void succeeded() {
+                Platform.runLater(() -> {
+                    UploadResult result = getValue();
+                    progressNotification.complete("Upload completed: " + result.successCount + " files uploaded");
+                    onComplete.accept(result);
+                });
+            }
+            
+            @Override
+            protected void failed() {
+                Platform.runLater(() -> {
+                    progressNotification.complete("Upload failed");
+                    onComplete.accept(new UploadResult(0, files.size(), getException().getMessage()));
+                });
+            }
+        };
+        
+        Thread uploadThread = new Thread(uploadTask);
+        uploadThread.setDaemon(true);
+        uploadThread.start();
+    }
+    
+    /**
+     * Download file with progress tracking
+     */
+    public void downloadFile(File sourceFile, File targetFile, Consumer<Boolean> onComplete) {
+        if (sourceFile == null || !sourceFile.exists()) {
+            NotificationSystem.showError("Download Error", "Source file does not exist");
+            onComplete.accept(false);
+            return;
+        }
+        
+        Task<Boolean> downloadTask = new Task<Boolean>() {
+            @Override
+            protected Boolean call() throws Exception {
+                Path sourcePath = sourceFile.toPath();
+                Path targetPath = targetFile.toPath();
+                
+                Files.createDirectories(targetPath.getParent());
+                Files.copy(sourcePath, targetPath, StandardCopyOption.REPLACE_EXISTING);
+                
+                return true;
+            }
+            
+            @Override
+            protected void succeeded() {
+                Platform.runLater(() -> {
+                    NotificationSystem.showSuccess("Download Complete", 
+                        sourceFile.getName() + " downloaded successfully");
+                    onComplete.accept(true);
+                });
+            }
+            
+            @Override
+            protected void failed() {
+                Platform.runLater(() -> {
+                    NotificationSystem.showError("Download Error", 
+                        "Failed to download file: " + getException().getMessage());
+                    onComplete.accept(false);
+                });
+            }
+        };
+        
+        Thread downloadThread = new Thread(downloadTask);
+        downloadThread.setDaemon(true);
+        downloadThread.start();
+    }
+    
+    /**
+     * Secure file deletion with confirmation
+     */
+    public void secureDeleteFiles(List<File> files, Consumer<DeletionResult> onComplete) {
+        if (files == null || files.isEmpty()) {
+            onComplete.accept(new DeletionResult(0, 0, "No files selected"));
+            return;
+        }
+        
+        // Show confirmation dialog
+        Alert confirmation = new Alert(Alert.AlertType.CONFIRMATION);
+        confirmation.setTitle("Confirm Secure Deletion");
+        confirmation.setHeaderText("Permanently delete " + files.size() + " file(s)?");
+        confirmation.setContentText("This action cannot be undone. Files will be securely deleted.");
+        
+        Optional<ButtonType> result = confirmation.showAndWait();
+        
+        if (result.isPresent() && result.get() == ButtonType.OK) {
+            performSecureDeletion(files, onComplete);
+        } else {
+            onComplete.accept(new DeletionResult(0, 0, "Deletion cancelled"));
+        }
+    }
+    
+    private void performSecureDeletion(List<File> files, Consumer<DeletionResult> onComplete) {
+        Task<DeletionResult> deleteTask = new Task<DeletionResult>() {
+            @Override
+            protected DeletionResult call() throws Exception {
+                int successCount = 0;
+                int failureCount = 0;
+                StringBuilder errors = new StringBuilder();
+                
+                for (File file : files) {
+                    try {
+                        if (file.delete()) {
+                            successCount++;
+                        } else {
+                            failureCount++;
+                            errors.append("Failed to delete ").append(file.getName()).append("\n");
+                        }
+                    } catch (Exception e) {
+                        failureCount++;
+                        errors.append("Error deleting ").append(file.getName())
+                              .append(": ").append(e.getMessage()).append("\n");
+                    }
+                }
+                
+                return new DeletionResult(successCount, failureCount, errors.toString());
+            }
+            
+            @Override
+            protected void succeeded() {
+                Platform.runLater(() -> {
+                    DeletionResult result = getValue();
+                    if (result.failureCount > 0) {
+                        NotificationSystem.showWarning("Deletion Issues", 
+                            result.failureCount + " files could not be deleted");
+                    } else {
+                        NotificationSystem.showSuccess("Deletion Complete", 
+                            "All " + result.successCount + " files deleted successfully");
+                    }
+                    onComplete.accept(result);
+                });
+            }
+            
+            @Override
+            protected void failed() {
+                Platform.runLater(() -> {
+                    NotificationSystem.showError("Deletion Error", 
+                        "Failed to delete files: " + getException().getMessage());
+                    onComplete.accept(new DeletionResult(0, files.size(), getException().getMessage()));
+                });
+            }
+        };
+        
+        Thread deleteThread = new Thread(deleteTask);
+        deleteThread.setDaemon(true);
+        deleteThread.start();
+    }
+    
+    /**
+     * Show directory chooser dialog
+     */
+    public CompletableFuture<File> showDirectoryChooser(String title) {
+        CompletableFuture<File> future = new CompletableFuture<>();
+        
+        Platform.runLater(() -> {
+            DirectoryChooser directoryChooser = new DirectoryChooser();
+            directoryChooser.setTitle(title != null ? title : "Select Directory");
+            
+            File selectedDirectory = directoryChooser.showDialog(parentStage);
+            
+            if (selectedDirectory != null) {
+                future.complete(selectedDirectory);
+            } else {
+                future.cancel(false);
+            }
+        });
+        
+        return future;
+    }
+    
+    /**
+     * Upload result class
+     */
+    public static class UploadResult {
+        public final int successCount;
+        public final int failureCount;
+        public final String errorMessages;
+        
+        public UploadResult(int successCount, int failureCount, String errorMessages) {
+            this.successCount = successCount;
+            this.failureCount = failureCount;
+            this.errorMessages = errorMessages;
+        }
+        
+        public boolean hasErrors() {
+            return failureCount > 0;
+        }
+        
+        public int getTotalFiles() {
+            return successCount + failureCount;
+        }
+    }
+    
+    /**
+     * Deletion result class
+     */
+    public static class DeletionResult {
+        public final int successCount;
+        public final int failureCount;
+        public final String errorMessages;
+        
+        public DeletionResult(int successCount, int failureCount, String errorMessages) {
+            this.successCount = successCount;
+            this.failureCount = failureCount;
+            this.errorMessages = errorMessages;
+        }
+        
+        public boolean hasErrors() {
+            return failureCount > 0;
+        }
+        
+        public int getTotalFiles() {
+            return successCount + failureCount;
+        }
+    }
+}

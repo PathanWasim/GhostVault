@@ -476,4 +476,21 @@ public class AuthenticationController {
     public boolean isAuthenticationInProgress() {
         return authenticationInProgress;
     }
+    
+    // Authentication provider for backend integration
+    private com.ghostvault.ui.components.AuthenticationProvider authenticationProvider;
+    
+    /**
+     * Set authentication provider for backend integration
+     */
+    public void setAuthenticationProvider(com.ghostvault.ui.components.AuthenticationProvider provider) {
+        this.authenticationProvider = provider;
+    }
+    
+    /**
+     * Get scene for integration
+     */
+    public Scene getScene() {
+        return scene;
+    }
 }
