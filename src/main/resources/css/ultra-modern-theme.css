@@ -1,0 +1,844 @@
+/* ===== ULTRA MODERN THEME - 2024 DISCORD/FIGMA STYLE ===== */
+
+/* Import modern fonts */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
+/* Root variables - Modern Design System */
+.root {
+    /* Ultra Modern Color Palette - Discord/Figma Inspired */
+    -fx-primary: #5865f2;
+    -fx-primary-hover: #4752c4;
+    -fx-primary-pressed: #3c45a5;
+    -fx-primary-light: rgba(88, 101, 242, 0.1);
+
+    -fx-success: #00d26a;
+    -fx-success-hover: #00b85c;
+    -fx-warning: #faa61a;
+    -fx-warning-hover: #e8940f;
+    -fx-danger: #f23f43;
+    -fx-danger-hover: #d73237;
+    -fx-info: #00aff4;
+
+    /* Modern Background System */
+    -fx-bg-primary: #313338;
+    /* Main background */
+    -fx-bg-secondary: #2b2d31;
+    /* Secondary panels */
+    -fx-bg-tertiary: #1e1f22;
+    /* Sidebar/nav */
+    -fx-bg-elevated: #383a40;
+    /* Modals/dropdowns */
+    -fx-bg-floating: #404249;
+    /* Floating elements */
+
+    /* Surface Colors */
+    -fx-surface-primary: #404249;
+    -fx-surface-secondary: #35373c;
+    -fx-surface-tertiary: #2b2d31;
+    -fx-surface-overlay: rgba(0, 0, 0, 0.6);
+
+    /* Text Colors - High Contrast */
+    -fx-text-primary: #f2f3f5;
+    -fx-text-secondary: #b5bac1;
+    -fx-text-muted: #80848e;
+    -fx-text-disabled: #4e5058;
+    -fx-text-link: #00aff4;
+
+    /* Border System */
+    -fx-border-primary: #3f4147;
+    -fx-border-secondary: #35373c;
+    -fx-border-focus: #5865f2;
+    -fx-border-hover: #4e5058;
+
+    /* Modern Shadows */
+    -fx-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.2);
+    -fx-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.3);
+    -fx-shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.4);
+    -fx-shadow-xl: 0 16px 48px rgba(0, 0, 0, 0.5);
+
+    /* Typography System */
+    -fx-font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    -fx-font-mono: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, monospace;
+
+    /* Spacing Scale */
+    -fx-spacing-xs: 4px;
+    -fx-spacing-sm: 8px;
+    -fx-spacing-md: 12px;
+    -fx-spacing-lg: 16px;
+    -fx-spacing-xl: 24px;
+    -fx-spacing-2xl: 32px;
+
+    /* Border Radius System */
+    -fx-radius-xs: 2px;
+    -fx-radius-sm: 4px;
+    -fx-radius-md: 6px;
+    -fx-radius-lg: 8px;
+    -fx-radius-xl: 12px;
+    -fx-radius-2xl: 16px;
+    -fx-radius-full: 9999px;
+}
+
+/* ===
+== BASE APPLICATION STYLING ===== */
+
+.root {
+    -fx-background-color: -fx-bg-primary;
+    -fx-font-family: -fx-font-family;
+    -fx-font-size: 14px;
+    -fx-text-fill: -fx-text-primary;
+    -fx-font-smoothing-type: lcd;
+}
+
+/* Remove default JavaFX styling */
+.scroll-pane,
+.list-view,
+.table-view,
+.tree-view {
+    -fx-background-insets: 0;
+    -fx-padding: 0;
+}
+
+/* ===== ULTRA MODERN BUTTONS ===== */
+
+.button {
+    -fx-background-color: -fx-surface-primary;
+    -fx-text-fill: -fx-text-primary;
+    -fx-border-color: transparent;
+    -fx-border-radius: -fx-radius-md;
+    -fx-background-radius: -fx-radius-md;
+    -fx-padding: 10px 16px;
+    -fx-font-size: 14px;
+    -fx-font-weight: 500;
+    -fx-font-family: -fx-font-family;
+    -fx-cursor: hand;
+    -fx-effect: -fx-shadow-sm;
+    -fx-background-insets: 0;
+    -fx-border-insets: 0;
+}
+
+.button:hover {
+    -fx-background-color: -fx-surface-secondary;
+    -fx-effect: -fx-shadow-md;
+    -fx-scale-x: 1.02;
+    -fx-scale-y: 1.02;
+}
+
+.button:pressed {
+    -fx-background-color: -fx-surface-tertiary;
+    -fx-effect: -fx-shadow-sm;
+    -fx-scale-x: 0.98;
+    -fx-scale-y: 0.98;
+}
+
+.button:focused {
+    -fx-border-color: -fx-border-focus;
+    -fx-border-width: 2px;
+}
+
+/* Primary Button - Modern Gradient */
+.button.primary,
+.button:default {
+    -fx-background-color: linear-gradient(135deg, -fx-primary 0%, -fx-primary-hover 100%);
+    -fx-text-fill: white;
+    -fx-font-weight: 600;
+}
+
+.button.primary:hover,
+.button:default:hover {
+    -fx-background-color: linear-gradient(135deg, -fx-primary-hover 0%, -fx-primary-pressed 100%);
+    -fx-effect: -fx-shadow-lg;
+}
+
+/* Success Button */
+.button.success {
+    -fx-background-color: linear-gradient(135deg, -fx-success 0%, -fx-success-hover 100%);
+    -fx-text-fill: white;
+    -fx-font-weight: 600;
+}
+
+/* Danger Button */
+.button.danger {
+    -fx-background-color: linear-gradient(135deg, -fx-danger 0%, -fx-danger-hover 100%);
+    -fx-text-fill: white;
+    -fx-font-weight: 600;
+}
+
+/* Ghost/Outline Button */
+.button.ghost {
+    -fx-background-color: transparent;
+    -fx-border-color: -fx-border-primary;
+    -fx-border-width: 1.5px;
+    -fx-text-fill: -fx-text-secondary;
+}
+
+.button.ghost:hover {
+    -fx-background-color: -fx-primary-light;
+    -fx-border-color: -fx-primary;
+    -fx-text-fill: -fx-primary;
+}
+
+/* Icon Button */
+.button.icon {
+    -fx-padding: 8px;
+    -fx-min-width: 36px;
+    -fx-min-height: 36px;
+    -fx-pref-width: 36px;
+    -fx-pref-height: 36px;
+    -fx-background-radius: -fx-radius-lg;
+    -fx-border-radius: -fx-radius-lg;
+}
+
+/* ===== MODERN INPUT FIELDS ===== */
+
+.text-field,
+.text-area,
+.password-field {
+    -fx-background-color: -fx-bg-secondary;
+    -fx-text-fill: -fx-text-primary;
+    -fx-border-color: -fx-border-secondary;
+    -fx-border-width: 1.5px;
+    -fx-border-radius: -fx-radius-lg;
+    -fx-background-radius: -fx-radius-lg;
+    -fx-padding: 12px 16px;
+    -fx-font-size: 14px;
+    -fx-font-family: -fx-font-family;
+    -fx-prompt-text-fill: -fx-text-muted;
+    -fx-background-insets: 0;
+    -fx-border-insets: 0;
+}
+
+.text-field:focused,
+.text-area:focused,
+.password-field:focused {
+    -fx-border-color: -fx-border-focus;
+    -fx-border-width: 2px;
+    -fx-effect: dropshadow(gaussian, -fx-primary, 8, 0, 0, 0);
+}
+
+/* ===== MODERN SCROLLBARS ===== */
+
+.scroll-bar {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-background-radius: 0;
+    -fx-border-radius: 0;
+}
+
+.scroll-bar .track {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-background-radius: 0;
+    -fx-border-radius: 0;
+}
+
+.scroll-bar .thumb {
+    -fx-background-color: -fx-surface-primary;
+    -fx-background-radius: -fx-radius-full;
+    -fx-border-radius: -fx-radius-full;
+    -fx-border-color: transparent;
+}
+
+.scroll-bar .thumb:hover {
+    -fx-background-color: -fx-surface-secondary;
+}
+
+.scroll-bar .thumb:pressed {
+    -fx-background-color: -fx-border-hover;
+}
+
+/* Vertical scrollbar */
+.scroll-bar:vertical {
+    -fx-pref-width: 6px;
+    -fx-max-width: 6px;
+}
+
+.scroll-bar:vertical .thumb {
+    -fx-min-height: 20px;
+}
+
+/* Horizontal scrollbar */
+.scroll-bar:horizontal {
+    -fx-pref-height: 6px;
+    -fx-max-height: 6px;
+}
+
+.scroll-bar:horizontal .thumb {
+    -fx-min-width: 20px;
+}
+
+/ *=====MODERN LISTS AND TABLES=====*/ .list-view,
+.table-view {
+    -fx-background-color: -fx-bg-secondary;
+    -fx-border-color: -fx-border-primary;
+    -fx-border-width: 1px;
+    -fx-border-radius: -fx-radius-xl;
+    -fx-background-radius: -fx-radius-xl;
+    -fx-effect: -fx-shadow-md;
+    -fx-background-insets: 0;
+    -fx-border-insets: 0;
+}
+
+.list-cell,
+.table-row-cell {
+    -fx-background-color: transparent;
+    -fx-text-fill: -fx-text-primary;
+    -fx-padding: 12px 16px;
+    -fx-border-color: transparent;
+    -fx-font-size: 14px;
+    -fx-font-family: -fx-font-family;
+}
+
+.list-cell:hover,
+.table-row-cell:hover {
+    -fx-background-color: -fx-surface-primary;
+    -fx-background-radius: -fx-radius-md;
+}
+
+.list-cell:selected,
+.table-row-cell:selected {
+    -fx-background-color: -fx-primary;
+    -fx-background-radius: -fx-radius-md;
+}
+
+.list-cell:selected .label,
+.table-row-cell:selected .table-cell {
+    -fx-text-fill: white;
+    -fx-font-weight: 500;
+}
+
+.table-column-header {
+    -fx-background-color: -fx-surface-primary;
+    -fx-text-fill: -fx-text-secondary;
+    -fx-font-weight: 600;
+    -fx-font-size: 12px;
+    -fx-font-family: -fx-font-family;
+    -fx-padding: 16px;
+    -fx-border-color: -fx-border-secondary;
+    -fx-text-transform: uppercase;
+    -fx-letter-spacing: 0.5px;
+}
+
+.table-column-header .label {
+    -fx-text-fill: -fx-text-secondary;
+    -fx-font-weight: 600;
+}
+
+/* ===== MODERN TABS ===== */
+
+.tab-pane {
+    -fx-background-color: -fx-bg-secondary;
+    -fx-border-color: -fx-border-primary;
+    -fx-border-radius: -fx-radius-xl;
+    -fx-background-radius: -fx-radius-xl;
+    -fx-effect: -fx-shadow-md;
+}
+
+.tab-pane .tab-header-area {
+    -fx-background-color: -fx-surface-primary;
+    -fx-background-radius: -fx-radius-xl -fx-radius-xl 0 0;
+    -fx-padding: 8px 8px 0 8px;
+}
+
+.tab {
+    -fx-background-color: transparent;
+    -fx-text-fill: -fx-text-muted;
+    -fx-padding: 12px 20px;
+    -fx-border-color: transparent;
+    -fx-background-radius: -fx-radius-lg -fx-radius-lg 0 0;
+    -fx-font-weight: 500;
+    -fx-font-family: -fx-font-family;
+}
+
+.tab:selected {
+    -fx-background-color: -fx-bg-secondary;
+    -fx-text-fill: -fx-text-primary;
+    -fx-font-weight: 600;
+}
+
+.tab:hover {
+    -fx-background-color: -fx-surface-secondary;
+    -fx-text-fill: -fx-text-primary;
+}
+
+/* ===== MODERN PROGRESS BARS ===== */
+
+.progress-bar {
+    -fx-background-color: -fx-surface-secondary;
+    -fx-background-radius: -fx-radius-full;
+    -fx-border-radius: -fx-radius-full;
+    -fx-pref-height: 8px;
+    -fx-background-insets: 0;
+}
+
+.progress-bar .bar {
+    -fx-background-color: linear-gradient(90deg, -fx-primary 0%, -fx-primary-hover 50%, -fx-primary 100%);
+    -fx-background-radius: -fx-radius-full;
+    -fx-border-radius: -fx-radius-full;
+    -fx-background-insets: 0;
+    -fx-border-insets: 0;
+}
+
+.progress-bar .track {
+    -fx-background-color: -fx-surface-secondary;
+    -fx-background-radius: -fx-radius-full;
+    -fx-border-radius: -fx-radius-full;
+}
+
+/* ===== MODERN COMBO BOXES ===== */
+
+.combo-box {
+    -fx-background-color: -fx-bg-secondary;
+    -fx-text-fill: -fx-text-primary;
+    -fx-border-color: -fx-border-secondary;
+    -fx-border-width: 1.5px;
+    -fx-border-radius: -fx-radius-lg;
+    -fx-background-radius: -fx-radius-lg;
+    -fx-font-family: -fx-font-family;
+    -fx-background-insets: 0;
+    -fx-border-insets: 0;
+}
+
+.combo-box:focused {
+    -fx-border-color: -fx-border-focus;
+    -fx-border-width: 2px;
+}
+
+.combo-box .arrow-button {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+}
+
+.combo-box .arrow {
+    -fx-background-color: -fx-text-secondary;
+    -fx-shape: "M 0 0 L 4 4 L 8 0 Z";
+    -fx-scale-shape: true;
+}
+
+/* ===== MODERN TOOLTIPS ===== */
+
+.tooltip {
+    -fx-background-color: -fx-bg-elevated;
+    -fx-text-fill: -fx-text-primary;
+    -fx-border-color: -fx-border-primary;
+    -fx-border-width: 1px;
+    -fx-border-radius: -fx-radius-lg;
+    -fx-background-radius: -fx-radius-lg;
+    -fx-padding: 8px 12px;
+    -fx-font-size: 12px;
+    -fx-font-family: -fx-font-family;
+    -fx-effect: -fx-shadow-xl;
+    -fx-background-insets: 0;
+    -fx-border-insets: 0;
+}
+
+/* ===== MODERN CONTEXT MENUS ===== */
+
+.context-menu {
+    -fx-background-color: -fx-bg-elevated;
+    -fx-border-color: -fx-border-primary;
+    -fx-border-width: 1px;
+    -fx-border-radius: -fx-radius-xl;
+    -fx-background-radius: -fx-radius-xl;
+    -fx-effect: -fx-shadow-xl;
+    -fx-padding: 8px;
+    -fx-background-insets: 0;
+    -fx-border-insets: 0;
+}
+
+.menu-item {
+    -fx-background-color: transparent;
+    -fx-text-fill: -fx-text-primary;
+    -fx-padding: 10px 16px;
+    -fx-border-radius: -fx-radius-lg;
+    -fx-background-radius: -fx-radius-lg;
+    -fx-font-family: -fx-font-family;
+}
+
+.menu-item:hover {
+    -fx-background-color: -fx-surface-secondary;
+}
+
+.menu-item:focused {
+    -fx-background-color: -fx-primary;
+    -fx-text-fill: white;
+}
+
+/* ===== MODERN CHECKBOXES AND RADIO BUTTONS ===== */
+
+.check-box,
+.radio-button {
+    -fx-text-fill: -fx-text-primary;
+    -fx-font-size: 14px;
+    -fx-font-family: -fx-font-family;
+}
+
+.check-box .box,
+.radio-button .radio {
+    -fx-background-color: -fx-surface-secondary;
+    -fx-border-color: -fx-border-primary;
+    -fx-border-width: 2px;
+    -fx-border-radius: -fx-radius-sm;
+    -fx-background-radius: -fx-radius-sm;
+}
+
+.check-box:selected .box,
+.radio-button:selected .radio {
+    -fx-background-color: -fx-primary;
+    -fx-border-color: -fx-primary;
+}
+
+.check-box .mark,
+.radio-button .dot {
+    -fx-background-color: white;
+}
+
+/ *=====MODERN SLIDERS=====*/ .slider {
+    -fx-background-color: transparent;
+}
+
+.slider .track {
+    -fx-background-color: -fx-surface-secondary;
+    -fx-background-radius: -fx-radius-full;
+    -fx-border-radius: -fx-radius-full;
+    -fx-pref-height: 6px;
+}
+
+.slider .thumb {
+    -fx-background-color: -fx-primary;
+    -fx-background-radius: -fx-radius-full;
+    -fx-border-radius: -fx-radius-full;
+    -fx-pref-width: 18px;
+    -fx-pref-height: 18px;
+    -fx-effect: -fx-shadow-md;
+}
+
+.slider .thumb:hover {
+    -fx-scale-x: 1.2;
+    -fx-scale-y: 1.2;
+    -fx-effect: -fx-shadow-lg;
+}
+
+.slider .thumb:pressed {
+    -fx-scale-x: 1.1;
+    -fx-scale-y: 1.1;
+}
+
+/* ===== MODERN SEPARATORS ===== */
+
+.separator {
+    -fx-background-color: -fx-border-secondary;
+}
+
+.separator .line {
+    -fx-background-color: -fx-border-secondary;
+    -fx-border-color: transparent;
+}
+
+/* ===== MODERN CARDS AND PANELS ===== */
+
+.card,
+.panel {
+    -fx-background-color: -fx-bg-secondary;
+    -fx-border-color: -fx-border-primary;
+    -fx-border-width: 1px;
+    -fx-border-radius: -fx-radius-xl;
+    -fx-background-radius: -fx-radius-xl;
+    -fx-effect: -fx-shadow-md;
+    -fx-padding: 20px;
+    -fx-background-insets: 0;
+    -fx-border-insets: 0;
+}
+
+.card:hover,
+.panel:hover {
+    -fx-effect: -fx-shadow-lg;
+    -fx-translate-y: -2px;
+}
+
+/* ===== MODERN BADGES ===== */
+
+.badge {
+    -fx-background-color: -fx-primary;
+    -fx-text-fill: white;
+    -fx-padding: 4px 10px;
+    -fx-background-radius: -fx-radius-full;
+    -fx-border-radius: -fx-radius-full;
+    -fx-font-size: 11px;
+    -fx-font-weight: 700;
+    -fx-font-family: -fx-font-family;
+    -fx-text-transform: uppercase;
+    -fx-letter-spacing: 0.5px;
+}
+
+.badge.success {
+    -fx-background-color: -fx-success;
+}
+
+.badge.warning {
+    -fx-background-color: -fx-warning;
+}
+
+.badge.danger {
+    -fx-background-color: -fx-danger;
+}
+
+/* ===== MODERN NOTIFICATIONS ===== */
+
+.notification {
+    -fx-background-color: -fx-bg-elevated;
+    -fx-border-color: -fx-border-primary;
+    -fx-border-width: 1px;
+    -fx-border-radius: -fx-radius-xl;
+    -fx-background-radius: -fx-radius-xl;
+    -fx-effect: -fx-shadow-xl;
+    -fx-padding: 16px 20px;
+    -fx-spacing: 12px;
+    -fx-background-insets: 0;
+    -fx-border-insets: 0;
+}
+
+.notification.success {
+    -fx-border-color: -fx-success;
+    -fx-border-width: 2px 2px 2px 4px;
+}
+
+.notification.warning {
+    -fx-border-color: -fx-warning;
+    -fx-border-width: 2px 2px 2px 4px;
+}
+
+.notification.danger {
+    -fx-border-color: -fx-danger;
+    -fx-border-width: 2px 2px 2px 4px;
+}
+
+.notification.info {
+    -fx-border-color: -fx-info;
+    -fx-border-width: 2px 2px 2px 4px;
+}
+
+/* ===== GHOSTVAULT SPECIFIC STYLING ===== */
+
+/* Main Application Window */
+.main-window {
+    -fx-background-color: -fx-bg-primary;
+}
+
+/* Header Bar */
+.header-bar {
+    -fx-background-color: -fx-bg-tertiary;
+    -fx-border-color: -fx-border-primary;
+    -fx-border-width: 0 0 1px 0;
+    -fx-padding: 12px 20px;
+    -fx-effect: -fx-shadow-sm;
+}
+
+.header-title {
+    -fx-text-fill: -fx-text-primary;
+    -fx-font-size: 18px;
+    -fx-font-weight: 700;
+    -fx-font-family: -fx-font-family;
+}
+
+.header-subtitle {
+    -fx-text-fill: -fx-text-muted;
+    -fx-font-size: 12px;
+    -fx-font-family: -fx-font-family;
+}
+
+/* Sidebar */
+.sidebar {
+    -fx-background-color: -fx-bg-tertiary;
+    -fx-border-color: -fx-border-primary;
+    -fx-border-width: 0 1px 0 0;
+    -fx-padding: 16px;
+}
+
+.sidebar-item {
+    -fx-background-color: transparent;
+    -fx-text-fill: -fx-text-secondary;
+    -fx-padding: 12px 16px;
+    -fx-border-radius: -fx-radius-lg;
+    -fx-background-radius: -fx-radius-lg;
+    -fx-font-weight: 500;
+    -fx-font-family: -fx-font-family;
+}
+
+.sidebar-item:hover {
+    -fx-background-color: -fx-surface-primary;
+    -fx-text-fill: -fx-text-primary;
+}
+
+.sidebar-item.active {
+    -fx-background-color: -fx-primary;
+    -fx-text-fill: white;
+    -fx-font-weight: 600;
+}
+
+/* File List */
+.file-list {
+    -fx-background-color: -fx-bg-secondary;
+    -fx-border-color: -fx-border-primary;
+    -fx-border-width: 1px;
+    -fx-border-radius: -fx-radius-xl;
+    -fx-background-radius: -fx-radius-xl;
+    -fx-effect: -fx-shadow-md;
+}
+
+.file-item {
+    -fx-background-color: transparent;
+    -fx-padding: 12px 16px;
+    -fx-border-radius: -fx-radius-lg;
+    -fx-background-radius: -fx-radius-lg;
+}
+
+.file-item:hover {
+    -fx-background-color: -fx-surface-primary;
+}
+
+.file-item:selected {
+    -fx-background-color: -fx-primary;
+}
+
+.file-name {
+    -fx-text-fill: -fx-text-primary;
+    -fx-font-weight: 500;
+    -fx-font-family: -fx-font-family;
+}
+
+.file-size {
+    -fx-text-fill: -fx-text-muted;
+    -fx-font-size: 12px;
+    -fx-font-family: -fx-font-mono;
+}
+
+/* Status Bar */
+.status-bar {
+    -fx-background-color: -fx-bg-tertiary;
+    -fx-border-color: -fx-border-primary;
+    -fx-border-width: 1px 0 0 0;
+    -fx-padding: 8px 20px;
+}
+
+.status-text {
+    -fx-text-fill: -fx-text-muted;
+    -fx-font-size: 12px;
+    -fx-font-family: -fx-font-family;
+}
+
+/* ===== ANIMATIONS ===== */
+
+@keyframes slideInRight {
+    from {
+        -fx-translate-x: 100%;
+        -fx-opacity: 0;
+    }
+
+    to {
+        -fx-translate-x: 0;
+        -fx-opacity: 1;
+    }
+}
+
+@keyframes slideOutRight {
+    from {
+        -fx-translate-x: 0;
+        -fx-opacity: 1;
+    }
+
+    to {
+        -fx-translate-x: 100%;
+        -fx-opacity: 0;
+    }
+}
+
+@keyframes fadeIn {
+    from {
+        -fx-opacity: 0;
+    }
+
+    to {
+        -fx-opacity: 1;
+    }
+}
+
+@keyframes fadeOut {
+    from {
+        -fx-opacity: 1;
+    }
+
+    to {
+        -fx-opacity: 0;
+    }
+}
+
+@keyframes scaleIn {
+    from {
+        -fx-scale-x: 0.8;
+        -fx-scale-y: 0.8;
+        -fx-opacity: 0;
+    }
+
+    to {
+        -fx-scale-x: 1;
+        -fx-scale-y: 1;
+        -fx-opacity: 1;
+    }
+}
+
+/* Animation Classes */
+.slide-in-right {
+    -fx-animation: slideInRight 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.slide-out-right {
+    -fx-animation: slideOutRight 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.fade-in {
+    -fx-animation: fadeIn 0.3s ease-in-out;
+}
+
+.fade-out {
+    -fx-animation: fadeOut 0.3s ease-in-out;
+}
+
+.scale-in {
+    -fx-animation: scaleIn 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ===== RESPONSIVE DESIGN ===== */
+
+@media (max-width: 1200px) {
+    .root {
+        -fx-font-size: 13px;
+    }
+
+    .button {
+        -fx-padding: 8px 14px;
+        -fx-font-size: 13px;
+    }
+
+    .header-title {
+        -fx-font-size: 16px;
+    }
+}
+
+@media (max-width: 800px) {
+    .root {
+        -fx-font-size: 12px;
+    }
+
+    .button {
+        -fx-padding: 6px 12px;
+        -fx-font-size: 12px;
+    }
+
+    .header-title {
+        -fx-font-size: 14px;
+    }
+
+    .sidebar {
+        -fx-padding: 12px;
+    }
+}

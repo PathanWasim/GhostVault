@@ -210,8 +210,11 @@ public class UIManager {
     public void applyTheme(Scene scene) {
         scene.getStylesheets().clear();
         
-        // Add professional base styling first
-        scene.getStylesheets().add(getClass().getResource("/styles/professional.css").toExternalForm());
+        // Add ultra-modern theme styling (2024 Discord/Figma style)
+        scene.getStylesheets().add(getClass().getResource("/css/ultra-modern-theme.css").toExternalForm());
+        
+        // Add modern theme as secondary
+        scene.getStylesheets().add(getClass().getResource("/css/modern-theme.css").toExternalForm());
         
         if (isDarkTheme) {
             scene.getStylesheets().add(getClass().getResource("/ghostvault-dark.css").toExternalForm());
@@ -219,8 +222,8 @@ public class UIManager {
             scene.getStylesheets().add(getClass().getResource("/ghostvault-light.css").toExternalForm());
         }
         
-        // Add common styles (will override professional where needed)
-        scene.getStylesheets().add(getClass().getResource("/styles/common.css").toExternalForm());
+        // Add professional theme as fallback
+        scene.getStylesheets().add(getClass().getResource("/css/professional-theme.css").toExternalForm());
         
         // Initialize accessibility for the scene
         if (accessibilityManager != null) {

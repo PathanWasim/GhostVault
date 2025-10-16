@@ -35,12 +35,12 @@ public class ModernFileUploader extends VBox {
     };
     
     // UI Components
-    private final VBox dropZone;
-    private final Button browseButton;
-    private final Label statusLabel;
-    private final ProgressBar uploadProgress;
-    private final VBox uploadQueue;
-    private final ScrollPane queueScrollPane;
+    private VBox dropZone;
+    private Button browseButton;
+    private Label statusLabel;
+    private ProgressBar uploadProgress;
+    private VBox uploadQueue;
+    private ScrollPane queueScrollPane;
     
     // Callbacks
     private Consumer<File> onFileSelected;

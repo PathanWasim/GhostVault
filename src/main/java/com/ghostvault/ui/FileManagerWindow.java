@@ -79,7 +79,7 @@ public class FileManagerWindow {
         
         // Create scene with styling
         Scene scene = new Scene(root);
-        scene.getStylesheets().add(getClass().getResource("/styles/professional.css").toExternalForm());
+        scene.getStylesheets().add(getClass().getResource("/css/ultra-modern-theme.css").toExternalForm());
         stage.setScene(scene);
     }
     

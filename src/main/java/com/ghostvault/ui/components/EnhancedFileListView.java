@@ -41,12 +41,12 @@ public class EnhancedFileListView extends VBox {
     private static final List<String> CODE_EXTENSIONS = Arrays.asList(".java", ".py", ".cpp", ".js", ".html", ".css", ".xml", ".json");
     
     // UI Components
-    private final TextField searchField;
-    private final ComboBox<String> filterComboBox;
-    private final ComboBox<String> sortComboBox;
-    private final TableView<VaultFile> fileTable;
-    private final Label statusLabel;
-    private final ProgressBar operationProgress;
+    private TextField searchField;
+    private ComboBox<String> filterComboBox;
+    private ComboBox<String> sortComboBox;
+    private TableView<VaultFile> fileTable;
+    private Label statusLabel;
+    private ProgressBar operationProgress;
     
     // Data
     private final ObservableList<VaultFile> allFiles;
@@ -641,4 +641,165 @@ public class EnhancedFileListView extends VBox {
         }
         return 0;
     }
-}
+} 
+   /**
+     * Real-time search and filtering implementation
+     */
+    private void updateFilter() {
+        String searchText = searchField.getText().toLowerCase().trim();
+        String filterType = filterComboBox.getValue();
+        
+        filteredFiles.setPredicate(file -> {
+            // Search filter
+            if (!searchText.isEmpty()) {
+                boolean nameMatch = file.getName().toLowerCase().contains(searchText);
+                boolean extensionMatch = getFileExtension(file.getName()).toLowerCase().contains(searchText);
+                if (!nameMatch && !extensionMatch) {
+                    return false;
+                }
+            }
+            
+            // Type filter
+            if (filterType != null && !filterType.equals("All Files")) {
+                String extension = getFileExtension(file.getName()).toLowerCase();
+                switch (filterType) {
+                    case "Images":
+                        if (!IMAGE_EXTENSIONS.contains(extension)) return false;
+                        break;
+                    case "Videos":
+                        if (!VIDEO_EXTENSIONS.contains(extension)) return false;
+                        break;
+                    case "Audio":
+                        if (!AUDIO_EXTENSIONS.contains(extension)) return false;
+                        break;
+                    case "Documents":
+                        if (!extension.matches("\\.(pdf|doc|docx|txt|rtf|odt)")) return false;
+                        break;
+                    case "Code":
+                        if (!CODE_EXTENSIONS.contains(extension)) return false;
+                        break;
+                    case "Archives":
+                        if (!extension.matches("\\.(zip|rar|7z|tar|gz|bz2)")) return false;
+                        break;
+                }
+            }
+            
+            return true;
+        });
+        
+        // Update status
+        int totalFiles = allFiles.size();
+        int filteredCount = filteredFiles.size();
+        
+        if (filteredCount == totalFiles) {
+            statusLabel.setText(String.format("Showing %d files", totalFiles));
+        } else {
+            statusLabel.setText(String.format("Showing %d of %d files", filteredCount, totalFiles));
+        }
+    }
+    
+    /**
+     * Advanced search with multiple criteria
+     */
+    public void performAdvancedSearch(String name, String extension, long minSize, long maxSize, 
+                                    LocalDateTime fromDate, LocalDateTime toDate) {
+        filteredFiles.setPredicate(file -> {
+            // Name filter
+            if (name != null && !name.trim().isEmpty()) {
+                if (!file.getName().toLowerCase().contains(name.toLowerCase().trim())) {
+                    return false;
+                }
+            }
+            
+            // Extension filter
+            if (extension != null && !extension.trim().isEmpty()) {
+                String fileExt = getFileExtension(file.getName()).toLowerCase();
+                if (!fileExt.equals(extension.toLowerCase().trim())) {
+                    return false;
+                }
+            }
+            
+            // Size filter
+            if (file.isFile()) {
+                long fileSize = file.length();
+                if (minSize > 0 && fileSize < minSize) return false;
+                if (maxSize > 0 && fileSize > maxSize) return false;
+            }
+            
+            // Date filter
+            if (fromDate != null || toDate != null) {
+                try {
+                    LocalDateTime fileDate = LocalDateTime.ofInstant(
+                        java.nio.file.Files.getLastModifiedTime(file.toPath()).toInstant(),
+                        java.time.ZoneId.systemDefault()
+                    );
+                    
+                    if (fromDate != null && fileDate.isBefore(fromDate)) return false;
+                    if (toDate != null && fileDate.isAfter(toDate)) return false;
+                    
+                } catch (Exception e) {
+                    // If we can't get the date, include the file
+                }
+            }
+            
+            return true;
+        });
+    }
+    
+    /**
+     * Quick filter methods
+     */
+    public void showOnlyImages() {
+        filterComboBox.setValue("Images");
+    }
+    
+    public void showOnlyVideos() {
+        filterComboBox.setValue("Videos");
+    }
+    
+    public void showOnlyAudio() {
+        filterComboBox.setValue("Audio");
+    }
+    
+    public void showOnlyDocuments() {
+        filterComboBox.setValue("Documents");
+    }
+    
+    public void showOnlyCode() {
+        filterComboBox.setValue("Code");
+    }
+    
+    public void clearFilters() {
+        searchField.clear();
+        filterComboBox.setValue("All Files");
+        sortComboBox.setValue("Name");
+    }
+    
+    /**
+     * Get search statistics
+     */
+    public SearchStats getSearchStats() {
+        return new SearchStats(
+            allFiles.size(),
+            filteredFiles.size(),
+            searchField.getText(),
+            filterComboBox.getValue()
+        );
+    }
+    
+    /**
+     * Search statistics class
+     */
+    public static class SearchStats {
+        public final int totalFiles;
+        public final int filteredFiles;
+        public final String searchTerm;
+        public final String filterType;
+        
+        public SearchStats(int totalFiles, int filteredFiles, String searchTerm, String filterType) {
+            this.totalFiles = totalFiles;
+            this.filteredFiles = filteredFiles;
+            this.searchTerm = searchTerm;
+            this.filterType = filterType;
+        }
+    }

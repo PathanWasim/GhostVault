@@ -149,7 +149,7 @@ public class SecurityDashboard {
         
         // Create scene with professional styling
         Scene scene = new Scene(root);
-        scene.getStylesheets().add(getClass().getResource("/styles/professional.css").toExternalForm());
+        scene.getStylesheets().add(getClass().getResource("/css/ultra-modern-theme.css").toExternalForm());
         
         dashboardStage.setScene(scene);
     }

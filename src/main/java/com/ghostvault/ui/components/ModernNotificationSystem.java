@@ -26,7 +26,17 @@ public class ModernNotificationSystem {
         INFO("ℹ", "#0078d4", "#d1ecf1"),
         WARNING("⚠", "#ff8c00", "#fff3cd"),
         ERROR("✗", "#d13438", "#f8d7da"),
-        SECURITY("🛡", "#9c27b0", "#e1bee7")
+        SECURITY("🛡", "#9c27b0", "#e1bee7");
+        
+        public final String icon;
+        public final String iconColor;
+        public final String backgroundColor;
+        
+        NotificationType(String icon, String iconColor, String backgroundColor) {
+            this.icon = icon;
+            this.iconColor = iconColor;
+            this.backgroundColor = backgroundColor;
+        }
     }
     
     private static ModernNotificationSystem instance;

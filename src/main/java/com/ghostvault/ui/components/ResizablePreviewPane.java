@@ -9,6 +9,8 @@ import javafx.scene.control.*;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.*;
 
+import java.io.File;
+
 /**
  * Resizable preview pane that can contain code or media preview components
  */
@@ -19,12 +21,12 @@ public class ResizablePreviewPane extends VBox {
     private static final double DEFAULT_PREVIEW_WIDTH = 400;
     
     // Components
-    private final HBox headerBox;
-    private final Label titleLabel;
-    private final Button closeButton;
-    private final Button resizeButton;
-    private final StackPane contentPane;
-    private final Region resizeHandle;
+    private HBox headerBox;
+    private Label titleLabel;
+    private Button closeButton;
+    private Button resizeButton;
+    private StackPane contentPane;
+    private Region resizeHandle;
     
     // Preview components
     private CodePreviewPane codePreview;
@@ -182,7 +184,8 @@ public class ResizablePreviewPane extends VBox {
             showPreviewComponent(codePreview, mediaPreview);
             
             // Load content
-            codePreview.previewFile(fileName, content);
+            File file = new File(fileName);
+            codePreview.loadFile(file);
             
             showPreview();
         });
@@ -200,7 +203,8 @@ public class ResizablePreviewPane extends VBox {
             showPreviewComponent(mediaPreview, codePreview);
             
             // Load content
-            mediaPreview.previewImage(fileName, imageData);
+            File file = new File(fileName);
+            mediaPreview.loadFile(file);
             
             showPreview();
         });
@@ -218,7 +222,8 @@ public class ResizablePreviewPane extends VBox {
             showPreviewComponent(mediaPreview, codePreview);
             
             // Load content
-            mediaPreview.previewAudio(fileName, audioData);
+            File file = new File(fileName);
+            mediaPreview.loadFile(file);
             
             showPreview();
         });
@@ -236,7 +241,8 @@ public class ResizablePreviewPane extends VBox {
             showPreviewComponent(mediaPreview, codePreview);
             
             // Load content
-            mediaPreview.previewVideo(fileName, videoData);
+            File file = new File(fileName);
+            mediaPreview.loadFile(file);
             
             showPreview();
         });
@@ -250,9 +256,10 @@ public class ResizablePreviewPane extends VBox {
             currentPreviewType = PreviewType.NONE;
             titleLabel.setText("📄 " + fileName);
             
-            if (CodePreviewPane.canPreviewAsCode(fileName)) {
+            File file = new File(fileName);
+            if (CodePreviewPane.canPreview(file)) {
                 showPreviewComponent(codePreview, mediaPreview);
-                codePreview.showUnsupportedFile(fileName, reason);
+                codePreview.clear();
             } else {
                 showPreviewComponent(mediaPreview, codePreview);
                 mediaPreview.showUnsupportedMedia(fileName, reason);

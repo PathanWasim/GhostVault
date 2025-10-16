@@ -22,510 +22,71 @@ import java.util.regex.Pattern;
  */
 public class CodePreviewPane extends VBox {
     
-    // Language detection patterns
-    private static final Map<Strns
-    private static final Map<String, String> LANGUAGE_EXTENSIONS = new HashMap<>();
-    static {
-        LANGUAGE_EXTENSIONS.put(".py", "python");
-        LANGUAGE_EXTENSIONS.put(".cpp", "cpp");
-        LANGUAGE_EXTENSIONS.put(".cxx", "cpp");
-        LANGUAGE_EXTENSIONS.put(".cc", "cpp");
-        LANGUAGE_EXTENSIONS.put(".c", "c");
-        LANGUAGE_EXTENSIONS.put(".h", "c");
-        LANGUAGE_EXTENSIONS.put(".hpp", "cpp");
-        LANGUAGE_EXTENSIONS.put(".java", "java");
-        LANGUAGE_EXTENSIONS.put(".js", "javascript");
-        LANGUAGE_EXTENSIONS.put(".jsx", "javascript");
-        LANGUAGE_EXTENSIONS.put(".ts", "typescript");
-        LANGUAGE_EXTENSIONS.put(".tsx", "typescript");
-        LANGUAGE_EXTENSIONS.put(".html", "html");
-        LANGUAGE_EXTENSIONS.put(".htm", "html");
-        LANGUAGE_EXTENSIONS.put(".css", "css");
-        LANGUAGE_EXTENSIONS.put(".scss", "css");
-        LANGUAGE_EXTENSIONS.put(".sass", "css");
-        LANGUAGE_EXTENSIONS.put(".xml", "xml");
-        LANGUAGE_EXTENSIONS.put(".json", "json");
-        LANGUAGE_EXTENSIONS.put(".yaml", "yaml");
-        LANGUAGE_EXTENSIONS.put(".yml", "yaml");
-        LANGUAGE_EXTENSIONS.put(".md", "markdown");
-        LANGUAGE_EXTENSIONS.put(".sql", "sql");
-        LANGUAGE_EXTENSIONS.put(".sh", "bash");
-        LANGUAGE_EXTENSIONS.put(".bat", "batch");
-        LANGUAGE_EXTENSIONS.put(".ps1", "powershell");
-    }
+    // UI Components
+    private HBox headerBar;
+    private Label fileNameLabel;
+    private Label languageLabel;
+    private ComboBox<String> themeSelector;
+    private Button copyButton;
+    private Button wrapToggleButton;
+    private ScrollPane scrollPane;
+    private HBox contentContainer;
+    private VBox lineNumbersPane;
+    private TextFlow codeTextFlow;
+    private ProgressIndicator loadingIndicator;
+    private Label statusLabel;
     
-    // Syntax highlighting colors
-    private static final Map<String, Color> SYNTAX_COLORS = new HashMap<>();
-    static {
-        SYNTAX_COLORS.put("keyword", Color.web("#569cd6"));      // Blue
-        SYNTAX_COLORS.put("string", Color.web("#ce9178"));       // Orange
-        SYNTAX_COLORS.put("comment", Color.web("#6a9955"));      // Green
-        SYNTAX_COLORS.put("number", Color.web("#b5cea8"));       // Light green
-        SYNTAX_COLORS.put("operator", Color.web("#d4d4d4"));     // Light gray
-        SYNTAX_COLORS.put("function", Color.web("#dcdcaa"));     // Yellow
-        SYNTAX_COLORS.put("type", Color.web("#4ec9b0"));         // Cyan
-        SYNTAX_COLORS.put("default", Color.web("#d4d4d4"));      // Default text
-    }
-    
-    private final Label headerLabel;
-    private final ScrollPane scrollPane;
-    private final VBox contentBox;
-    private final ProgressIndicator loadingIndicator;
-    private final Label errorLabel;
-    
-    private String currentFileName;
+    // State
+    private File currentFile;
     private String currentLanguage;
+    private boolean lineWrapEnabled = false;
+    private boolean showLineNumbers = true;
+    private String currentTheme = "dark";
+    private List<String> codeLines = new ArrayList<>();
+    
+    // Syntax highlighting patterns
+    private Map<String, Map<String, Pattern>> syntaxPatterns = new HashMap<>();
     
     public CodePreviewPane() {
-        super(5);
-        setPadding(new Insets(10));
-        getStyleClass().add("professional-panel");
-        
-        // Header with file info
-        headerLabel = new Label("No file selected");
-        headerLabel.getStyleClass().addAll("header-subtitle");
-        headerLabel.setMaxWidth(Double.MAX_VALUE);
-        
-        // Loading indicator
-        loadingIndicator = new ProgressIndicator();
-        loadingIndicator.setMaxSize(30, 30);
-        loadingIndicator.setVisible(false);
-        
-        // Error label
-        errorLabel = new Label();
-        errorLabel.getStyleClass().add("error-text");
-        errorLabel.setVisible(false);
-        errorLabel.setWrapText(true);
-        
-        // Content area
-        contentBox = new VBox(2);
-        contentBox.setPadding(new Insets(10));
-        
-        scrollPane = new ScrollPane(contentBox);
-        scrollPane.setFitToWidth(true);
-        scrollPane.setFitToHeight(true);
-        scrollPane.getStyleClass().add("code-scroll-pane");
-        scrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
-        scrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
-        
-        VBox.setVgrow(scrollPane, Priority.ALWAYS);
-        
-        getChildren().addAll(headerLabel, scrollPane);
-        
-        // Apply professional styling
-        setStyle("-fx-background-color: #2d2d2d; -fx-border-color: #404040; -fx-border-width: 1px; -fx-border-radius: 6px;");
+        initializeComponents();
+        setupLayout();
+        setupStyling();
+        setupEventHandlers();
+        initializeSyntaxPatterns();
     }
     
     /**
-     * Preview a code file with syntax highlighting
+     * Initialize all components
      */
-    public void previewFile(String fileName, String content) {
-        this.currentFileName = fileName;
-        this.currentLanguage = detectLanguage(fileName);
+    private void initializeComponents() {
+        // Header bar
+        headerBar = new HBox(8);
+        headerBar.setAlignment(Pos.CENTER_LEFT);
+        headerBar.getStyleClass().add("code-preview-header");
         
-        Platform.runLater(() -> {
-            headerLabel.setText(String.format("📄 %s (%s) - %d lines", 
-                fileName, currentLanguage.toUpperCase(), content.split("\n").length));
-            
-            showLoading(true);
-            contentBox.getChildren().clear();
-        });
+        // File info
+        fileNameLabel = new Label("No file selected");
+        fileNameLabel.getStyleClass().add("code-file-name");
         
-        // Process syntax highlighting in background
-        Task<Void> highlightTask = new Task<Void>() {
-            @Override
-            protected Void call() throws Exception {
-                String[] lines = content.split("\n");
-                
-                Platform.runLater(() -> {
-                    try {
-                        for (int i = 0; i < Math.min(lines.length, MAX_LINES_PREVIEW); i++) {
-                            HBox lineBox = createLineWithHighlighting(i + 1, lines[i]);
-                            contentBox.getChildren().add(lineBox);
-                        }
-                        
-                        if (lines.length > MAX_LINES_PREVIEW) {
-                            Label truncatedLabel = new Label(String.format("... (%d more lines truncated for performance)", 
-                                lines.length - MAX_LINES_PREVIEW));
-                            truncatedLabel.setStyle("-fx-text-fill: #888888; -fx-font-style: italic;");
-                            contentBox.getChildren().add(truncatedLabel);
-                        }
-                        
-                        showLoading(false);
-                        
-                    } catch (Exception e) {
-                        showError("Error highlighting code: " + e.getMessage());
-                    }
-                });
-                
-                return null;
-            }
-        };
+        languageLabel = new Label("");
+        languageLabel.getStyleClass().add("code-language-badge");
         
-        Thread highlightThread = new Thread(highlightTask);
-        highlightThread.setDaemon(true);
-        highlightThread.start();
-    }
-    
-    /**
-     * Show message for unsupported files
-     */
-    public void showUnsupportedFile(String fileName, String reason) {
-        Platform.runLater(() -> {
-            headerLabel.setText("📄 " + fileName);
-            contentBox.getChildren().clear();
-            
-            VBox messageBox = new VBox(10);
-            messageBox.setStyle("-fx-alignment: center; -fx-padding: 50px;");
-            
-            Label iconLabel = new Label("⚠️");
-            iconLabel.setStyle("-fx-font-size: 48px;");
-            
-            Label messageLabel = new Label("Cannot preview this file");
-            messageLabel.setStyle("-fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: #cccccc;");
-            
-            Label reasonLabel = new Label(reason);
-            reasonLabel.setStyle("-fx-font-size: 14px; -fx-text-fill: #888888;");
-            reasonLabel.setWrapText(true);
-            
-            messageBox.getChildren().addAll(iconLabel, messageLabel, reasonLabel);
-            contentBox.getChildren().add(messageBox);
-            
-            showLoading(false);
-        });
-    }
-    
-    /**
-     * Create a line with syntax highlighting and line numbers
-     */
-    private HBox createLineWithHighlighting(int lineNumber, String lineContent) {
-        HBox lineBox = new HBox(10);
-        lineBox.setStyle("-fx-padding: 2px 0;");
+        // Controls
+        themeSelector = new ComboBox<>();
+        themeSelector.getItems().addAll("Dark", "Light", "High Contrast");
+        themeSelector.setValue("Dark");
+        themeSelector.getStyleClass().add("theme-selector");
         
-        // Line number
-        Label lineNumLabel = new Label(String.format("%4d", lineNumber));
-        lineNumLabel.setFont(CODE_FONT);
-        lineNumLabel.setStyle("-fx-text-fill: #858585; -fx-min-width: 40px; -fx-alignment: center-right;");
+        copyButton = new Button("📋");
+        copyButton.setTooltip(new Tooltip("Copy code to clipboard"));
+        copyButton.getStyleClass().addAll("button", "icon", "copy-button");
         
-        // Code content with syntax highlighting
-        TextFlow codeFlow = new TextFlow();
-        codeFlow.getChildren().addAll(highlightSyntax(lineContent, currentLanguage));
+        wrapToggleButton = new Button("↩️");
+        wrapToggleButton.setTooltip(new Tooltip("Toggle line wrap"));
+        wrapToggleButton.getStyleClass().addAll("button", "icon", "wrap-toggle-button");
         
-        lineBox.getChildren().addAll(lineNumLabel, codeFlow);
+        // Spacer
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
         
-        return lineBox;
-    }
-    
-    /**
-     * Apply syntax highlighting to a line of code
-     */
-    private Text[] highlightSyntax(String line, String language) {
-        if (line.trim().isEmpty()) {
-            Text emptyText = new Text(" ");
-            emptyText.setFont(CODE_FONT);
-            return new Text[]{emptyText};
-        }
-        
-        switch (language.toLowerCase()) {
-            case "java":
-                return highlightJava(line);
-            case "python":
-                return highlightPython(line);
-            case "cpp":
-            case "c":
-                return highlightCpp(line);
-            case "javascript":
-            case "typescript":
-                return highlightJavaScript(line);
-            case "html":
-                return highlightHtml(line);
-            case "css":
-                return highlightCss(line);
-            case "json":
-                return highlightJson(line);
-            case "xml":
-                return highlightXml(line);
-            default:
-                return highlightGeneric(line);
-        }
-    }
-    
-    /**
-     * Highlight Java syntax
-     */
-    private Text[] highlightJava(String line) {
-        String[] javaKeywords = {
-            "public", "private", "protected", "static", "final", "abstract", "class", "interface",
-            "extends", "implements", "import", "package", "if", "else", "for", "while", "do",
-            "switch", "case", "default", "break", "continue", "return", "try", "catch", "finally",
-            "throw", "throws", "new", "this", "super", "null", "true", "false", "void", "int",
-            "double", "float", "long", "short", "byte", "char", "boolean", "String"
-        };
-        
-        return highlightWithKeywords(line, javaKeywords);
-    }
-    
-    /**
-     * Highlight Python syntax
-     */
-    private Text[] highlightPython(String line) {
-        String[] pythonKeywords = {
-            "def", "class", "if", "elif", "else", "for", "while", "try", "except", "finally",
-            "import", "from", "as", "return", "yield", "break", "continue", "pass", "lambda",
-            "and", "or", "not", "in", "is", "None", "True", "False", "self", "with", "async", "await"
-        };
-        
-        return highlightWithKeywords(line, pythonKeywords);
-    }
-    
-    /**
-     * Highlight C/C++ syntax
-     */
-    private Text[] highlightCpp(String line) {
-        String[] cppKeywords = {
-            "int", "char", "float", "double", "void", "bool", "long", "short", "unsigned", "signed",
-            "const", "static", "extern", "auto", "register", "volatile", "inline", "typedef",
-            "struct", "union", "enum", "class", "public", "private", "protected", "virtual",
-            "if", "else", "for", "while", "do", "switch", "case", "default", "break", "continue",
-            "return", "goto", "sizeof", "new", "delete", "this", "true", "false", "nullptr",
-            "#include", "#define", "#ifdef", "#ifndef", "#endif", "#pragma"
-        };
-        
-        return highlightWithKeywords(line, cppKeywords);
-    }
-    
-    /**
-     * Highlight JavaScript/TypeScript syntax
-     */
-    private Text[] highlightJavaScript(String line) {
-        String[] jsKeywords = {
-            "var", "let", "const", "function", "class", "extends", "import", "export", "default",
-            "if", "else", "for", "while", "do", "switch", "case", "break", "continue", "return",
-            "try", "catch", "finally", "throw", "new", "this", "super", "null", "undefined",
-            "true", "false", "typeof", "instanceof", "in", "of", "async", "await", "yield"
-        };
-        
-        return highlightWithKeywords(line, jsKeywords);
-    }
-    
-    /**
-     * Generic syntax highlighting with keywords
-     */
-    private Text[] highlightWithKeywords(String line, String[] keywords) {
-        java.util.List<Text> texts = new java.util.ArrayList<>();
-        
-        // Check for comments first
-        if (line.trim().startsWith("//") || line.trim().startsWith("#")) {
-            Text commentText = new Text(line);
-            commentText.setFont(CODE_FONT);
-            commentText.setFill(SYNTAX_COLORS.get("comment"));
-            texts.add(commentText);
-            return texts.toArray(new Text[0]);
-        }
-        
-        // Split by whitespace and operators while preserving them
-        String[] tokens = line.split("(\\s+|(?=[(){}\\[\\];,.])|(?<=[(){}\\[\\];,.]))");
-        
-        for (String token : tokens) {
-            if (token.isEmpty()) continue;
-            
-            Text text = new Text(token);
-            text.setFont(CODE_FONT);
-            
-            // Determine token type and color
-            if (isKeyword(token, keywords)) {
-                text.setFill(SYNTAX_COLORS.get("keyword"));
-            } else if (isString(token)) {
-                text.setFill(SYNTAX_COLORS.get("string"));
-            } else if (isNumber(token)) {
-                text.setFill(SYNTAX_COLORS.get("number"));
-            } else if (isOperator(token)) {
-                text.setFill(SYNTAX_COLORS.get("operator"));
-            } else {
-                text.setFill(SYNTAX_COLORS.get("default"));
-            }
-            
-            texts.add(text);
-        }
-        
-        return texts.toArray(new Text[0]);
-    }
-    
-    /**
-     * Highlight HTML syntax
-     */
-    private Text[] highlightHtml(String line) {
-        java.util.List<Text> texts = new java.util.ArrayList<>();
-        
-        // Simple HTML tag highlighting
-        Pattern tagPattern = Pattern.compile("<[^>]+>");
-        Matcher matcher = tagPattern.matcher(line);
-        
-        int lastEnd = 0;
-        while (matcher.find()) {
-            // Add text before tag
-            if (matcher.start() > lastEnd) {
-                Text beforeText = new Text(line.substring(lastEnd, matcher.start()));
-                beforeText.setFont(CODE_FONT);
-                beforeText.setFill(SYNTAX_COLORS.get("default"));
-                texts.add(beforeText);
-            }
-            
-            // Add tag
-            Text tagText = new Text(matcher.group());
-            tagText.setFont(CODE_FONT);
-            tagText.setFill(SYNTAX_COLORS.get("keyword"));
-            texts.add(tagText);
-            
-            lastEnd = matcher.end();
-        }
-        
-        // Add remaining text
-        if (lastEnd < line.length()) {
-            Text remainingText = new Text(line.substring(lastEnd));
-            remainingText.setFont(CODE_FONT);
-            remainingText.setFill(SYNTAX_COLORS.get("default"));
-            texts.add(remainingText);
-        }
-        
-        return texts.toArray(new Text[0]);
-    }
-    
-    /**
-     * Highlight CSS syntax
-     */
-    private Text[] highlightCss(String line) {
-        return highlightGeneric(line); // Simplified for now
-    }
-    
-    /**
-     * Highlight JSON syntax
-     */
-    private Text[] highlightJson(String line) {
-        return highlightGeneric(line); // Simplified for now
-    }
-    
-    /**
-     * Highlight XML syntax
-     */
-    private Text[] highlightXml(String line) {
-        return highlightHtml(line); // Similar to HTML
-    }
-    
-    /**
-     * Generic highlighting for unknown languages
-     */
-    private Text[] highlightGeneric(String line) {
-        Text text = new Text(line);
-        text.setFont(CODE_FONT);
-        text.setFill(SYNTAX_COLORS.get("default"));
-        return new Text[]{text};
-    }
-    
-    /**
-     * Check if token is a keyword
-     */
-    private boolean isKeyword(String token, String[] keywords) {
-        for (String keyword : keywords) {
-            if (keyword.equals(token)) {
-                return true;
-            }
-        }
-        return false;
-    }
-    
-    /**
-     * Check if token is a string literal
-     */
-    private boolean isString(String token) {
-        return (token.startsWith("\"") && token.endsWith("\"")) ||
-               (token.startsWith("'") && token.endsWith("'")) ||
-               (token.startsWith("`") && token.endsWith("`"));
-    }
-    
-    /**
-     * Check if token is a number
-     */
-    private boolean isNumber(String token) {
-        try {
-            Double.parseDouble(token);
-            return true;
-        } catch (NumberFormatException e) {
-            return false;
-        }
-    }
-    
-    /**
-     * Check if token is an operator
-     */
-    private boolean isOperator(String token) {
-        return token.matches("[+\\-*/=<>!&|%^~(){}\\[\\];,.]");
-    }
-    
-    /**
-     * Detect programming language from file extension
-     */
-    private String detectLanguage(String fileName) {
-        if (fileName == null) return "text";
-        
-        int lastDot = fileName.lastIndexOf('.');
-        if (lastDot == -1) return "text";
-        
-        String extension = fileName.substring(lastDot).toLowerCase();
-        return LANGUAGE_EXTENSIONS.getOrDefault(extension, "text");
-    }
-    
-    /**
-     * Show/hide loading indicator
-     */
-    private void showLoading(boolean show) {
-        loadingIndicator.setVisible(show);
-        if (show) {
-            if (!getChildren().contains(loadingIndicator)) {
-                getChildren().add(1, loadingIndicator);
-            }
-        } else {
-            getChildren().remove(loadingIndicator);
-        }
-    }
-    
-    /**
-     * Show error message
-     */
-    private void showError(String message) {
-        Platform.runLater(() -> {
-            errorLabel.setText(message);
-            errorLabel.setVisible(true);
-            showLoading(false);
-            
-            if (!getChildren().contains(errorLabel)) {
-                getChildren().add(errorLabel);
-            }
-        });
-    }
-    
-    /**
-     * Clear the preview
-     */
-    public void clear() {
-        Platform.runLater(() -> {
-            headerLabel.setText("No file selected");
-            contentBox.getChildren().clear();
-            showLoading(false);
-            errorLabel.setVisible(false);
-        });
-    }
-    
-    /**
-     * Check if file can be previewed as code
-     */
-    public static boolean canPreviewAsCode(String fileName) {
-        if (fileName == null) return false;
-        
-        int lastDot = fileName.lastIndexOf('.');
-        if (lastDot == -1) return false;
-        
-        String extension = fileName.substring(lastDot).toLowerCase();
-        return LANGUAGE_EXTENSIONS.containsKey(extension);
-    }
-}
+        headerBar.getChildren().addAll(\n            fileNameLabel, languageLabel, spacer, themeSelector, copyButton, wrapToggleButton\n        );\n        \n        // Content area\n        contentContainer = new HBox();\n        contentContainer.getStyleClass().add(\"code-content-container\");\n        \n        // Line numbers pane\n        lineNumbersPane = new VBox();\n        lineNumbersPane.getStyleClass().add(\"line-numbers-pane\");\n        lineNumbersPane.setPrefWidth(50);\n        lineNumbersPane.setMinWidth(50);\n        \n        // Code text flow\n        codeTextFlow = new TextFlow();\n        codeTextFlow.getStyleClass().add(\"code-text-flow\");\n        \n        // Scroll pane\n        scrollPane = new ScrollPane();\n        scrollPane.setContent(contentContainer);\n        scrollPane.getStyleClass().add(\"code-scroll-pane\");\n        scrollPane.setFitToWidth(true);\n        scrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);\n        scrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);\n        \n        contentContainer.getChildren().addAll(lineNumbersPane, codeTextFlow);\n        \n        // Loading indicator\n        loadingIndicator = new ProgressIndicator();\n        loadingIndicator.getStyleClass().add(\"code-loading-indicator\");\n        loadingIndicator.setVisible(false);\n        \n        // Status label\n        statusLabel = new Label(\"Ready\");\n        statusLabel.getStyleClass().add(\"code-status-label\");\n        \n        this.getChildren().addAll(headerBar, scrollPane, statusLabel);\n    }\n    \n    /**\n     * Setup layout properties\n     */\n    private void setupLayout() {\n        this.setSpacing(0);\n        this.setPadding(new Insets(0));\n        VBox.setVgrow(scrollPane, Priority.ALWAYS);\n    }\n    \n    /**\n     * Setup component styling\n     */\n    private void setupStyling() {\n        this.getStyleClass().add(\"code-preview-pane\");\n    }\n    \n    /**\n     * Setup event handlers\n     */\n    private void setupEventHandlers() {\n        // Theme selector\n        themeSelector.setOnAction(e -> {\n            currentTheme = themeSelector.getValue().toLowerCase().replace(\" \", \"-\");\n            applyTheme();\n        });\n        \n        // Copy button\n        copyButton.setOnAction(e -> copyCodeToClipboard());\n        \n        // Wrap toggle button\n        wrapToggleButton.setOnAction(e -> {\n            lineWrapEnabled = !lineWrapEnabled;\n            updateLineWrap();\n        });\n    }\n    \n    /**\n     * Initialize syntax highlighting patterns\n     */\n    private void initializeSyntaxPatterns() {\n        // Java patterns\n        Map<String, Pattern> javaPatterns = new HashMap<>();\n        javaPatterns.put(\"keyword\", Pattern.compile(\"\\\\b(public|private|protected|static|final|class|interface|extends|implements|import|package|if|else|for|while|do|switch|case|default|try|catch|finally|throw|throws|return|new|this|super|null|true|false|void|int|double|float|long|short|byte|char|boolean|String)\\\\b\"));\n        javaPatterns.put(\"string\", Pattern.compile(\"\\\"([^\\\"\\\\\\\\]|\\\\\\\\.)*\\\"\"));\n        javaPatterns.put(\"comment\", Pattern.compile(\"//.*$|/\\\\*[\\\\s\\\\S]*?\\\\*/\", Pattern.MULTILINE));\n        javaPatterns.put(\"number\", Pattern.compile(\"\\\\b\\\\d+(\\\\.\\\\d+)?[fFdDlL]?\\\\b\"));\n        javaPatterns.put(\"annotation\", Pattern.compile(\"@\\\\w+\"));\n        syntaxPatterns.put(\"java\", javaPatterns);\n        \n        // Python patterns\n        Map<String, Pattern> pythonPatterns = new HashMap<>();\n        pythonPatterns.put(\"keyword\", Pattern.compile(\"\\\\b(def|class|if|elif|else|for|while|try|except|finally|import|from|as|return|yield|lambda|with|assert|break|continue|pass|global|nonlocal|True|False|None|and|or|not|in|is)\\\\b\"));\n        pythonPatterns.put(\"string\", Pattern.compile(\"\\\"\\\"\\\"[\\\\s\\\\S]*?\\\"\\\"\\\"|'''[\\\\s\\\\S]*?'''|\\\"([^\\\"\\\\\\\\]|\\\\\\\\.)*\\\"|'([^'\\\\\\\\]|\\\\\\\\.)*'\"));\n        pythonPatterns.put(\"comment\", Pattern.compile(\"#.*$\", Pattern.MULTILINE));\n        pythonPatterns.put(\"number\", Pattern.compile(\"\\\\b\\\\d+(\\\\.\\\\d+)?\\\\b\"));\n        pythonPatterns.put(\"decorator\", Pattern.compile(\"@\\\\w+\"));\n        syntaxPatterns.put(\"python\", pythonPatterns);\n        \n        // JavaScript patterns\n        Map<String, Pattern> jsPatterns = new HashMap<>();\n        jsPatterns.put(\"keyword\", Pattern.compile(\"\\\\b(var|let|const|function|if|else|for|while|do|switch|case|default|try|catch|finally|throw|return|new|this|typeof|instanceof|in|of|class|extends|import|export|from|as|default|async|await|yield|true|false|null|undefined)\\\\b\"));\n        jsPatterns.put(\"string\", Pattern.compile(\"`[\\\\s\\\\S]*?`|\\\"([^\\\"\\\\\\\\]|\\\\\\\\.)*\\\"|'([^'\\\\\\\\]|\\\\\\\\.)*'\"));\n        jsPatterns.put(\"comment\", Pattern.compile(\"//.*$|/\\\\*[\\\\s\\\\S]*?\\\\*/\", Pattern.MULTILINE));\n        jsPatterns.put(\"number\", Pattern.compile(\"\\\\b\\\\d+(\\\\.\\\\d+)?\\\\b\"));\n        jsPatterns.put(\"regex\", Pattern.compile(\"/([^/\\\\\\\\]|\\\\\\\\.)+/[gimuy]*\"));\n        syntaxPatterns.put(\"javascript\", jsPatterns);\n        \n        // CSS patterns\n        Map<String, Pattern> cssPatterns = new HashMap<>();\n        cssPatterns.put(\"selector\", Pattern.compile(\"[.#]?[a-zA-Z][a-zA-Z0-9_-]*(?=\\\\s*\\\\{)\"));\n        cssPatterns.put(\"property\", Pattern.compile(\"[a-zA-Z-]+(?=\\\\s*:)\"));\n        cssPatterns.put(\"value\", Pattern.compile(\"(?<=:\\\\s)[^;]+\"));\n        cssPatterns.put(\"string\", Pattern.compile(\"\\\"([^\\\"\\\\\\\\]|\\\\\\\\.)*\\\"|'([^'\\\\\\\\]|\\\\\\\\.)*'\"));\n        cssPatterns.put(\"comment\", Pattern.compile(\"/\\\\*[\\\\s\\\\S]*?\\\\*/\"));\n        syntaxPatterns.put(\"css\", cssPatterns);\n        \n        // HTML patterns\n        Map<String, Pattern> htmlPatterns = new HashMap<>();\n        htmlPatterns.put(\"tag\", Pattern.compile(\"</?[a-zA-Z][a-zA-Z0-9]*(?:\\\\s[^>]*)?>\")); \n        htmlPatterns.put(\"attribute\", Pattern.compile(\"\\\\s[a-zA-Z-]+(?==)\"));\n        htmlPatterns.put(\"string\", Pattern.compile(\"\\\"([^\\\"\\\\\\\\]|\\\\\\\\.)*\\\"|'([^'\\\\\\\\]|\\\\\\\\.)*'\"));\n        htmlPatterns.put(\"comment\", Pattern.compile(\"<!--[\\\\s\\\\S]*?-->\"));\n        syntaxPatterns.put(\"html\", htmlPatterns);\n        \n        // JSON patterns\n        Map<String, Pattern> jsonPatterns = new HashMap<>();\n        jsonPatterns.put(\"key\", Pattern.compile(\"\\\"[^\\\"]*\\\"(?=\\\\s*:)\"));\n        jsonPatterns.put(\"string\", Pattern.compile(\"\\\"([^\\\"\\\\\\\\]|\\\\\\\\.)*\\\"\"));\n        jsonPatterns.put(\"number\", Pattern.compile(\"\\\\b-?\\\\d+(\\\\.\\\\d+)?([eE][+-]?\\\\d+)?\\\\b\"));\n        jsonPatterns.put(\"boolean\", Pattern.compile(\"\\\\b(true|false|null)\\\\b\"));\n        syntaxPatterns.put(\"json\", jsonPatterns);\n    }\n    \n    /**\n     * Load and display a code file\n     */\n    public void loadFile(File file) {\n        if (file == null || !file.exists() || !file.isFile()) {\n            showError(\"Invalid file\");\n            return;\n        }\n        \n        currentFile = file;\n        currentLanguage = detectLanguage(file);\n        \n        // Update UI\n        fileNameLabel.setText(file.getName());\n        languageLabel.setText(currentLanguage.toUpperCase());\n        \n        // Show loading\n        showLoading(\"Loading file...\");\n        \n        // Load file content in background\n        Task<List<String>> loadTask = new Task<List<String>>() {\n            @Override\n            protected List<String> call() throws Exception {\n                List<String> lines = new ArrayList<>();\n                try (BufferedReader reader = new BufferedReader(new FileReader(file))) {\n                    String line;\n                    while ((line = reader.readLine()) != null) {\n                        lines.add(line);\n                    }\n                } catch (IOException e) {\n                    throw new RuntimeException(\"Failed to read file: \" + e.getMessage());\n                }\n                return lines;\n            }\n            \n            @Override\n            protected void succeeded() {\n                Platform.runLater(() -> {\n                    codeLines = getValue();\n                    displayCode();\n                    hideLoading();\n                    statusLabel.setText(\"Loaded \" + codeLines.size() + \" lines\");\n                });\n            }\n            \n            @Override\n            protected void failed() {\n                Platform.runLater(() -> {\n                    showError(\"Failed to load file: \" + getException().getMessage());\n                    hideLoading();\n                });\n            }\n        };\n        \n        Thread loadThread = new Thread(loadTask);\n        loadThread.setDaemon(true);\n        loadThread.start();\n    }\n    \n    /**\n     * Display the loaded code with syntax highlighting\n     */\n    private void displayCode() {\n        // Clear existing content\n        codeTextFlow.getChildren().clear();\n        lineNumbersPane.getChildren().clear();\n        \n        if (codeLines.isEmpty()) {\n            Text emptyText = new Text(\"File is empty\");\n            emptyText.getStyleClass().add(\"code-empty-text\");\n            codeTextFlow.getChildren().add(emptyText);\n            return;\n        }\n        \n        // Add line numbers and code\n        for (int i = 0; i < codeLines.size(); i++) {\n            // Line number\n            if (showLineNumbers) {\n                Label lineNumber = new Label(String.valueOf(i + 1));\n                lineNumber.getStyleClass().add(\"line-number\");\n                lineNumber.setPrefWidth(40);\n                lineNumber.setAlignment(Pos.CENTER_RIGHT);\n                lineNumbersPane.getChildren().add(lineNumber);\n            }\n            \n            // Code line with syntax highlighting\n            String line = codeLines.get(i);\n            List<Text> highlightedLine = applySyntaxHighlighting(line, currentLanguage);\n            \n            // Add line content\n            codeTextFlow.getChildren().addAll(highlightedLine);\n            \n            // Add line break (except for last line)\n            if (i < codeLines.size() - 1) {\n                Text lineBreak = new Text(\"\\n\");\n                codeTextFlow.getChildren().add(lineBreak);\n            }\n        }\n        \n        applyTheme();\n    }\n    \n    /**\n     * Apply syntax highlighting to a line of code\n     */\n    private List<Text> applySyntaxHighlighting(String line, String language) {\n        List<Text> result = new ArrayList<>();\n        \n        if (!syntaxPatterns.containsKey(language)) {\n            // No syntax highlighting available, return plain text\n            Text plainText = new Text(line);\n            plainText.getStyleClass().add(\"code-text\");\n            result.add(plainText);\n            return result;\n        }\n        \n        Map<String, Pattern> patterns = syntaxPatterns.get(language);\n        List<HighlightMatch> matches = new ArrayList<>();\n        \n        // Find all matches\n        for (Map.Entry<String, Pattern> entry : patterns.entrySet()) {\n            String type = entry.getKey();\n            Pattern pattern = entry.getValue();\n            Matcher matcher = pattern.matcher(line);\n            \n            while (matcher.find()) {\n                matches.add(new HighlightMatch(matcher.start(), matcher.end(), type));\n            }\n        }\n        \n        // Sort matches by start position\n        matches.sort(Comparator.comparingInt(m -> m.start));\n        \n        // Build highlighted text\n        int lastEnd = 0;\n        for (HighlightMatch match : matches) {\n            // Add text before match\n            if (match.start > lastEnd) {\n                Text beforeText = new Text(line.substring(lastEnd, match.start));\n                beforeText.getStyleClass().add(\"code-text\");\n                result.add(beforeText);\n            }\n            \n            // Add highlighted match\n            Text matchText = new Text(line.substring(match.start, match.end));\n            matchText.getStyleClass().addAll(\"code-text\", \"code-\" + match.type);\n            result.add(matchText);\n            \n            lastEnd = Math.max(lastEnd, match.end);\n        }\n        \n        // Add remaining text\n        if (lastEnd < line.length()) {\n            Text remainingText = new Text(line.substring(lastEnd));\n            remainingText.getStyleClass().add(\"code-text\");\n            result.add(remainingText);\n        }\n        \n        return result;\n    }\n    \n    /**\n     * Detect programming language from file extension\n     */\n    private String detectLanguage(File file) {\n        String fileName = file.getName().toLowerCase();\n        \n        if (fileName.endsWith(\".java\")) return \"java\";\n        if (fileName.endsWith(\".py\")) return \"python\";\n        if (fileName.endsWith(\".js\") || fileName.endsWith(\".jsx\")) return \"javascript\";\n        if (fileName.endsWith(\".ts\") || fileName.endsWith(\".tsx\")) return \"javascript\";\n        if (fileName.endsWith(\".css\")) return \"css\";\n        if (fileName.endsWith(\".html\") || fileName.endsWith(\".htm\")) return \"html\";\n        if (fileName.endsWith(\".json\")) return \"json\";\n        if (fileName.endsWith(\".xml\")) return \"html\";\n        if (fileName.endsWith(\".cpp\") || fileName.endsWith(\".c\") || fileName.endsWith(\".h\")) return \"java\"; // Similar to Java\n        \n        return \"text\"; // Default to plain text\n    }\n    \n    /**\n     * Apply the selected theme\n     */\n    private void applyTheme() {\n        // Remove existing theme classes\n        this.getStyleClass().removeIf(cls -> cls.startsWith(\"theme-\"));\n        \n        // Add new theme class\n        this.getStyleClass().add(\"theme-\" + currentTheme);\n    }\n    \n    /**\n     * Update line wrap setting\n     */\n    private void updateLineWrap() {\n        if (lineWrapEnabled) {\n            codeTextFlow.getStyleClass().add(\"line-wrap-enabled\");\n            wrapToggleButton.setTooltip(new Tooltip(\"Disable line wrap\"));\n        } else {\n            codeTextFlow.getStyleClass().remove(\"line-wrap-enabled\");\n            wrapToggleButton.setTooltip(new Tooltip(\"Enable line wrap\"));\n        }\n    }\n    \n    /**\n     * Copy code content to clipboard\n     */\n    private void copyCodeToClipboard() {\n        if (codeLines.isEmpty()) {\n            return;\n        }\n        \n        StringBuilder content = new StringBuilder();\n        for (String line : codeLines) {\n            content.append(line).append(\"\\n\");\n        }\n        \n        // Copy to system clipboard\n        javafx.scene.input.Clipboard clipboard = javafx.scene.input.Clipboard.getSystemClipboard();\n        javafx.scene.input.ClipboardContent clipboardContent = new javafx.scene.input.ClipboardContent();\n        clipboardContent.putString(content.toString());\n        clipboard.setContent(clipboardContent);\n        \n        // Show feedback\n        statusLabel.setText(\"Code copied to clipboard\");\n        \n        // Reset status after delay\n        Platform.runLater(() -> {\n            new Thread(() -> {\n                try {\n                    Thread.sleep(2000);\n                    Platform.runLater(() -> statusLabel.setText(\"Ready\"));\n                } catch (InterruptedException e) {\n                    Thread.currentThread().interrupt();\n                }\n            }).start();\n        });\n    }\n    \n    /**\n     * Show loading indicator\n     */\n    private void showLoading(String message) {\n        statusLabel.setText(message);\n        loadingIndicator.setVisible(true);\n    }\n    \n    /**\n     * Hide loading indicator\n     */\n    private void hideLoading() {\n        loadingIndicator.setVisible(false);\n    }\n    \n    /**\n     * Show error message\n     */\n    private void showError(String message) {\n        statusLabel.setText(\"Error: \" + message);\n        codeTextFlow.getChildren().clear();\n        lineNumbersPane.getChildren().clear();\n        \n        Text errorText = new Text(\"Error loading file: \" + message);\n        errorText.getStyleClass().add(\"code-error-text\");\n        codeTextFlow.getChildren().add(errorText);\n    }\n    \n    // Getters and Setters\n    \n    public void setShowLineNumbers(boolean show) {\n        this.showLineNumbers = show;\n        if (currentFile != null) {\n            displayCode();\n        }\n    }\n    \n    public boolean isShowLineNumbers() {\n        return showLineNumbers;\n    }\n    \n    public void setLineWrapEnabled(boolean enabled) {\n        this.lineWrapEnabled = enabled;\n        updateLineWrap();\n    }\n    \n    public boolean isLineWrapEnabled() {\n        return lineWrapEnabled;\n    }\n    \n    public String getCurrentLanguage() {\n        return currentLanguage;\n    }\n    \n    public File getCurrentFile() {\n        return currentFile;\n    }\n    \n    /**\n     * Helper class for syntax highlighting matches\n     */\n    private static class HighlightMatch {\n        final int start;\n        final int end;\n        final String type;\n        \n        HighlightMatch(int start, int end, String type) {\n            this.start = start;\n            this.end = end;\n            this.type = type;\n        }\n    }\n}"

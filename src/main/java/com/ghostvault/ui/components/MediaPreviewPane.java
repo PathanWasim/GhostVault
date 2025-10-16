@@ -1,7 +1,7 @@
 package com.ghostvault.ui.components;
 
 import javafx.application.Platform;
-import javafx.concurrent.Task;
+import javafx.beans.binding.Bindings;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.*;
@@ -13,483 +13,436 @@ import javafx.scene.media.MediaPlayer;
 import javafx.scene.media.MediaView;
 import javafx.util.Duration;
 
-import java.io.ByteArrayInputStream;
+import java.io.File;
 import java.util.Arrays;
 import java.util.List;
 
 /**
- * Professional media preview component for images, audio, and video
+ * Modern media preview component with support for images, audio, and video
  */
 public class MediaPreviewPane extends VBox {
     
-    // Supported file formats
+    // Supported file types
     private static final List<String> IMAGE_EXTENSIONS = Arrays.asList(
-        ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tiff", ".tif", ".webp"
-    );
-    
-    private static final List<String> AUDIO_EXTENSIONS = Arrays.asList(
-        ".mp3", ".wav", ".aac", ".m4a", ".ogg", ".flac", ".wma"
+        ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tiff", ".svg", ".webp"
     );
     
     private static final List<String> VIDEO_EXTENSIONS = Arrays.asList(
         ".mp4", ".avi", ".mkv", ".mov", ".wmv", ".flv", ".webm", ".m4v"
     );
     
-    private final Label headerLabel;
-    private final ScrollPane scrollPane;
-    private final VBox contentBox;
-    private final ProgressIndicator loadingIndicator;
-    private final Label errorLabel;
+    private static final List<String> AUDIO_EXTENSIONS = Arrays.asList(
+        ".mp3", ".wav", ".aac", ".flac", ".ogg", ".m4a", ".wma"
+    );
+    
+    // UI Components
+    private HBox headerPane;
+    private Label fileNameLabel;
+    private Label fileInfoLabel;
+    private StackPane contentPane;
+    private HBox controlsPane;
     
     // Media components
     private ImageView imageView;
     private MediaView mediaView;
     private MediaPlayer mediaPlayer;
-    private VBox mediaControls;
     
-    private String currentFileName;
-    private String currentFileType;
+    // Media controls
+    private Button playPauseButton;
+    private Button stopButton;
+    private Button muteButton;
+    private Slider timeSlider;
+    private Slider volumeSlider;
+    private Label timeLabel;
+    private Label durationLabel;
+    
+    // State
+    private File currentFile;
+    private MediaType currentMediaType = MediaType.NONE;
+    private boolean isPlaying = false;
+    private boolean isMuted = false;
+    
+    public enum MediaType {
+        NONE, IMAGE, AUDIO, VIDEO
+    }
     
     public MediaPreviewPane() {
-        super(5);
-        setPadding(new Insets(10));
-        getStyleClass().add("professional-panel");
-        
-        // Header with file info
-        headerLabel = new Label("No media selected");
-        headerLabel.getStyleClass().addAll("header-subtitle");
-        headerLabel.setMaxWidth(Double.MAX_VALUE);
-        
-        // Loading indicator
-        loadingIndicator = new ProgressIndicator();
-        loadingIndicator.setMaxSize(30, 30);
-        loadingIndicator.setVisible(false);
-        
-        // Error label
-        errorLabel = new Label();
-        errorLabel.getStyleClass().add("error-text");
-        errorLabel.setVisible(false);
-        errorLabel.setWrapText(true);
-        
-        // Content area
-        contentBox = new VBox(10);
-        contentBox.setPadding(new Insets(10));
-        contentBox.setAlignment(Pos.CENTER);
-        
-        scrollPane = new ScrollPane(contentBox);
-        scrollPane.setFitToWidth(true);
-        scrollPane.setFitToHeight(true);
-        scrollPane.getStyleClass().add("media-scroll-pane");
-        scrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
-        scrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
-        
-        VBox.setVgrow(scrollPane, Priority.ALWAYS);
-        
-        getChildren().addAll(headerLabel, scrollPane);
-        
-        // Apply professional styling
-        setStyle("-fx-background-color: #2d2d2d; -fx-border-color: #404040; -fx-border-width: 1px; -fx-border-radius: 6px;");
+        initializeComponents();
+        setupLayout();
+        setupStyling();
     }
     
     /**
-     * Preview an image file
+     * Initialize all components
      */
-    public void previewImage(String fileName, byte[] imageData) {
-        this.currentFileName = fileName;
-        this.currentFileType = "image";
+    private void initializeComponents() {
+        // Header
+        headerPane = new HBox(10);
+        headerPane.setAlignment(Pos.CENTER_LEFT);
+        headerPane.setPadding(new Insets(12, 16, 12, 16));
+        headerPane.getStyleClass().add("media-preview-header");
         
-        Platform.runLater(() -> {
-            headerLabel.setText("🖼️ " + fileName);
-            showLoading(true);
-            contentBox.getChildren().clear();
-            stopCurrentMedia();
-        });
+        fileNameLabel = new Label();
+        fileNameLabel.getStyleClass().add("media-file-name");
         
-        Task<Void> imageTask = new Task<Void>() {
-            @Override
-            protected Void call() throws Exception {
-                try {
-                    ByteArrayInputStream inputStream = new ByteArrayInputStream(imageData);
-                    Image image = new Image(inputStream);
-                    
-                    Platform.runLater(() -> {
-                        if (image.isError()) {
-                            showError("Failed to load image: Invalid format or corrupted file");
-                            return;
-                        }
-                        
-                        // Create image view
-                        imageView = new ImageView(image);
-                        imageView.setPreserveRatio(true);
-                        imageView.setSmooth(true);
-                        imageView.setCache(true);
-                        
-                        // Fit image to available space
-                        double maxWidth = scrollPane.getWidth() - 40;
-                        double maxHeight = scrollPane.getHeight() - 100;
-                        
-                        if (maxWidth > 0 && maxHeight > 0) {
-                            imageView.setFitWidth(Math.min(image.getWidth(), maxWidth));
-                            imageView.setFitHeight(Math.min(image.getHeight(), maxHeight));
-                        } else {
-                            imageView.setFitWidth(Math.min(image.getWidth(), 800));
-                            imageView.setFitHeight(Math.min(image.getHeight(), 600));
-                        }
-                        
-                        // Create metadata panel
-                        VBox metadataPanel = createImageMetadataPanel(image, imageData.length);
-                        
-                        contentBox.getChildren().addAll(imageView, metadataPanel);
-                        showLoading(false);
-                        
-                        // Update header with dimensions
-                        headerLabel.setText(String.format("🖼️ %s (%dx%d)", 
-                            fileName, (int)image.getWidth(), (int)image.getHeight()));
-                    });
-                    
-                } catch (Exception e) {
-                    Platform.runLater(() -> showError("Error loading image: " + e.getMessage()));
-                }
-                
-                return null;
-            }
-        };
+        fileInfoLabel = new Label();
+        fileInfoLabel.getStyleClass().add("media-file-info");
         
-        Thread imageThread = new Thread(imageTask);
-        imageThread.setDaemon(true);
-        imageThread.start();
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+        
+        Button fullscreenButton = new Button("⛶");
+        fullscreenButton.getStyleClass().addAll("button", "icon");
+        fullscreenButton.setTooltip(new Tooltip("Fullscreen"));
+        
+        headerPane.getChildren().addAll(fileNameLabel, fileInfoLabel, spacer, fullscreenButton);
+        
+        // Content pane
+        contentPane = new StackPane();
+        contentPane.getStyleClass().add("media-content-pane");
+        contentPane.setPrefSize(600, 400);
+        VBox.setVgrow(contentPane, Priority.ALWAYS);
+        
+        // Image view
+        imageView = new ImageView();
+        imageView.setPreserveRatio(true);
+        imageView.setSmooth(true);
+        imageView.setCache(true);
+        
+        // Media view for video
+        mediaView = new MediaView();
+        mediaView.setPreserveRatio(true);
+        mediaView.setSmooth(true);
+        
+        // Controls pane
+        controlsPane = new HBox(12);
+        controlsPane.setAlignment(Pos.CENTER);
+        controlsPane.setPadding(new Insets(12, 16, 12, 16));
+        controlsPane.getStyleClass().add("media-controls-pane");
+        controlsPane.setVisible(false);
+        
+        initializeMediaControls();
+        
+        this.getChildren().addAll(headerPane, contentPane, controlsPane);
     }
     
     /**
-     * Preview an audio file
+     * Initialize media control components
      */
-    public void previewAudio(String fileName, byte[] audioData) {
-        this.currentFileName = fileName;
-        this.currentFileType = "audio";
+    private void initializeMediaControls() {
+        // Play/Pause button\n        playPauseButton = new Button("▶");
+        playPauseButton.getStyleClass().addAll("button", "primary", "icon");
+        playPauseButton.setTooltip(new Tooltip("Play/Pause"));
+        playPauseButton.setOnAction(e -> togglePlayPause());
         
-        Platform.runLater(() -> {
-            headerLabel.setText("🎵 " + fileName);
-            showLoading(true);
-            contentBox.getChildren().clear();
-            stopCurrentMedia();
-        });
+        // Stop button
+        stopButton = new Button("⏹");
+        stopButton.getStyleClass().addAll("button", "icon");
+        stopButton.setTooltip(new Tooltip("Stop"));
+        stopButton.setOnAction(e -> stopMedia());
         
-        try {
-            // Create temporary file for JavaFX Media
-            java.io.File tempFile = java.io.File.createTempFile("ghostvault_audio", getFileExtension(fileName));
-            tempFile.deleteOnExit();
-            
-            java.nio.file.Files.write(tempFile.toPath(), audioData);
-            
-            Media media = new Media(tempFile.toURI().toString());
-            mediaPlayer = new MediaPlayer(media);
-            
-            Platform.runLater(() -> {
-                // Create audio player UI
-                VBox audioPlayerBox = createAudioPlayerUI();
-                
-                // Create metadata panel
-                VBox metadataPanel = createAudioMetadataPanel(audioData.length);
-                
-                contentBox.getChildren().addAll(audioPlayerBox, metadataPanel);
-                showLoading(false);
-            });
-            
-        } catch (Exception e) {
-            Platform.runLater(() -> showError("Error loading audio: " + e.getMessage()));
-        }
-    }
-    
-    /**
-     * Preview a video file
-     */
-    public void previewVideo(String fileName, byte[] videoData) {
-        this.currentFileName = fileName;
-        this.currentFileType = "video";
-        
-        Platform.runLater(() -> {
-            headerLabel.setText("🎬 " + fileName);
-            showLoading(true);
-            contentBox.getChildren().clear();
-            stopCurrentMedia();
-        });
-        
-        try {
-            // Create temporary file for JavaFX Media
-            java.io.File tempFile = java.io.File.createTempFile("ghostvault_video", getFileExtension(fileName));
-            tempFile.deleteOnExit();
-            
-            java.nio.file.Files.write(tempFile.toPath(), videoData);
-            
-            Media media = new Media(tempFile.toURI().toString());
-            mediaPlayer = new MediaPlayer(media);
-            
-            Platform.runLater(() -> {
-                // Create video player UI
-                mediaView = new MediaView(mediaPlayer);
-                mediaView.setFitWidth(600);
-                mediaView.setFitHeight(400);
-                mediaView.setPreserveRatio(true);
-                
-                VBox videoPlayerBox = createVideoPlayerUI();
-                
-                // Create metadata panel
-                VBox metadataPanel = createVideoMetadataPanel(videoData.length);
-                
-                contentBox.getChildren().addAll(videoPlayerBox, metadataPanel);
-                showLoading(false);
-            });
-            
-        } catch (Exception e) {
-            Platform.runLater(() -> showError("Error loading video: " + e.getMessage()));
-        }
-    }
-    
-    /**
-     * Create image metadata panel
-     */
-    private VBox createImageMetadataPanel(Image image, int fileSize) {
-        VBox metadataBox = new VBox(5);
-        metadataBox.setStyle("-fx-background-color: #3a3a3a; -fx-padding: 10px; -fx-border-radius: 4px; -fx-background-radius: 4px;");
-        metadataBox.setMaxWidth(400);
-        
-        Label titleLabel = new Label("Image Information");
-        titleLabel.setStyle("-fx-font-weight: bold; -fx-text-fill: #ffffff;");
-        
-        Label dimensionsLabel = new Label(String.format("Dimensions: %dx%d pixels", 
-            (int)image.getWidth(), (int)image.getHeight()));
-        dimensionsLabel.setStyle("-fx-text-fill: #cccccc;");
-        
-        Label sizeLabel = new Label("File Size: " + formatFileSize(fileSize));
-        sizeLabel.setStyle("-fx-text-fill: #cccccc;");
-        
-        Label formatLabel = new Label("Format: " + getFileExtension(currentFileName).toUpperCase().substring(1));
-        formatLabel.setStyle("-fx-text-fill: #cccccc;");
-        
-        metadataBox.getChildren().addAll(titleLabel, dimensionsLabel, sizeLabel, formatLabel);
-        
-        return metadataBox;
-    }
-    
-    /**
-     * Create audio player UI
-     */
-    private VBox createAudioPlayerUI() {
-        VBox playerBox = new VBox(10);
-        playerBox.setAlignment(Pos.CENTER);
-        playerBox.setStyle("-fx-background-color: #3a3a3a; -fx-padding: 20px; -fx-border-radius: 8px; -fx-background-radius: 8px;");
-        playerBox.setMaxWidth(400);
-        
-        // Audio icon
-        Label audioIcon = new Label("🎵");
-        audioIcon.setStyle("-fx-font-size: 48px;");
-        
-        // File name
-        Label fileNameLabel = new Label(currentFileName);
-        fileNameLabel.setStyle("-fx-font-weight: bold; -fx-text-fill: #ffffff; -fx-font-size: 14px;");
-        
-        // Media controls
-        mediaControls = createMediaControls();
-        
-        playerBox.getChildren().addAll(audioIcon, fileNameLabel, mediaControls);
-        
-        return playerBox;
-    }
-    
-    /**
-     * Create video player UI
-     */
-    private VBox createVideoPlayerUI() {
-        VBox playerBox = new VBox(10);
-        playerBox.setAlignment(Pos.CENTER);
-        
-        // Video view
-        VBox videoContainer = new VBox();
-        videoContainer.setAlignment(Pos.CENTER);
-        videoContainer.setStyle("-fx-background-color: black; -fx-border-radius: 8px; -fx-background-radius: 8px;");
-        videoContainer.getChildren().add(mediaView);
-        
-        // Media controls
-        mediaControls = createMediaControls();
-        
-        playerBox.getChildren().addAll(videoContainer, mediaControls);
-        
-        return playerBox;
-    }
-    
-    /**
-     * Create media controls (play, pause, progress, volume)
-     */
-    private VBox createMediaControls() {
-        VBox controlsBox = new VBox(10);
-        controlsBox.setAlignment(Pos.CENTER);
-        
-        // Progress bar
-        ProgressBar progressBar = new ProgressBar(0);
-        progressBar.setPrefWidth(300);
-        progressBar.getStyleClass().add("media-progress");
-        
-        // Control buttons
-        HBox buttonBox = new HBox(10);
-        buttonBox.setAlignment(Pos.CENTER);
-        
-        Button playButton = new Button("▶️");
-        playButton.getStyleClass().addAll("professional-button", "button-primary");
-        playButton.setOnAction(e -> {
+        // Time slider
+        timeSlider = new Slider();
+        timeSlider.getStyleClass().add("time-slider");
+        timeSlider.setPrefWidth(300);
+        timeSlider.setOnMousePressed(e -> {
             if (mediaPlayer != null) {
-                if (mediaPlayer.getStatus() == MediaPlayer.Status.PLAYING) {
-                    mediaPlayer.pause();
-                    playButton.setText("▶️");
-                } else {
-                    mediaPlayer.play();
-                    playButton.setText("⏸️");
-                }
+                mediaPlayer.seek(Duration.seconds(timeSlider.getValue()));
             }
         });
         
-        Button stopButton = new Button("⏹️");
-        stopButton.getStyleClass().addAll("professional-button");
-        stopButton.setOnAction(e -> {
-            if (mediaPlayer != null) {
-                mediaPlayer.stop();
-                playButton.setText("▶️");
-                progressBar.setProgress(0);
-            }
-        });
+        // Time labels
+        timeLabel = new Label("00:00");
+        timeLabel.getStyleClass().add("time-label");
         
-        // Volume control
-        Slider volumeSlider = new Slider(0, 1, 0.5);
-        volumeSlider.setPrefWidth(100);
+        durationLabel = new Label("00:00");
+        durationLabel.getStyleClass().add("time-label");
+        
+        // Volume controls
+        muteButton = new Button("🔊");
+        muteButton.getStyleClass().addAll("button", "icon");
+        muteButton.setTooltip(new Tooltip("Mute/Unmute"));
+        muteButton.setOnAction(e -> toggleMute());
+        
+        volumeSlider = new Slider(0, 1, 0.5);
+        volumeSlider.getStyleClass().add("volume-slider");
+        volumeSlider.setPrefWidth(80);
         volumeSlider.valueProperty().addListener((obs, oldVal, newVal) -> {
             if (mediaPlayer != null) {
                 mediaPlayer.setVolume(newVal.doubleValue());
+                updateVolumeIcon();
             }
         });
         
-        Label volumeLabel = new Label("🔊");
-        volumeLabel.setStyle("-fx-text-fill: #cccccc;");
+        controlsPane.getChildren().addAll(
+            playPauseButton,
+            stopButton,
+            timeLabel,
+            timeSlider,
+            durationLabel,
+            muteButton,
+            volumeSlider
+        );
+    }
+    
+    /**
+     * Setup layout properties
+     */
+    private void setupLayout() {
+        this.setSpacing(0);
+        this.setPrefWidth(600);
+        this.setPrefHeight(500);
+    }
+    
+    /**
+     * Setup component styling
+     */
+    private void setupStyling() {
+        this.getStyleClass().add("media-preview-pane");
+    }
+    
+    /**
+     * Load and display a media file
+     */
+    public void loadFile(File file) {
+        if (file == null || !file.exists() || !file.isFile()) {
+            showError("File not found or invalid");
+            return;
+        }
         
-        HBox volumeBox = new HBox(5, volumeLabel, volumeSlider);
-        volumeBox.setAlignment(Pos.CENTER);
+        // Clean up previous media
+        cleanup();
         
-        buttonBox.getChildren().addAll(playButton, stopButton, volumeBox);
+        this.currentFile = file;
+        this.currentMediaType = detectMediaType(file);
         
-        // Update progress bar
-        if (mediaPlayer != null) {
-            mediaPlayer.currentTimeProperty().addListener((obs, oldTime, newTime) -> {
-                if (mediaPlayer.getTotalDuration() != null) {
-                    double progress = newTime.toMillis() / mediaPlayer.getTotalDuration().toMillis();
-                    progressBar.setProgress(progress);
-                }
+        // Update header info
+        fileNameLabel.setText(file.getName());
+        
+        switch (currentMediaType) {
+            case IMAGE:
+                loadImage(file);
+                break;
+            case AUDIO:
+                loadAudio(file);
+                break;
+            case VIDEO:
+                loadVideo(file);
+                break;
+            default:
+                showUnsupportedMedia(file.getName(), "Unsupported media format");
+        }
+    }
+    
+    /**
+     * Load and display an image
+     */
+    private void loadImage(File file) {
+        try {
+            Image image = new Image(file.toURI().toString());
+            imageView.setImage(image);
+            
+            // Bind image size to content pane
+            imageView.fitWidthProperty().bind(
+                Bindings.min(contentPane.widthProperty().subtract(20), 
+                            Bindings.multiply(image.getWidth(), 
+                                            Bindings.min(
+                                                Bindings.divide(contentPane.widthProperty().subtract(20), image.getWidth()),
+                                                Bindings.divide(contentPane.heightProperty().subtract(20), image.getHeight())
+                                            )))
+            );
+            
+            imageView.fitHeightProperty().bind(
+                Bindings.min(contentPane.heightProperty().subtract(20),
+                            Bindings.multiply(image.getHeight(),
+                                            Bindings.min(
+                                                Bindings.divide(contentPane.widthProperty().subtract(20), image.getWidth()),
+                                                Bindings.divide(contentPane.heightProperty().subtract(20), image.getHeight())
+                                            )))
+            );
+            
+            contentPane.getChildren().clear();
+            contentPane.getChildren().add(imageView);
+            
+            // Update file info
+            fileInfoLabel.setText(String.format("%.0f × %.0f • %s", 
+                image.getWidth(), image.getHeight(), formatFileSize(file.length())));
+            
+            controlsPane.setVisible(false);
+            
+        } catch (Exception e) {
+            showError("Failed to load image: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Load and play audio
+     */
+    private void loadAudio(File file) {
+        try {
+            Media media = new Media(file.toURI().toString());
+            mediaPlayer = new MediaPlayer(media);
+            
+            // Setup media player listeners
+            setupMediaPlayerListeners();
+            
+            // Show audio visualization or album art placeholder
+            Label audioIcon = new Label("🎵");
+            audioIcon.getStyleClass().add("audio-icon");
+            audioIcon.setStyle("-fx-font-size: 64px; -fx-text-fill: #5865f2;");
+            
+            VBox audioContainer = new VBox(16);
+            audioContainer.setAlignment(Pos.CENTER);
+            audioContainer.getChildren().addAll(
+                audioIcon,
+                new Label(file.getName())
+            );
+            
+            contentPane.getChildren().clear();
+            contentPane.getChildren().add(audioContainer);
+            
+            controlsPane.setVisible(true);
+            
+            // Update file info
+            fileInfoLabel.setText(formatFileSize(file.length()));
+            
+        } catch (Exception e) {
+            showError("Failed to load audio: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Load and play video
+     */
+    private void loadVideo(File file) {
+        try {
+            Media media = new Media(file.toURI().toString());
+            mediaPlayer = new MediaPlayer(media);
+            mediaView.setMediaPlayer(mediaPlayer);
+            
+            // Setup media player listeners
+            setupMediaPlayerListeners();
+            
+            // Bind video size to content pane
+            mediaView.fitWidthProperty().bind(contentPane.widthProperty().subtract(20));
+            mediaView.fitHeightProperty().bind(contentPane.heightProperty().subtract(20));
+            
+            contentPane.getChildren().clear();
+            contentPane.getChildren().add(mediaView);
+            
+            controlsPane.setVisible(true);
+            
+            // Update file info when media is ready
+            mediaPlayer.setOnReady(() -> {
+                Platform.runLater(() -> {
+                    fileInfoLabel.setText(String.format("%.0f × %.0f • %s", 
+                        mediaView.getMediaPlayer().getMedia().getWidth(),
+                        mediaView.getMediaPlayer().getMedia().getHeight(),
+                        formatFileSize(file.length())));
+                });
             });
+            
+        } catch (Exception e) {
+            showError("Failed to load video: " + e.getMessage());
         }
-        
-        controlsBox.getChildren().addAll(progressBar, buttonBox);
-        
-        return controlsBox;
     }
     
     /**
-     * Create audio metadata panel
+     * Setup media player event listeners
      */
-    private VBox createAudioMetadataPanel(int fileSize) {
-        VBox metadataBox = new VBox(5);
-        metadataBox.setStyle("-fx-background-color: #3a3a3a; -fx-padding: 10px; -fx-border-radius: 4px; -fx-background-radius: 4px;");
-        metadataBox.setMaxWidth(400);
+    private void setupMediaPlayerListeners() {
+        if (mediaPlayer == null) return;
         
-        Label titleLabel = new Label("Audio Information");
-        titleLabel.setStyle("-fx-font-weight: bold; -fx-text-fill: #ffffff;");
+        // Update duration when ready
+        mediaPlayer.setOnReady(() -> {
+            Platform.runLater(() -> {
+                Duration duration = mediaPlayer.getTotalDuration();
+                timeSlider.setMax(duration.toSeconds());
+                durationLabel.setText(formatTime(duration));
+            });
+        });
         
-        Label sizeLabel = new Label("File Size: " + formatFileSize(fileSize));
-        sizeLabel.setStyle("-fx-text-fill: #cccccc;");
+        // Update time slider during playback
+        mediaPlayer.currentTimeProperty().addListener((obs, oldTime, newTime) -> {
+            Platform.runLater(() -> {
+                if (!timeSlider.isPressed()) {
+                    timeSlider.setValue(newTime.toSeconds());
+                }
+                timeLabel.setText(formatTime(newTime));
+            });
+        });
         
-        Label formatLabel = new Label("Format: " + getFileExtension(currentFileName).toUpperCase().substring(1));
-        formatLabel.setStyle("-fx-text-fill: #cccccc;");
+        // Handle end of media
+        mediaPlayer.setOnEndOfMedia(() -> {
+            Platform.runLater(() -> {
+                isPlaying = false;
+                playPauseButton.setText("▶");
+                timeSlider.setValue(0);
+                timeLabel.setText("00:00");
+            });
+        });
         
-        metadataBox.getChildren().addAll(titleLabel, sizeLabel, formatLabel);
-        
-        return metadataBox;
-    }
-    
-    /**
-     * Create video metadata panel
-     */
-    private VBox createVideoMetadataPanel(int fileSize) {
-        VBox metadataBox = new VBox(5);
-        metadataBox.setStyle("-fx-background-color: #3a3a3a; -fx-padding: 10px; -fx-border-radius: 4px; -fx-background-radius: 4px;");
-        metadataBox.setMaxWidth(400);
-        
-        Label titleLabel = new Label("Video Information");
-        titleLabel.setStyle("-fx-font-weight: bold; -fx-text-fill: #ffffff;");
-        
-        Label sizeLabel = new Label("File Size: " + formatFileSize(fileSize));
-        sizeLabel.setStyle("-fx-text-fill: #cccccc;");
-        
-        Label formatLabel = new Label("Format: " + getFileExtension(currentFileName).toUpperCase().substring(1));
-        formatLabel.setStyle("-fx-text-fill: #cccccc;");
-        
-        metadataBox.getChildren().addAll(titleLabel, sizeLabel, formatLabel);
-        
-        return metadataBox;
-    }
-    
-    /**
-     * Show unsupported media message
-     */
-    public void showUnsupportedMedia(String fileName, String reason) {
-        Platform.runLater(() -> {
-            headerLabel.setText("📄 " + fileName);
-            contentBox.getChildren().clear();
-            stopCurrentMedia();
-            
-            VBox messageBox = new VBox(10);
-            messageBox.setStyle("-fx-alignment: center; -fx-padding: 50px;");
-            
-            Label iconLabel = new Label("⚠️");
-            iconLabel.setStyle("-fx-font-size: 48px;");
-            
-            Label messageLabel = new Label("Cannot preview this media file");
-            messageLabel.setStyle("-fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: #cccccc;");
-            
-            Label reasonLabel = new Label(reason);
-            reasonLabel.setStyle("-fx-font-size: 14px; -fx-text-fill: #888888;");
-            reasonLabel.setWrapText(true);
-            
-            messageBox.getChildren().addAll(iconLabel, messageLabel, reasonLabel);
-            contentBox.getChildren().add(messageBox);
-            
-            showLoading(false);
+        // Handle errors
+        mediaPlayer.setOnError(() -> {
+            Platform.runLater(() -> {
+                showError("Media playback error: " + mediaPlayer.getError().getMessage());
+            });
         });
     }
     
     /**
-     * Stop current media playback
+     * Toggle play/pause
      */
-    private void stopCurrentMedia() {
-        if (mediaPlayer != null) {
-            mediaPlayer.stop();
-            mediaPlayer.dispose();
-            mediaPlayer = null;
-        }
-        if (mediaView != null) {
-            mediaView = null;
-        }
-        if (imageView != null) {
-            imageView = null;
+    private void togglePlayPause() {
+        if (mediaPlayer == null) return;
+        
+        if (isPlaying) {
+            mediaPlayer.pause();
+            playPauseButton.setText("▶");
+            isPlaying = false;
+        } else {
+            mediaPlayer.play();
+            playPauseButton.setText("⏸");
+            isPlaying = true;
         }
     }
     
     /**
-     * Show/hide loading indicator
+     * Stop media playback
      */
-    private void showLoading(boolean show) {
-        loadingIndicator.setVisible(show);
-        if (show) {
-            if (!getChildren().contains(loadingIndicator)) {
-                getChildren().add(1, loadingIndicator);
-            }
+    private void stopMedia() {
+        if (mediaPlayer == null) return;
+        
+        mediaPlayer.stop();
+        playPauseButton.setText("▶");
+        isPlaying = false;
+        timeSlider.setValue(0);
+        timeLabel.setText("00:00");
+    }
+    
+    /**
+     * Toggle mute
+     */
+    private void toggleMute() {
+        if (mediaPlayer == null) return;
+        
+        isMuted = !isMuted;
+        mediaPlayer.setMute(isMuted);
+        updateVolumeIcon();
+    }
+    
+    /**
+     * Update volume icon based on current volume
+     */
+    private void updateVolumeIcon() {
+        if (mediaPlayer == null) return;
+        
+        if (isMuted || mediaPlayer.getVolume() == 0) {
+            muteButton.setText("🔇");
+        } else if (mediaPlayer.getVolume() < 0.5) {
+            muteButton.setText("🔉");
         } else {
-            getChildren().remove(loadingIndicator);
+            muteButton.setText("🔊");
         }
     }
     
@@ -497,37 +450,99 @@ public class MediaPreviewPane extends VBox {
      * Show error message
      */
     private void showError(String message) {
-        Platform.runLater(() -> {
-            errorLabel.setText(message);
-            errorLabel.setVisible(true);
-            showLoading(false);
-            
-            if (!getChildren().contains(errorLabel)) {
-                getChildren().add(errorLabel);
+        contentPane.getChildren().clear();
+        
+        VBox errorContainer = new VBox(16);
+        errorContainer.setAlignment(Pos.CENTER);
+        
+        Label errorIcon = new Label("❌");
+        errorIcon.setStyle("-fx-font-size: 48px;");
+        
+        Label errorLabel = new Label(message);
+        errorLabel.getStyleClass().add("error-text");
+        errorLabel.setWrapText(true);
+        
+        errorContainer.getChildren().addAll(errorIcon, errorLabel);
+        contentPane.getChildren().add(errorContainer);
+        
+        controlsPane.setVisible(false);
+        fileNameLabel.setText("Error");
+        fileInfoLabel.setText("");
+    }
+    
+    /**
+     * Show unsupported media message
+     */
+    public void showUnsupportedMedia(String fileName, String reason) {
+        contentPane.getChildren().clear();
+        
+        VBox unsupportedContainer = new VBox(16);
+        unsupportedContainer.setAlignment(Pos.CENTER);
+        
+        Label unsupportedIcon = new Label("📄");
+        unsupportedIcon.setStyle("-fx-font-size: 48px;");
+        
+        Label unsupportedLabel = new Label("Preview not supported");
+        unsupportedLabel.getStyleClass().add("unsupported-text");
+        
+        Label reasonLabel = new Label(reason);
+        reasonLabel.getStyleClass().add("reason-text");
+        reasonLabel.setWrapText(true);
+        
+        unsupportedContainer.getChildren().addAll(unsupportedIcon, unsupportedLabel, reasonLabel);
+        contentPane.getChildren().add(unsupportedContainer);
+        
+        controlsPane.setVisible(false);
+        fileNameLabel.setText(fileName);
+        fileInfoLabel.setText("");
+    }
+    
+    /**
+     * Detect media type from file extension
+     */
+    private MediaType detectMediaType(File file) {
+        String fileName = file.getName().toLowerCase();
+        
+        for (String ext : IMAGE_EXTENSIONS) {
+            if (fileName.endsWith(ext)) {
+                return MediaType.IMAGE;
             }
-        });
+        }
+        
+        for (String ext : VIDEO_EXTENSIONS) {
+            if (fileName.endsWith(ext)) {
+                return MediaType.VIDEO;
+            }
+        }
+        
+        for (String ext : AUDIO_EXTENSIONS) {
+            if (fileName.endsWith(ext)) {
+                return MediaType.AUDIO;
+            }
+        }
+        
+        return MediaType.NONE;
     }
     
     /**
-     * Clear the preview
+     * Format time duration for display
      */
-    public void clear() {
-        Platform.runLater(() -> {
-            headerLabel.setText("No media selected");
-            contentBox.getChildren().clear();
-            stopCurrentMedia();
-            showLoading(false);
-            errorLabel.setVisible(false);
-        });
-    }
-    
-    /**
-     * Get file extension
-     */
-    private String getFileExtension(String fileName) {
-        if (fileName == null) return "";
-        int lastDot = fileName.lastIndexOf('.');
-        return lastDot == -1 ? "" : fileName.substring(lastDot).toLowerCase();
+    private String formatTime(Duration duration) {
+        if (duration == null || duration.isUnknown()) {
+            return "00:00";
+        }
+        
+        int seconds = (int) duration.toSeconds();
+        int minutes = seconds / 60;
+        seconds = seconds % 60;
+        
+        if (minutes >= 60) {
+            int hours = minutes / 60;
+            minutes = minutes % 60;
+            return String.format("%02d:%02d:%02d", hours, minutes, seconds);
+        } else {
+            return String.format("%02d:%02d", minutes, seconds);
+        }
     }
     
     /**
@@ -541,38 +556,68 @@ public class MediaPreviewPane extends VBox {
     }
     
     /**
-     * Check if file can be previewed as image
+     * Check if file can be previewed as media
      */
-    public static boolean canPreviewAsImage(String fileName) {
-        if (fileName == null) return false;
-        String extension = getExtension(fileName);
-        return IMAGE_EXTENSIONS.contains(extension);
+    public static boolean canPreview(File file) {
+        if (file == null || !file.exists() || !file.isFile()) {
+            return false;
+        }
+        
+        String fileName = file.getName().toLowerCase();
+        
+        // Check for supported extensions
+        for (String ext : IMAGE_EXTENSIONS) {
+            if (fileName.endsWith(ext)) return true;
+        }
+        for (String ext : VIDEO_EXTENSIONS) {
+            if (fileName.endsWith(ext)) return true;
+        }
+        for (String ext : AUDIO_EXTENSIONS) {
+            if (fileName.endsWith(ext)) return true;
+        }
+        
+        return false;
     }
     
     /**
-     * Check if file can be previewed as audio
+     * Cleanup resources
      */
-    public static boolean canPreviewAsAudio(String fileName) {
-        if (fileName == null) return false;
-        String extension = getExtension(fileName);
-        return AUDIO_EXTENSIONS.contains(extension);
+    public void cleanup() {
+        if (mediaPlayer != null) {
+            mediaPlayer.stop();
+            mediaPlayer.dispose();
+            mediaPlayer = null;
+        }
+        
+        if (imageView != null) {
+            imageView.setImage(null);
+        }
+        
+        contentPane.getChildren().clear();
+        controlsPane.setVisible(false);
     }
     
     /**
-     * Check if file can be previewed as video
+     * Clear the preview
      */
-    public static boolean canPreviewAsVideo(String fileName) {
-        if (fileName == null) return false;
-        String extension = getExtension(fileName);
-        return VIDEO_EXTENSIONS.contains(extension);
+    public void clear() {
+        cleanup();
+        fileNameLabel.setText("");
+        fileInfoLabel.setText("");
+        currentFile = null;
+        currentMediaType = MediaType.NONE;
     }
     
-    /**
-     * Get file extension (static helper)
-     */
-    private static String getExtension(String fileName) {
-        if (fileName == null) return "";
-        int lastDot = fileName.lastIndexOf('.');
-        return lastDot == -1 ? "" : fileName.substring(lastDot).toLowerCase();
+    // Getters
+    public File getCurrentFile() {
+        return currentFile;
+    }
+    
+    public MediaType getCurrentMediaType() {
+        return currentMediaType;
+    }
+    
+    public boolean isPlaying() {
+        return isPlaying;
     }
 }

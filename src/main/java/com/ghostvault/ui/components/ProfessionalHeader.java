@@ -223,7 +223,7 @@ public class ProfessionalHeader extends HBox {
     private void updateSessionTime() {
         Platform.runLater(() -> {
             LocalDateTime now = LocalDateTime.now();
-            Duration sessionDuration = Duration.between(sessionStart, now);
+            java.time.Duration sessionDuration = java.time.Duration.between(sessionStart, now);
             
             long hours = sessionDuration.toHours();
             long minutes = sessionDuration.toMinutes() % 60;
@@ -451,7 +451,7 @@ public class ProfessionalHeader extends HBox {
      * Get session duration in seconds
      */
     public long getSessionDurationSeconds() {
-        return Duration.between(sessionStart, LocalDateTime.now()).getSeconds();
+        return java.time.Duration.between(sessionStart, LocalDateTime.now()).getSeconds();
     }
     
     /**
