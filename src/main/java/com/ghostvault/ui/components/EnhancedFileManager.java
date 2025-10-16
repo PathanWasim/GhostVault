@@ -1,69 +1,505 @@
 package com.ghostvault.ui.components;
 
-import javafx.application.Platform;
-import javafx.beans.property.SimpleObjectProperty;
-import javafx.beans.property.SimpleStringProperty;
-import javafx.collections.FXCollections;
-import javafx.collections.ObservableList;
-import javafx.collections.transformation.FilteredList;
-import javafx.collections.transformation.SortedList;
-import javafx.concurrent.Task;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.*;
-import javafx.scene.control.cell.PropertyValueFactory;
-import javafx.scene.image.Image;
-import javafx.scene.image.ImageView;
 import javafx.scene.layout.*;
-import javafx.util.Callback;
+import javafx.stage.DirectoryChooser;
+import javafx.stage.Stage;
 
 import java.io.File;
-import java.text.DecimalFormat;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
-import java.util.*;
-import java.util.function.Predicate;
-import java.util.stream.Collectors;
+import java.util.Arrays;
+import java.util.List;
+import java.util.function.Consumer;
 
 /**
- * Enhanced file manager with search, filtering, sorting, and bulk operations
+ * Enhanced file manager component
  */
 public class EnhancedFileManager extends VBox {
     
-    // UI Components
-    private TextField searchField;
-    private ComboBox<String> fileTypeFilter;
-    private ComboBox<String> sortByCombo;
-    private CheckBox sortDescending;
-    private TableView<FileItem> fileTable;
-    private Label statusLabel;
-    private ProgressIndicator loadingIndicator;
-    private Button selectAllButton;
-    private Button deselectAllButton;
-    private Button deleteSelectedButton;
-    private Button refreshButton;
-    
-    // Data
-    private ObservableList<FileItem> allFiles = FXCollections.observableArrayList();
-    private FilteredList<FileItem> filteredFiles;
-    private SortedList<FileItem> sortedFiles;
     private File currentDirectory;
-    
-    // Selection tracking
-    private Set<FileItem> selectedFiles = new HashSet<>();
+    private EnhancedFileListView fileListView;
+    private FileSortingToolbar sortingToolbar;
+    private BulkOperationsBar bulkOperationsBar;
+    private DragDropFileUploader dragDropUploader;
+    private TextField pathField;
+    private Button backButton;
+    private Button forwardButton;
+    private Button upButton;
+    private Button refreshButton;
+    private Consumer<File> onFileSelected;
+    private Consumer<File> onDirectoryChanged;
     
     public EnhancedFileManager() {
-        initializeComponents();
-        setupLayout();
-        setupEventHandlers();
-        applyStyles();
+        super();
+        initialize();
     }
     
-    private void initializeComponents() {
-        // Search and filter controls
-        searchField = new TextField();
-        searchField.setPromptText("Search files...");
+    private void initialize() {
+        this.setSpacing(10);
+        this.setPadding(new Insets(10));
         
-        fileTypeFilter = new ComboBox<>();
-        fileTypeFilter.getItems().addAll(\"All Files\", \"Images\", \"Documents\", \"Videos\", \"Audio\", \"Archives\", \"Code Files\");\n        fileTypeFilter.setValue(\"All Files\");\n        \n        sortByCombo = new ComboBox<>();\n        sortByCombo.getItems().addAll(\"Name\", \"Size\", \"Type\", \"Modified Date\");\n        sortByCombo.setValue(\"Name\");\n        \n        sortDescending = new CheckBox(\"Descending\");\n        \n        // File table\n        fileTable = new TableView<>();\n        setupFileTable();\n        \n        // Status and loading\n        statusLabel = new Label(\"No directory selected\");\n        loadingIndicator = new ProgressIndicator();\n        loadingIndicator.setVisible(false);\n        loadingIndicator.setMaxSize(20, 20);\n        \n        // Bulk operation buttons\n        selectAllButton = new Button(\"Select All\");\n        deselectAllButton = new Button(\"Deselect All\");\n        deleteSelectedButton = new Button(\"Delete Selected\");\n        refreshButton = new Button(\"Refresh\");\n        \n        // Setup filtered and sorted lists\n        filteredFiles = new FilteredList<>(allFiles);\n        sortedFiles = new SortedList<>(filteredFiles);\n        fileTable.setItems(sortedFiles);\n    }\n    \n    private void setupFileTable() {\n        // Selection column with checkboxes\n        TableColumn<FileItem, Boolean> selectColumn = new TableColumn<>(\"\");\n        selectColumn.setPrefWidth(30);\n        selectColumn.setCellValueFactory(new PropertyValueFactory<>(\"selected\"));\n        selectColumn.setCellFactory(new Callback<TableColumn<FileItem, Boolean>, TableCell<FileItem, Boolean>>() {\n            @Override\n            public TableCell<FileItem, Boolean> call(TableColumn<FileItem, Boolean> param) {\n                return new TableCell<FileItem, Boolean>() {\n                    private CheckBox checkBox = new CheckBox();\n                    \n                    {\n                        checkBox.setOnAction(e -> {\n                            FileItem item = getTableRow().getItem();\n                            if (item != null) {\n                                item.setSelected(checkBox.isSelected());\n                                updateSelectedFiles();\n                            }\n                        });\n                    }\n                    \n                    @Override\n                    protected void updateItem(Boolean selected, boolean empty) {\n                        super.updateItem(selected, empty);\n                        if (empty) {\n                            setGraphic(null);\n                        } else {\n                            checkBox.setSelected(selected != null && selected);\n                            setGraphic(checkBox);\n                        }\n                    }\n                };\n            }\n        });\n        \n        // Icon column\n        TableColumn<FileItem, File> iconColumn = new TableColumn<>(\"\");\n        iconColumn.setPrefWidth(40);\n        iconColumn.setCellValueFactory(new PropertyValueFactory<>(\"file\"));\n        iconColumn.setCellFactory(new Callback<TableColumn<FileItem, File>, TableCell<FileItem, File>>() {\n            @Override\n            public TableCell<FileItem, File> call(TableColumn<FileItem, File> param) {\n                return new TableCell<FileItem, File>() {\n                    private ImageView imageView = new ImageView();\n                    \n                    {\n                        imageView.setFitWidth(16);\n                        imageView.setFitHeight(16);\n                        imageView.setPreserveRatio(true);\n                    }\n                    \n                    @Override\n                    protected void updateItem(File file, boolean empty) {\n                        super.updateItem(file, empty);\n                        if (empty || file == null) {\n                            setGraphic(null);\n                        } else {\n                            String iconPath = FileIconProvider.getIconPath(file);\n                            if (iconPath != null) {\n                                try {\n                                    Image icon = new Image(getClass().getResourceAsStream(iconPath));\n                                    imageView.setImage(icon);\n                                    setGraphic(imageView);\n                                } catch (Exception e) {\n                                    setGraphic(null);\n                                }\n                            } else {\n                                setGraphic(null);\n                            }\n                        }\n                    }\n                };\n            }\n        });\n        \n        // Name column\n        TableColumn<FileItem, String> nameColumn = new TableColumn<>(\"Name\");\n        nameColumn.setPrefWidth(200);\n        nameColumn.setCellValueFactory(new PropertyValueFactory<>(\"name\"));\n        \n        // Size column\n        TableColumn<FileItem, Long> sizeColumn = new TableColumn<>(\"Size\");\n        sizeColumn.setPrefWidth(80);\n        sizeColumn.setCellValueFactory(new PropertyValueFactory<>(\"size\"));\n        sizeColumn.setCellFactory(new Callback<TableColumn<FileItem, Long>, TableCell<FileItem, Long>>() {\n            @Override\n            public TableCell<FileItem, Long> call(TableColumn<FileItem, Long> param) {\n                return new TableCell<FileItem, Long>() {\n                    @Override\n                    protected void updateItem(Long size, boolean empty) {\n                        super.updateItem(size, empty);\n                        if (empty || size == null) {\n                            setText(null);\n                        } else {\n                            setText(formatFileSize(size));\n                        }\n                    }\n                };\n            }\n        });\n        \n        // Type column\n        TableColumn<FileItem, String> typeColumn = new TableColumn<>(\"Type\");\n        typeColumn.setPrefWidth(100);\n        typeColumn.setCellValueFactory(new PropertyValueFactory<>(\"type\"));\n        \n        // Modified date column\n        TableColumn<FileItem, LocalDateTime> modifiedColumn = new TableColumn<>(\"Modified\");\n        modifiedColumn.setPrefWidth(120);\n        modifiedColumn.setCellValueFactory(new PropertyValueFactory<>(\"modified\"));\n        modifiedColumn.setCellFactory(new Callback<TableColumn<FileItem, LocalDateTime>, TableCell<FileItem, LocalDateTime>>() {\n            @Override\n            public TableCell<FileItem, LocalDateTime> call(TableColumn<FileItem, LocalDateTime> param) {\n                return new TableCell<FileItem, LocalDateTime>() {\n                    @Override\n                    protected void updateItem(LocalDateTime dateTime, boolean empty) {\n                        super.updateItem(dateTime, empty);\n                        if (empty || dateTime == null) {\n                            setText(null);\n                        } else {\n                            setText(dateTime.format(DateTimeFormatter.ofPattern(\"MMM dd, yyyy HH:mm\")));\n                        }\n                    }\n                };\n            }\n        });\n        \n        fileTable.getColumns().addAll(selectColumn, iconColumn, nameColumn, sizeColumn, typeColumn, modifiedColumn);\n        \n        // Enable multiple selection\n        fileTable.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);\n        \n        // Row double-click handler\n        fileTable.setRowFactory(tv -> {\n            TableRow<FileItem> row = new TableRow<>();\n            row.setOnMouseClicked(event -> {\n                if (event.getClickCount() == 2 && !row.isEmpty()) {\n                    FileItem item = row.getItem();\n                    if (item.getFile().isDirectory()) {\n                        loadDirectory(item.getFile());\n                    } else {\n                        // Open file for preview\n                        openFileForPreview(item.getFile());\n                    }\n                }\n            });\n            return row;\n        });\n    }\n    \n    private void setupLayout() {\n        // Search and filter bar\n        HBox searchBar = new HBox(10);\n        searchBar.setPadding(new Insets(10));\n        searchBar.setAlignment(Pos.CENTER_LEFT);\n        \n        Label searchLabel = new Label(\"Search:\");\n        Label filterLabel = new Label(\"Filter:\");\n        Label sortLabel = new Label(\"Sort by:\");\n        \n        searchBar.getChildren().addAll(\n            searchLabel, searchField,\n            new Separator(),\n            filterLabel, fileTypeFilter,\n            new Separator(),\n            sortLabel, sortByCombo, sortDescending\n        );\n        \n        HBox.setHgrow(searchField, Priority.ALWAYS);\n        \n        // Bulk operations bar\n        HBox bulkOpsBar = new HBox(10);\n        bulkOpsBar.setPadding(new Insets(5, 10, 5, 10));\n        bulkOpsBar.setAlignment(Pos.CENTER_LEFT);\n        \n        bulkOpsBar.getChildren().addAll(\n            selectAllButton, deselectAllButton,\n            new Separator(),\n            deleteSelectedButton,\n            new Separator(),\n            refreshButton\n        );\n        \n        // Status bar\n        HBox statusBar = new HBox(10);\n        statusBar.setPadding(new Insets(5, 10, 10, 10));\n        statusBar.setAlignment(Pos.CENTER_LEFT);\n        statusBar.getChildren().addAll(statusLabel, loadingIndicator);\n        \n        // Main layout\n        this.getChildren().addAll(searchBar, bulkOpsBar, fileTable, statusBar);\n        VBox.setVgrow(fileTable, Priority.ALWAYS);\n    }\n    \n    private void setupEventHandlers() {\n        // Search field\n        searchField.textProperty().addListener((obs, oldText, newText) -> {\n            updateFilter();\n        });\n        \n        // File type filter\n        fileTypeFilter.valueProperty().addListener((obs, oldValue, newValue) -> {\n            updateFilter();\n        });\n        \n        // Sort controls\n        sortByCombo.valueProperty().addListener((obs, oldValue, newValue) -> {\n            updateSort();\n        });\n        \n        sortDescending.selectedProperty().addListener((obs, oldValue, newValue) -> {\n            updateSort();\n        });\n        \n        // Bulk operation buttons\n        selectAllButton.setOnAction(e -> selectAll());\n        deselectAllButton.setOnAction(e -> deselectAll());\n        deleteSelectedButton.setOnAction(e -> deleteSelected());\n        refreshButton.setOnAction(e -> refreshDirectory());\n    }\n    \n    private void applyStyles() {\n        this.getStyleClass().add(\"enhanced-file-manager\");\n        fileTable.getStyleClass().add(\"file-table\");\n        searchField.getStyleClass().add(\"search-field\");\n        \n        // Button styling\n        selectAllButton.getStyleClass().add(\"bulk-operation-button\");\n        deselectAllButton.getStyleClass().add(\"bulk-operation-button\");\n        deleteSelectedButton.getStyleClass().addAll(\"bulk-operation-button\", \"danger-button\");\n        refreshButton.getStyleClass().add(\"bulk-operation-button\");\n    }\n    \n    /**\n     * Load files from a directory\n     */\n    public void loadDirectory(File directory) {\n        if (directory == null || !directory.exists() || !directory.isDirectory()) {\n            statusLabel.setText(\"Invalid directory\");\n            return;\n        }\n        \n        this.currentDirectory = directory;\n        showLoading(true);\n        statusLabel.setText(\"Loading directory...\");\n        \n        Task<List<FileItem>> loadTask = new Task<List<FileItem>>() {\n            @Override\n            protected List<FileItem> call() throws Exception {\n                File[] files = directory.listFiles();\n                if (files == null) {\n                    return new ArrayList<>();\n                }\n                \n                return Arrays.stream(files)\n                    .map(FileItem::new)\n                    .collect(Collectors.toList());\n            }\n            \n            @Override\n            protected void succeeded() {\n                Platform.runLater(() -> {\n                    allFiles.setAll(getValue());\n                    updateStatus();\n                    showLoading(false);\n                });\n            }\n            \n            @Override\n            protected void failed() {\n                Platform.runLater(() -> {\n                    statusLabel.setText(\"Failed to load directory: \" + getException().getMessage());\n                    showLoading(false);\n                });\n            }\n        };\n        \n        Thread loadThread = new Thread(loadTask);\n        loadThread.setDaemon(true);\n        loadThread.start();\n    }\n    \n    private void updateFilter() {\n        String searchText = searchField.getText().toLowerCase();\n        String fileTypeFilter = this.fileTypeFilter.getValue();\n        \n        Predicate<FileItem> searchPredicate = item -> {\n            if (searchText.isEmpty()) {\n                return true;\n            }\n            return item.getName().toLowerCase().contains(searchText);\n        };\n        \n        Predicate<FileItem> typePredicate = item -> {\n            if (\"All Files\".equals(fileTypeFilter)) {\n                return true;\n            }\n            \n            String category = FileIconProvider.getFileTypeCategory(item.getFile());\n            switch (fileTypeFilter) {\n                case \"Images\": return \"Image\".equals(category);\n                case \"Documents\": return \"Document\".equals(category);\n                case \"Videos\": return \"Video\".equals(category);\n                case \"Audio\": return \"Audio\".equals(category);\n                case \"Archives\": return \"Archive\".equals(category);\n                case \"Code Files\": return \"Code\".equals(category);\n                default: return true;\n            }\n        };\n        \n        filteredFiles.setPredicate(searchPredicate.and(typePredicate));\n        updateStatus();\n    }\n    \n    private void updateSort() {\n        String sortBy = sortByCombo.getValue();\n        boolean descending = sortDescending.isSelected();\n        \n        Comparator<FileItem> comparator;\n        \n        switch (sortBy) {\n            case \"Size\":\n                comparator = Comparator.comparing(FileItem::getSize);\n                break;\n            case \"Type\":\n                comparator = Comparator.comparing(FileItem::getType);\n                break;\n            case \"Modified Date\":\n                comparator = Comparator.comparing(FileItem::getModified);\n                break;\n            default: // Name\n                comparator = Comparator.comparing(FileItem::getName, String.CASE_INSENSITIVE_ORDER);\n                break;\n        }\n        \n        if (descending) {\n            comparator = comparator.reversed();\n        }\n        \n        sortedFiles.setComparator(comparator);\n    }\n    \n    private void selectAll() {\n        for (FileItem item : filteredFiles) {\n            item.setSelected(true);\n        }\n        fileTable.refresh();\n        updateSelectedFiles();\n    }\n    \n    private void deselectAll() {\n        for (FileItem item : allFiles) {\n            item.setSelected(false);\n        }\n        fileTable.refresh();\n        updateSelectedFiles();\n    }\n    \n    private void deleteSelected() {\n        List<FileItem> selected = allFiles.stream()\n            .filter(FileItem::isSelected)\n            .collect(Collectors.toList());\n        \n        if (selected.isEmpty()) {\n            showAlert(\"No files selected\", \"Please select files to delete.\");\n            return;\n        }\n        \n        // Confirmation dialog\n        Alert confirmation = new Alert(Alert.AlertType.CONFIRMATION);\n        confirmation.setTitle(\"Confirm Deletion\");\n        confirmation.setHeaderText(\"Delete \" + selected.size() + \" file(s)?\");\n        confirmation.setContentText(\"This action cannot be undone.\");\n        \n        Optional<ButtonType> result = confirmation.showAndWait();\n        if (result.isPresent() && result.get() == ButtonType.OK) {\n            performBulkDelete(selected);\n        }\n    }\n    \n    private void performBulkDelete(List<FileItem> itemsToDelete) {\n        showLoading(true);\n        statusLabel.setText(\"Deleting files...\");\n        \n        Task<Integer> deleteTask = new Task<Integer>() {\n            @Override\n            protected Integer call() throws Exception {\n                int deletedCount = 0;\n                for (FileItem item : itemsToDelete) {\n                    if (item.getFile().delete()) {\n                        deletedCount++;\n                    }\n                }\n                return deletedCount;\n            }\n            \n            @Override\n            protected void succeeded() {\n                Platform.runLater(() -> {\n                    int deletedCount = getValue();\n                    refreshDirectory();\n                    statusLabel.setText(deletedCount + \" file(s) deleted successfully\");\n                    showLoading(false);\n                });\n            }\n            \n            @Override\n            protected void failed() {\n                Platform.runLater(() -> {\n                    statusLabel.setText(\"Failed to delete files: \" + getException().getMessage());\n                    showLoading(false);\n                });\n            }\n        };\n        \n        Thread deleteThread = new Thread(deleteTask);\n        deleteThread.setDaemon(true);\n        deleteThread.start();\n    }\n    \n    private void refreshDirectory() {\n        if (currentDirectory != null) {\n            loadDirectory(currentDirectory);\n        }\n    }\n    \n    private void updateSelectedFiles() {\n        selectedFiles.clear();\n        selectedFiles.addAll(allFiles.stream()\n            .filter(FileItem::isSelected)\n            .collect(Collectors.toSet()));\n        \n        deleteSelectedButton.setDisable(selectedFiles.isEmpty());\n    }\n    \n    private void updateStatus() {\n        int totalFiles = allFiles.size();\n        int visibleFiles = filteredFiles.size();\n        int selectedCount = selectedFiles.size();\n        \n        String status = String.format(\"%d files\", totalFiles);\n        if (visibleFiles != totalFiles) {\n            status += String.format(\" (%d shown)\", visibleFiles);\n        }\n        if (selectedCount > 0) {\n            status += String.format(\", %d selected\", selectedCount);\n        }\n        \n        statusLabel.setText(status);\n    }\n    \n    private void showLoading(boolean show) {\n        loadingIndicator.setVisible(show);\n        fileTable.setDisable(show);\n    }\n    \n    private void showAlert(String title, String message) {\n        Alert alert = new Alert(Alert.AlertType.INFORMATION);\n        alert.setTitle(title);\n        alert.setHeaderText(null);\n        alert.setContentText(message);\n        alert.showAndWait();\n    }\n    \n    private void openFileForPreview(File file) {\n        // This would trigger file preview in the main application\n        // For now, just show an info dialog\n        showAlert(\"File Preview\", \"Opening \" + file.getName() + \" for preview...\");\n    }\n    \n    private String formatFileSize(long bytes) {\n        if (bytes < 1024) return bytes + \" B\";\n        if (bytes < 1024 * 1024) return new DecimalFormat(\"#.# KB\").format(bytes / 1024.0);\n        if (bytes < 1024 * 1024 * 1024) return new DecimalFormat(\"#.# MB\").format(bytes / (1024.0 * 1024.0));\n        return new DecimalFormat(\"#.# GB\").format(bytes / (1024.0 * 1024.0 * 1024.0));\n    }\n    \n    /**\n     * Get current directory\n     */\n    public File getCurrentDirectory() {\n        return currentDirectory;\n    }\n    \n    /**\n     * Get selected files\n     */\n    public Set<FileItem> getSelectedFiles() {\n        return new HashSet<>(selectedFiles);\n    }\n    \n    /**\n     * File item class for table display\n     */\n    public static class FileItem {\n        private final SimpleObjectProperty<File> file;\n        private final SimpleStringProperty name;\n        private final SimpleObjectProperty<Long> size;\n        private final SimpleStringProperty type;\n        private final SimpleObjectProperty<LocalDateTime> modified;\n        private boolean selected = false;\n        \n        public FileItem(File file) {\n            this.file = new SimpleObjectProperty<>(file);\n            this.name = new SimpleStringProperty(file.getName());\n            this.size = new SimpleObjectProperty<>(file.length());\n            this.type = new SimpleStringProperty(getFileType(file));\n            this.modified = new SimpleObjectProperty<>(\n                LocalDateTime.ofInstant(\n                    java.time.Instant.ofEpochMilli(file.lastModified()),\n                    ZoneId.systemDefault()\n                )\n            );\n        }\n        \n        private String getFileType(File file) {\n            if (file.isDirectory()) {\n                return \"Folder\";\n            }\n            \n            String name = file.getName();\n            int lastDot = name.lastIndexOf('.');\n            if (lastDot > 0) {\n                return name.substring(lastDot + 1).toUpperCase();\n            }\n            return \"File\";\n        }\n        \n        // Getters and setters\n        public File getFile() { return file.get(); }\n        public String getName() { return name.get(); }\n        public Long getSize() { return size.get(); }\n        public String getType() { return type.get(); }\n        public LocalDateTime getModified() { return modified.get(); }\n        public boolean isSelected() { return selected; }\n        public void setSelected(boolean selected) { this.selected = selected; }\n        \n        // Property getters for TableView\n        public SimpleObjectProperty<File> fileProperty() { return file; }\n        public SimpleStringProperty nameProperty() { return name; }\n        public SimpleObjectProperty<Long> sizeProperty() { return size; }\n        public SimpleStringProperty typeProperty() { return type; }\n        public SimpleObjectProperty<LocalDateTime> modifiedProperty() { return modified; }\n    }\n}"
+        createToolbar();
+        createSortingToolbar();
+        createBulkOperationsBar();
+        createFileList();
+        setupDragAndDrop();
+        setupEventHandlers();
+        
+        // Set initial directory to user home
+        setCurrentDirectory(new File(System.getProperty("user.home")));
+    }
+    
+    private void createToolbar() {
+        HBox toolbar = new HBox(10);
+        toolbar.setAlignment(Pos.CENTER_LEFT);
+        toolbar.setPadding(new Insets(5));
+        
+        // Navigation buttons
+        backButton = new Button("←");
+        backButton.setDisable(true);
+        
+        forwardButton = new Button("→");
+        forwardButton.setDisable(true);
+        
+        upButton = new Button("↑");
+        
+        refreshButton = new Button("⟳");
+        
+        // Path field
+        pathField = new TextField();
+        pathField.setEditable(false);
+        HBox.setHgrow(pathField, Priority.ALWAYS);
+        
+        // Browse button
+        Button browseButton = new Button("Browse...");
+        
+        toolbar.getChildren().addAll(
+            backButton, forwardButton, upButton, refreshButton,
+            new Separator(), pathField, browseButton
+        );
+        
+        this.getChildren().add(toolbar);
+    }
+    
+    private void createSortingToolbar() {
+        sortingToolbar = new FileSortingToolbar();
+        this.getChildren().add(sortingToolbar);
+    }
+    
+    private void createBulkOperationsBar() {
+        bulkOperationsBar = new BulkOperationsBar();
+        this.getChildren().add(bulkOperationsBar);
+    }
+    
+    private void createFileList() {
+        fileListView = new EnhancedFileListView();
+        fileListView.setPrefHeight(400);
+        
+        // Wrap in scroll pane
+        ScrollPane scrollPane = new ScrollPane(fileListView);
+        scrollPane.setFitToWidth(true);
+        scrollPane.setFitToHeight(true);
+        
+        VBox.setVgrow(scrollPane, Priority.ALWAYS);
+        this.getChildren().add(scrollPane);
+    }
+    
+    private void setupDragAndDrop() {
+        dragDropUploader = new DragDropFileUploader();
+        
+        // Enable drag and drop on the entire file manager
+        dragDropUploader.enableDragAndDrop(this);
+        
+        // Handle file drops
+        dragDropUploader.setOnFilesDropped(files -> {
+            handleFileUpload(files);
+        });
+        
+        // Visual feedback for drag operations
+        dragDropUploader.setOnDragEntered(event -> {
+            this.setStyle(this.getStyle() + "; -fx-background-color: rgba(76, 175, 80, 0.1);");
+        });
+        
+        dragDropUploader.setOnDragExited(event -> {
+            this.setStyle(this.getStyle().replace("; -fx-background-color: rgba(76, 175, 80, 0.1);", ""));
+        });
+    }
+    
+    private void setupEventHandlers() {
+        // Up button
+        upButton.setOnAction(e -> navigateUp());
+        
+        // Refresh button
+        refreshButton.setOnAction(e -> refreshCurrentDirectory());
+        
+        // File selection
+        fileListView.setOnFileSelected(file -> {
+            if (onFileSelected != null) {
+                onFileSelected.accept(file);
+            }
+        });
+        
+        // File double click
+        fileListView.setOnFileDoubleClicked(file -> {
+            if (file.isDirectory()) {
+                setCurrentDirectory(file);
+            } else {
+                // Open file
+                if (onFileSelected != null) {
+                    onFileSelected.accept(file);
+                }
+            }
+        });
+        
+        // Context menu actions
+        FileContextMenuManager contextManager = fileListView.getContextMenuManager();
+        
+        contextManager.setOnOpenFile(file -> {
+            if (file.isDirectory()) {
+                setCurrentDirectory(file);
+            } else {
+                // Open file with default application
+                try {
+                    java.awt.Desktop.getDesktop().open(file);
+                } catch (Exception e) {
+                    NotificationSystem.showError("Open Failed", "Could not open file: " + e.getMessage());
+                }
+            }
+        });
+        
+        contextManager.setOnPreviewFile(file -> {
+            NotificationSystem.showInfo("Preview", "Preview functionality not yet implemented");
+        });
+        
+        contextManager.setOnEditFile(file -> {
+            NotificationSystem.showInfo("Edit", "Edit functionality not yet implemented");
+        });
+        
+        contextManager.setOnDeleteFile(file -> {
+            // Show confirmation dialog
+            Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+            alert.setTitle("Delete File");
+            alert.setHeaderText("Are you sure you want to delete this file?");
+            alert.setContentText(file.getName());
+            
+            alert.showAndWait().ifPresent(response -> {
+                if (response == ButtonType.OK) {
+                    if (file.delete()) {
+                        refreshCurrentDirectory();
+                        NotificationSystem.showSuccess("File Deleted", "File deleted successfully");
+                    } else {
+                        NotificationSystem.showError("Delete Failed", "Could not delete file");
+                    }
+                }
+            });
+        });
+        
+        contextManager.setOnRenameFile(file -> {
+            showRenameDialog(file);
+        });
+        
+        contextManager.setOnCopyFile(file -> {
+            NotificationSystem.showInfo("Copy", "Copy functionality not yet implemented");
+        });
+        
+        contextManager.setOnMoveFile(file -> {
+            NotificationSystem.showInfo("Move", "Move functionality not yet implemented");
+        });
+        
+        contextManager.setOnShowProperties(file -> {
+            showFilePropertiesDialog(file);
+        });
+        
+        contextManager.setOnShowInExplorer(file -> {
+            try {
+                java.awt.Desktop.getDesktop().open(file.getParentFile());
+            } catch (Exception e) {
+                NotificationSystem.showError("Explorer Failed", "Could not open file location");
+            }
+        });
+        
+        contextManager.setOnCompressFile(file -> {
+            NotificationSystem.showInfo("Compress", "Compression functionality not yet implemented");
+        });
+        
+        contextManager.setOnEncryptFile(file -> {
+            NotificationSystem.showInfo("Encrypt", "Encryption functionality not yet implemented");
+        });
+        
+        contextManager.setOnShareFile(file -> {
+            NotificationSystem.showInfo("Share", "Share functionality not yet implemented");
+        });
+        
+        // Setup sorting toolbar
+        sortingToolbar.setOnSortCriteriaChanged(criteria -> {
+            fileListView.sortBy(criteria);
+            sortingToolbar.updateFromFileList(fileListView);
+        });
+        
+        sortingToolbar.setOnSortOrderToggled(() -> {
+            // The file list view handles the toggle internally
+            sortingToolbar.updateFromFileList(fileListView);
+        });
+        
+        // Setup bulk operations bar
+        bulkOperationsBar.setOnSelectAll(v -> fileListView.selectAll());
+        bulkOperationsBar.setOnSelectNone(v -> fileListView.selectNone());
+        
+        bulkOperationsBar.setOnDeleteSelected(files -> {
+            deleteMultipleFiles(files);
+        });
+        
+        bulkOperationsBar.setOnCopySelected(files -> {
+            NotificationSystem.showInfo("Copy Files", "Copy functionality not yet implemented");
+        });
+        
+        bulkOperationsBar.setOnMoveSelected(files -> {
+            NotificationSystem.showInfo("Move Files", "Move functionality not yet implemented");
+        });
+        
+        // Handle selection changes in file list
+        fileListView.setOnSelectionChanged(selectedFiles -> {
+            bulkOperationsBar.updateSelection(selectedFiles);
+        });
+    }
+    
+    /**
+     * Set the current directory
+     */
+    public void setCurrentDirectory(File directory) {
+        if (directory != null && directory.exists() && directory.isDirectory()) {
+            this.currentDirectory = directory;
+            pathField.setText(directory.getAbsolutePath());
+            
+            // Update file list
+            File[] files = directory.listFiles();
+            if (files != null) {
+                List<File> fileList = Arrays.asList(files);
+                fileListView.updateFiles(fileList);
+            }
+            
+            // Update navigation buttons
+            upButton.setDisable(directory.getParentFile() == null);
+            
+            // Notify listeners
+            if (onDirectoryChanged != null) {
+                onDirectoryChanged.accept(directory);
+            }
+        }
+    }
+    
+    /**
+     * Navigate to parent directory
+     */
+    public void navigateUp() {
+        if (currentDirectory != null && currentDirectory.getParentFile() != null) {
+            setCurrentDirectory(currentDirectory.getParentFile());
+        }
+    }
+    
+    /**
+     * Refresh current directory
+     */
+    public void refreshCurrentDirectory() {
+        if (currentDirectory != null) {
+            setCurrentDirectory(currentDirectory);
+        }
+    }
+    
+    /**
+     * Show directory chooser
+     */
+    public void showDirectoryChooser(Stage parentStage) {
+        DirectoryChooser directoryChooser = new DirectoryChooser();
+        directoryChooser.setTitle("Select Directory");
+        
+        if (currentDirectory != null) {
+            directoryChooser.setInitialDirectory(currentDirectory);
+        }
+        
+        File selectedDirectory = directoryChooser.showDialog(parentStage);
+        if (selectedDirectory != null) {
+            setCurrentDirectory(selectedDirectory);
+        }
+    }
+    
+    // Getters and setters
+    public File getCurrentDirectory() {
+        return currentDirectory;
+    }
+    
+    public void setOnFileSelected(Consumer<File> onFileSelected) {
+        this.onFileSelected = onFileSelected;
+    }
+    
+    public void setOnDirectoryChanged(Consumer<File> onDirectoryChanged) {
+        this.onDirectoryChanged = onDirectoryChanged;
+    }
+    
+    public EnhancedFileListView getFileListView() {
+        return fileListView;
+    }
+    
+    /**
+     * Delete multiple files
+     */
+    private void deleteMultipleFiles(List<File> files) {
+        if (files == null || files.isEmpty()) {
+            return;
+        }
+        
+        int successCount = 0;
+        int failCount = 0;
+        
+        for (File file : files) {
+            if (file.delete()) {
+                successCount++;
+            } else {
+                failCount++;
+            }
+        }
+        
+        // Clear selection after deletion
+        fileListView.selectNone();
+        
+        // Refresh directory
+        refreshCurrentDirectory();
+        
+        // Show result notification
+        if (failCount == 0) {
+            NotificationSystem.showSuccess("Files Deleted", 
+                String.format("Successfully deleted %d file(s)", successCount));
+        } else if (successCount == 0) {
+            NotificationSystem.showError("Delete Failed", 
+                String.format("Failed to delete %d file(s)", failCount));
+        } else {
+            NotificationSystem.showWarning("Partial Success", 
+                String.format("Deleted %d file(s), failed to delete %d file(s)", successCount, failCount));
+        }
+    }
+    
+    /**
+     * Get the bulk operations bar
+     */
+    public BulkOperationsBar getBulkOperationsBar() {
+        return bulkOperationsBar;
+    }
+    
+    /**
+     * Handle file upload from drag and drop
+     */
+    private void handleFileUpload(List<File> files) {
+        if (currentDirectory == null || files == null || files.isEmpty()) {
+            return;
+        }
+        
+        int successCount = 0;
+        int failCount = 0;
+        
+        for (File sourceFile : files) {
+            try {
+                File targetFile = new File(currentDirectory, sourceFile.getName());
+                
+                // Check if file already exists
+                if (targetFile.exists()) {
+                    Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+                    alert.setTitle("File Exists");
+                    alert.setHeaderText("File already exists");
+                    alert.setContentText("Do you want to replace " + sourceFile.getName() + "?");
+                    
+                    Optional<ButtonType> result = alert.showAndWait();
+                    if (result.isEmpty() || result.get() != ButtonType.OK) {
+                        continue; // Skip this file
+                    }
+                }
+                
+                // Copy file to current directory
+                if (copyFile(sourceFile, targetFile)) {
+                    successCount++;
+                } else {
+                    failCount++;
+                }
+                
+            } catch (Exception e) {
+                failCount++;
+            }
+        }
+        
+        // Refresh directory to show new files
+        refreshCurrentDirectory();
+        
+        // Show result notification
+        if (failCount == 0) {
+            NotificationSystem.showSuccess("Files Uploaded", 
+                String.format("Successfully uploaded %d file(s)", successCount));
+        } else if (successCount == 0) {
+            NotificationSystem.showError("Upload Failed", 
+                String.format("Failed to upload %d file(s)", failCount));
+        } else {
+            NotificationSystem.showWarning("Partial Success", 
+                String.format("Uploaded %d file(s), failed to upload %d file(s)", successCount, failCount));
+        }
+    }
+    
+    /**
+     * Copy a file from source to target location
+     */
+    private boolean copyFile(File source, File target) {
+        try {
+            java.nio.file.Files.copy(source.toPath(), target.toPath(), 
+                java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+    
+    /**
+     * Get the drag and drop uploader
+     */
+    public DragDropFileUploader getDragDropUploader() {
+        return dragDropUploader;
+    }
+    
+    /**
+     * Show rename dialog for a file
+     */
+    private void showRenameDialog(File file) {
+        TextInputDialog dialog = new TextInputDialog(file.getName());
+        dialog.setTitle("Rename File");
+        dialog.setHeaderText("Rename " + (file.isDirectory() ? "folder" : "file"));
+        dialog.setContentText("New name:");
+        
+        Optional<String> result = dialog.showAndWait();
+        result.ifPresent(newName -> {
+            if (!newName.trim().isEmpty() && !newName.equals(file.getName())) {
+                File newFile = new File(file.getParent(), newName.trim());
+                if (file.renameTo(newFile)) {
+                    refreshCurrentDirectory();
+                    NotificationSystem.showSuccess("Renamed", "Successfully renamed to " + newName);
+                } else {
+                    NotificationSystem.showError("Rename Failed", "Could not rename file");
+                }
+            }
+        });
+    }
+    
+    /**
+     * Show file properties dialog
+     */
+    private void showFilePropertiesDialog(File file) {
+        Dialog<Void> dialog = new Dialog<>();
+        dialog.setTitle("Properties");
+        dialog.setHeaderText(file.getName());
+        
+        // Create detailed file info pane
+        DetailedFileInfoPane infoPane = new DetailedFileInfoPane();
+        infoPane.showFileInfo(file);
+        
+        dialog.getDialogPane().setContent(infoPane);
+        dialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
+        
+        dialog.showAndWait();
+    }
+}

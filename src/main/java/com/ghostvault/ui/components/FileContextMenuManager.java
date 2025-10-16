@@ -1,25 +1,331 @@
 package com.ghostvault.ui.components;
 
-import javafx.scene.control.*;
-import javafx.scene.input.KeyCode;
-import javafx.scene.input.KeyCodeCombination;
-import javafx.scene.input.KeyCombination;
+import javafx.scene.control.ContextMenu;
+import javafx.scene.control.MenuItem;
+import javafx.scene.control.SeparatorMenuItem;
+import javafx.scene.control.Menu;
 
 import java.io.File;
-import java.util.List;
 import java.util.function.Consumer;
 
 /**
- * Context menu manager for file operations
+ * Enhanced context menu manager for file operations
  */
 public class FileContextMenuManager {
     
-    private ModernFileOperations fileOperations;
-    private Consumer<File> onFileOpen;
-    private Consumer<File> onFilePreview;
-    private Consumer<List<File>> onFilesDelete;
-    private Consumer<File> onFileRename;
-    private Consumer<File> onFileProperties;
-    private Runnable onRefresh;
+    private Consumer<File> onOpenFile;
+    private Consumer<File> onPreviewFile;
+    private Consumer<File> onEditFile;
+    private Consumer<File> onDeleteFile;
+    private Consumer<File> onRenameFile;
+    private Consumer<File> onCopyFile;
+    private Consumer<File> onMoveFile;
+    private Consumer<File> onShowProperties;
+    private Consumer<File> onShowInExplorer;
+    private Consumer<File> onCompressFile;
+    private Consumer<File> onEncryptFile;
+    private Consumer<File> onShareFile;
     
-    public FileContextMenuManager(ModernFileOperations fileOperations) {\n        this.fileOperations = fileOperations;\n    }\n    \n    /**\n     * Create context menu for a single file\n     */\n    public ContextMenu createFileContextMenu(File file) {\n        ContextMenu contextMenu = new ContextMenu();\n        \n        // Open/Preview\n        MenuItem openItem = new MenuItem(\"Open\");\n        openItem.setOnAction(e -> {\n            if (onFileOpen != null) {\n                onFileOpen.accept(file);\n            }\n        });\n        openItem.setAccelerator(new KeyCodeCombination(KeyCode.ENTER));\n        \n        MenuItem previewItem = new MenuItem(\"Preview\");\n        previewItem.setOnAction(e -> {\n            if (onFilePreview != null) {\n                onFilePreview.accept(file);\n            }\n        });\n        previewItem.setAccelerator(new KeyCodeCombination(KeyCode.SPACE));\n        \n        // Separator\n        SeparatorMenuItem separator1 = new SeparatorMenuItem();\n        \n        // File operations\n        MenuItem downloadItem = new MenuItem(\"Download...\");\n        downloadItem.setOnAction(e -> downloadFile(file));\n        downloadItem.setAccelerator(new KeyCodeCombination(KeyCode.S, KeyCombination.CONTROL_DOWN));\n        \n        MenuItem renameItem = new MenuItem(\"Rename...\");\n        renameItem.setOnAction(e -> {\n            if (onFileRename != null) {\n                onFileRename.accept(file);\n            }\n        });\n        renameItem.setAccelerator(new KeyCodeCombination(KeyCode.F2));\n        \n        MenuItem deleteItem = new MenuItem(\"Delete\");\n        deleteItem.setOnAction(e -> {\n            if (onFilesDelete != null) {\n                onFilesDelete.accept(List.of(file));\n            }\n        });\n        deleteItem.setAccelerator(new KeyCodeCombination(KeyCode.DELETE));\n        deleteItem.getStyleClass().add(\"danger-menu-item\");\n        \n        // Separator\n        SeparatorMenuItem separator2 = new SeparatorMenuItem();\n        \n        // Properties\n        MenuItem propertiesItem = new MenuItem(\"Properties...\");\n        propertiesItem.setOnAction(e -> {\n            if (onFileProperties != null) {\n                onFileProperties.accept(file);\n            }\n        });\n        propertiesItem.setAccelerator(new KeyCodeCombination(KeyCode.ENTER, KeyCombination.ALT_DOWN));\n        \n        // Add items to menu\n        contextMenu.getItems().addAll(\n            openItem, previewItem,\n            separator1,\n            downloadItem, renameItem, deleteItem,\n            separator2,\n            propertiesItem\n        );\n        \n        // Disable items based on file type\n        if (file.isDirectory()) {\n            previewItem.setDisable(true);\n            downloadItem.setText(\"Export Folder...\");\n        }\n        \n        return contextMenu;\n    }\n    \n    /**\n     * Create context menu for multiple selected files\n     */\n    public ContextMenu createMultiFileContextMenu(List<File> files) {\n        ContextMenu contextMenu = new ContextMenu();\n        \n        int fileCount = files.size();\n        \n        // Bulk operations\n        MenuItem downloadAllItem = new MenuItem(\"Download All (\" + fileCount + \")...\");\n        downloadAllItem.setOnAction(e -> downloadMultipleFiles(files));\n        \n        MenuItem deleteAllItem = new MenuItem(\"Delete All (\" + fileCount + \")\");\n        deleteAllItem.setOnAction(e -> {\n            if (onFilesDelete != null) {\n                onFilesDelete.accept(files);\n            }\n        });\n        deleteAllItem.getStyleClass().add(\"danger-menu-item\");\n        \n        // Separator\n        SeparatorMenuItem separator = new SeparatorMenuItem();\n        \n        // Selection operations\n        MenuItem deselectAllItem = new MenuItem(\"Deselect All\");\n        deselectAllItem.setOnAction(e -> {\n            // This would be handled by the file manager\n        });\n        \n        contextMenu.getItems().addAll(\n            downloadAllItem, deleteAllItem,\n            separator,\n            deselectAllItem\n        );\n        \n        return contextMenu;\n    }\n    \n    /**\n     * Create context menu for empty space (no files selected)\n     */\n    public ContextMenu createEmptySpaceContextMenu() {\n        ContextMenu contextMenu = new ContextMenu();\n        \n        // Upload operations\n        MenuItem uploadFilesItem = new MenuItem(\"Upload Files...\");\n        uploadFilesItem.setOnAction(e -> uploadFiles());\n        uploadFilesItem.setAccelerator(new KeyCodeCombination(KeyCode.U, KeyCombination.CONTROL_DOWN));\n        \n        MenuItem uploadFolderItem = new MenuItem(\"Upload Folder...\");\n        uploadFolderItem.setOnAction(e -> uploadFolder());\n        \n        // Separator\n        SeparatorMenuItem separator1 = new SeparatorMenuItem();\n        \n        // New operations\n        MenuItem newFolderItem = new MenuItem(\"New Folder...\");\n        newFolderItem.setOnAction(e -> createNewFolder());\n        newFolderItem.setAccelerator(new KeyCodeCombination(KeyCode.N, KeyCombination.CONTROL_DOWN, KeyCombination.SHIFT_DOWN));\n        \n        // Separator\n        SeparatorMenuItem separator2 = new SeparatorMenuItem();\n        \n        // View operations\n        MenuItem refreshItem = new MenuItem(\"Refresh\");\n        refreshItem.setOnAction(e -> {\n            if (onRefresh != null) {\n                onRefresh.run();\n            }\n        });\n        refreshItem.setAccelerator(new KeyCodeCombination(KeyCode.F5));\n        \n        MenuItem selectAllItem = new MenuItem(\"Select All\");\n        selectAllItem.setOnAction(e -> {\n            // This would be handled by the file manager\n        });\n        selectAllItem.setAccelerator(new KeyCodeCombination(KeyCode.A, KeyCombination.CONTROL_DOWN));\n        \n        contextMenu.getItems().addAll(\n            uploadFilesItem, uploadFolderItem,\n            separator1,\n            newFolderItem,\n            separator2,\n            refreshItem, selectAllItem\n        );\n        \n        return contextMenu;\n    }\n    \n    /**\n     * Create context menu for directory/folder\n     */\n    public ContextMenu createDirectoryContextMenu(File directory) {\n        ContextMenu contextMenu = new ContextMenu();\n        \n        // Open operations\n        MenuItem openItem = new MenuItem(\"Open\");\n        openItem.setOnAction(e -> {\n            if (onFileOpen != null) {\n                onFileOpen.accept(directory);\n            }\n        });\n        \n        MenuItem openInNewWindowItem = new MenuItem(\"Open in New Window\");\n        openInNewWindowItem.setOnAction(e -> {\n            // This would open the directory in a new window\n        });\n        \n        // Separator\n        SeparatorMenuItem separator1 = new SeparatorMenuItem();\n        \n        // Directory operations\n        MenuItem exportItem = new MenuItem(\"Export Folder...\");\n        exportItem.setOnAction(e -> exportDirectory(directory));\n        \n        MenuItem renameItem = new MenuItem(\"Rename...\");\n        renameItem.setOnAction(e -> {\n            if (onFileRename != null) {\n                onFileRename.accept(directory);\n            }\n        });\n        \n        MenuItem deleteItem = new MenuItem(\"Delete Folder\");\n        deleteItem.setOnAction(e -> {\n            if (onFilesDelete != null) {\n                onFilesDelete.accept(List.of(directory));\n            }\n        });\n        deleteItem.getStyleClass().add(\"danger-menu-item\");\n        \n        // Separator\n        SeparatorMenuItem separator2 = new SeparatorMenuItem();\n        \n        // Properties\n        MenuItem propertiesItem = new MenuItem(\"Properties...\");\n        propertiesItem.setOnAction(e -> {\n            if (onFileProperties != null) {\n                onFileProperties.accept(directory);\n            }\n        });\n        \n        contextMenu.getItems().addAll(\n            openItem, openInNewWindowItem,\n            separator1,\n            exportItem, renameItem, deleteItem,\n            separator2,\n            propertiesItem\n        );\n        \n        return contextMenu;\n    }\n    \n    private void downloadFile(File file) {\n        String extension = getFileExtension(file);\n        fileOperations.showFileSaveDialog(file.getName(), extension)\n            .thenAccept(targetFile -> {\n                if (targetFile != null) {\n                    fileOperations.downloadFile(file, targetFile, success -> {\n                        // Download completion handled by ModernFileOperations\n                    });\n                }\n            });\n    }\n    \n    private void downloadMultipleFiles(List<File> files) {\n        fileOperations.showDirectoryChooser(\"Select Download Location\")\n            .thenAccept(targetDirectory -> {\n                if (targetDirectory != null) {\n                    // Download each file to the target directory\n                    for (File file : files) {\n                        File targetFile = new File(targetDirectory, file.getName());\n                        fileOperations.downloadFile(file, targetFile, success -> {\n                            // Individual file download completion\n                        });\n                    }\n                }\n            });\n    }\n    \n    private void uploadFiles() {\n        fileOperations.showFileUploadDialog()\n            .thenAccept(selectedFiles -> {\n                if (!selectedFiles.isEmpty()) {\n                    // This would need the target directory from the current context\n                    // For now, we'll show a notification\n                    NotificationSystem.showInfo(\"Upload\", \n                        \"Selected \" + selectedFiles.size() + \" files for upload\");\n                }\n            });\n    }\n    \n    private void uploadFolder() {\n        fileOperations.showDirectoryChooser(\"Select Folder to Upload\")\n            .thenAccept(selectedDirectory -> {\n                if (selectedDirectory != null) {\n                    NotificationSystem.showInfo(\"Upload Folder\", \n                        \"Selected folder: \" + selectedDirectory.getName());\n                }\n            });\n    }\n    \n    private void createNewFolder() {\n        TextInputDialog dialog = new TextInputDialog(\"New Folder\");\n        dialog.setTitle(\"Create New Folder\");\n        dialog.setHeaderText(\"Enter folder name:\");\n        dialog.setContentText(\"Name:\");\n        \n        dialog.showAndWait().ifPresent(folderName -> {\n            if (!folderName.trim().isEmpty()) {\n                // This would create the folder in the current directory\n                NotificationSystem.showInfo(\"New Folder\", \n                    \"Creating folder: \" + folderName);\n            }\n        });\n    }\n    \n    private void exportDirectory(File directory) {\n        fileOperations.showDirectoryChooser(\"Select Export Location\")\n            .thenAccept(targetDirectory -> {\n                if (targetDirectory != null) {\n                    NotificationSystem.showInfo(\"Export Folder\", \n                        \"Exporting \" + directory.getName() + \" to \" + targetDirectory.getName());\n                }\n            });\n    }\n    \n    private String getFileExtension(File file) {\n        String name = file.getName();\n        int lastDot = name.lastIndexOf('.');\n        return lastDot > 0 ? name.substring(lastDot + 1) : \"\";\n    }\n    \n    // Setters for event handlers\n    public void setOnFileOpen(Consumer<File> onFileOpen) {\n        this.onFileOpen = onFileOpen;\n    }\n    \n    public void setOnFilePreview(Consumer<File> onFilePreview) {\n        this.onFilePreview = onFilePreview;\n    }\n    \n    public void setOnFilesDelete(Consumer<List<File>> onFilesDelete) {\n        this.onFilesDelete = onFilesDelete;\n    }\n    \n    public void setOnFileRename(Consumer<File> onFileRename) {\n        this.onFileRename = onFileRename;\n    }\n    \n    public void setOnFileProperties(Consumer<File> onFileProperties) {\n        this.onFileProperties = onFileProperties;\n    }\n    \n    public void setOnRefresh(Runnable onRefresh) {\n        this.onRefresh = onRefresh;\n    }\n}"
+    /**
+     * Create enhanced context menu for a file
+     */
+    public ContextMenu createFileContextMenu(File file) {
+        ContextMenu contextMenu = new ContextMenu();
+        
+        if (file.isDirectory()) {
+            createDirectoryContextMenu(contextMenu, file);
+        } else {
+            createFileContextMenu(contextMenu, file);
+        }
+        
+        return contextMenu;
+    }
+    
+    /**
+     * Create context menu for files
+     */
+    private void createFileContextMenu(ContextMenu contextMenu, File file) {
+        // Open actions
+        MenuItem openItem = new MenuItem("Open");
+        openItem.setOnAction(e -> {
+            if (onOpenFile != null) {
+                onOpenFile.accept(file);
+            }
+        });
+        
+        MenuItem previewItem = new MenuItem("Preview");
+        previewItem.setOnAction(e -> {
+            if (onPreviewFile != null) {
+                onPreviewFile.accept(file);
+            }
+        });
+        
+        MenuItem editItem = new MenuItem("Edit");
+        editItem.setOnAction(e -> {
+            if (onEditFile != null) {
+                onEditFile.accept(file);
+            }
+        });
+        
+        // File operations
+        MenuItem renameItem = new MenuItem("Rename");
+        renameItem.setOnAction(e -> {
+            if (onRenameFile != null) {
+                onRenameFile.accept(file);
+            }
+        });
+        
+        MenuItem copyItem = new MenuItem("Copy");
+        copyItem.setOnAction(e -> {
+            if (onCopyFile != null) {
+                onCopyFile.accept(file);
+            }
+        });
+        
+        MenuItem moveItem = new MenuItem("Move");
+        moveItem.setOnAction(e -> {
+            if (onMoveFile != null) {
+                onMoveFile.accept(file);
+            }
+        });
+        
+        // Advanced operations submenu
+        Menu advancedMenu = new Menu("Advanced");
+        
+        MenuItem compressItem = new MenuItem("Compress");
+        compressItem.setOnAction(e -> {
+            if (onCompressFile != null) {
+                onCompressFile.accept(file);
+            }
+        });
+        
+        MenuItem encryptItem = new MenuItem("Encrypt");
+        encryptItem.setOnAction(e -> {
+            if (onEncryptFile != null) {
+                onEncryptFile.accept(file);
+            }
+        });
+        
+        MenuItem shareItem = new MenuItem("Share");
+        shareItem.setOnAction(e -> {
+            if (onShareFile != null) {
+                onShareFile.accept(file);
+            }
+        });
+        
+        advancedMenu.getItems().addAll(compressItem, encryptItem, shareItem);
+        
+        // System operations
+        MenuItem showInExplorerItem = new MenuItem("Show in Explorer");
+        showInExplorerItem.setOnAction(e -> {
+            if (onShowInExplorer != null) {
+                onShowInExplorer.accept(file);
+            }
+        });
+        
+        MenuItem propertiesItem = new MenuItem("Properties");
+        propertiesItem.setOnAction(e -> {
+            if (onShowProperties != null) {
+                onShowProperties.accept(file);
+            }
+        });
+        
+        // Delete
+        MenuItem deleteItem = new MenuItem("Delete");
+        deleteItem.setOnAction(e -> {
+            if (onDeleteFile != null) {
+                onDeleteFile.accept(file);
+            }
+        });
+        
+        // Add items to context menu
+        contextMenu.getItems().addAll(
+            openItem,
+            previewItem,
+            editItem,
+            new SeparatorMenuItem(),
+            renameItem,
+            copyItem,
+            moveItem,
+            new SeparatorMenuItem(),
+            advancedMenu,
+            new SeparatorMenuItem(),
+            showInExplorerItem,
+            propertiesItem,
+            new SeparatorMenuItem(),
+            deleteItem
+        );
+        
+        // Enable/disable items based on file type
+        String extension = getFileExtension(file).toLowerCase();
+        boolean isTextFile = isTextFile(extension);
+        boolean isImageFile = isImageFile(extension);
+        
+        editItem.setDisable(!isTextFile);
+        previewItem.setDisable(!isImageFile && !isTextFile);
+    }
+    
+    /**
+     * Create context menu for directories
+     */
+    private void createDirectoryContextMenu(ContextMenu contextMenu, File directory) {
+        // Open directory
+        MenuItem openItem = new MenuItem("Open");
+        openItem.setOnAction(e -> {
+            if (onOpenFile != null) {
+                onOpenFile.accept(directory);
+            }
+        });
+        
+        MenuItem showInExplorerItem = new MenuItem("Show in Explorer");
+        showInExplorerItem.setOnAction(e -> {
+            if (onShowInExplorer != null) {
+                onShowInExplorer.accept(directory);
+            }
+        });
+        
+        // Directory operations
+        MenuItem renameItem = new MenuItem("Rename");
+        renameItem.setOnAction(e -> {
+            if (onRenameFile != null) {
+                onRenameFile.accept(directory);
+            }
+        });
+        
+        MenuItem copyItem = new MenuItem("Copy");
+        copyItem.setOnAction(e -> {
+            if (onCopyFile != null) {
+                onCopyFile.accept(directory);
+            }
+        });
+        
+        MenuItem moveItem = new MenuItem("Move");
+        moveItem.setOnAction(e -> {
+            if (onMoveFile != null) {
+                onMoveFile.accept(directory);
+            }
+        });
+        
+        // Advanced operations
+        Menu advancedMenu = new Menu("Advanced");
+        
+        MenuItem compressItem = new MenuItem("Compress Folder");
+        compressItem.setOnAction(e -> {
+            if (onCompressFile != null) {
+                onCompressFile.accept(directory);
+            }
+        });
+        
+        MenuItem encryptItem = new MenuItem("Encrypt Folder");
+        encryptItem.setOnAction(e -> {
+            if (onEncryptFile != null) {
+                onEncryptFile.accept(directory);
+            }
+        });
+        
+        advancedMenu.getItems().addAll(compressItem, encryptItem);
+        
+        // Properties
+        MenuItem propertiesItem = new MenuItem("Properties");
+        propertiesItem.setOnAction(e -> {
+            if (onShowProperties != null) {
+                onShowProperties.accept(directory);
+            }
+        });
+        
+        // Delete
+        MenuItem deleteItem = new MenuItem("Delete");
+        deleteItem.setOnAction(e -> {
+            if (onDeleteFile != null) {
+                onDeleteFile.accept(directory);
+            }
+        });
+        
+        contextMenu.getItems().addAll(
+            openItem,
+            showInExplorerItem,
+            new SeparatorMenuItem(),
+            renameItem,
+            copyItem,
+            moveItem,
+            new SeparatorMenuItem(),
+            advancedMenu,
+            new SeparatorMenuItem(),
+            propertiesItem,
+            new SeparatorMenuItem(),
+            deleteItem
+        );
+    }
+    
+    /**
+     * Get file extension
+     */
+    private String getFileExtension(File file) {
+        String name = file.getName();
+        int lastDot = name.lastIndexOf('.');
+        return lastDot > 0 ? name.substring(lastDot + 1) : "";
+    }
+    
+    /**
+     * Check if file is a text file
+     */
+    private boolean isTextFile(String extension) {
+        return extension.matches("txt|md|java|js|html|css|xml|json|py|cpp|c|h|php|sql|log");
+    }
+    
+    /**
+     * Check if file is an image file
+     */
+    private boolean isImageFile(String extension) {
+        return extension.matches("jpg|jpeg|png|gif|bmp|svg|tiff|tif|webp");
+    }
+    
+    // Setters for callbacks
+    public void setOnOpenFile(Consumer<File> onOpenFile) {
+        this.onOpenFile = onOpenFile;
+    }
+    
+    public void setOnPreviewFile(Consumer<File> onPreviewFile) {
+        this.onPreviewFile = onPreviewFile;
+    }
+    
+    public void setOnEditFile(Consumer<File> onEditFile) {
+        this.onEditFile = onEditFile;
+    }
+    
+    public void setOnDeleteFile(Consumer<File> onDeleteFile) {
+        this.onDeleteFile = onDeleteFile;
+    }
+    
+    public void setOnRenameFile(Consumer<File> onRenameFile) {
+        this.onRenameFile = onRenameFile;
+    }
+    
+    public void setOnCopyFile(Consumer<File> onCopyFile) {
+        this.onCopyFile = onCopyFile;
+    }
+    
+    public void setOnMoveFile(Consumer<File> onMoveFile) {
+        this.onMoveFile = onMoveFile;
+    }
+    
+    public void setOnShowProperties(Consumer<File> onShowProperties) {
+        this.onShowProperties = onShowProperties;
+    }
+    
+    public void setOnShowInExplorer(Consumer<File> onShowInExplorer) {
+        this.onShowInExplorer = onShowInExplorer;
+    }
+    
+    public void setOnCompressFile(Consumer<File> onCompressFile) {
+        this.onCompressFile = onCompressFile;
+    }
+    
+    public void setOnEncryptFile(Consumer<File> onEncryptFile) {
+        this.onEncryptFile = onEncryptFile;
+    }
+    
+    public void setOnShareFile(Consumer<File> onShareFile) {
+        this.onShareFile = onShareFile;
+    }
+}

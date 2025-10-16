@@ -12,7 +12,6 @@ import javafx.scene.text.Text;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.IOException;
 import java.text.DecimalFormat;
 import java.util.Arrays;
 import java.util.List;
@@ -133,4 +132,359 @@ public class ImagePreviewComponent extends VBox {
                 }
             }
         });
-    }\n    \n    private void applyStyles() {\n        this.getStyleClass().add(\"image-preview-component\");\n        imageView.getStyleClass().add(\"image-view\");\n        scrollPane.getStyleClass().add(\"image-scroll-pane\");\n        controlsPane.getStyleClass().add(\"image-controls\");\n        statusLabel.getStyleClass().add(\"status-label\");\n        imageInfoLabel.getStyleClass().add(\"image-info-label\");\n        \n        // Button styling\n        zoomInButton.getStyleClass().addAll(\"zoom-button\", \"zoom-in\");\n        zoomOutButton.getStyleClass().addAll(\"zoom-button\", \"zoom-out\");\n        resetZoomButton.getStyleClass().addAll(\"zoom-button\", \"reset-zoom\");\n        fitToWindowButton.getStyleClass().addAll(\"zoom-button\", \"fit-window\");\n        \n        // Set button sizes\n        zoomInButton.setPrefSize(30, 30);\n        zoomOutButton.setPrefSize(30, 30);\n    }\n    \n    /**\n     * Load and display an image file\n     */\n    public void loadImage(File file) {\n        if (file == null || !file.exists() || !file.isFile()) {\n            showError(\"Invalid image file selected\");\n            return;\n        }\n        \n        String extension = getFileExtension(file).toLowerCase();\n        if (!SUPPORTED_FORMATS.contains(extension)) {\n            showError(\"Unsupported image format: \" + extension.toUpperCase());\n            return;\n        }\n        \n        this.currentFile = file;\n        showLoading(true);\n        statusLabel.setText(\"Loading \" + file.getName() + \"...\");\n        \n        Task<Image> loadTask = new Task<Image>() {\n            @Override\n            protected Image call() throws Exception {\n                try (FileInputStream fis = new FileInputStream(file)) {\n                    return new Image(fis);\n                }\n            }\n            \n            @Override\n            protected void succeeded() {\n                Platform.runLater(() -> {\n                    currentImage = getValue();\n                    displayImage();\n                    showLoading(false);\n                    updateImageInfo();\n                });\n            }\n            \n            @Override\n            protected void failed() {\n                Platform.runLater(() -> {\n                    showError(\"Failed to load image: \" + getException().getMessage());\n                    showLoading(false);\n                });\n            }\n        };\n        \n        Thread loadThread = new Thread(loadTask);\n        loadThread.setDaemon(true);\n        loadThread.start();\n    }\n    \n    private void displayImage() {\n        if (currentImage == null) {\n            return;\n        }\n        \n        imageView.setImage(currentImage);\n        resetZoom();\n        \n        statusLabel.setText(currentFile.getName() + \" loaded successfully\");\n    }\n    \n    private void updateImageInfo() {\n        if (currentImage == null || currentFile == null) {\n            imageInfoLabel.setText(\"\");\n            return;\n        }\n        \n        double width = currentImage.getWidth();\n        double height = currentImage.getHeight();\n        long fileSize = currentFile.length();\n        \n        String sizeText = formatFileSize(fileSize);\n        String dimensionsText = String.format(\"%.0f × %.0f\", width, height);\n        String zoomText = String.format(\"%.0f%%\", currentZoom * 100);\n        \n        imageInfoLabel.setText(String.format(\"%s | %s | %s | %s\", \n            dimensionsText, sizeText, getFileExtension(currentFile).toUpperCase(), zoomText));\n    }\n    \n    private void zoomIn() {\n        double newZoom = Math.min(currentZoom * 1.2, MAX_ZOOM);\n        setZoom(newZoom);\n    }\n    \n    private void zoomOut() {\n        double newZoom = Math.max(currentZoom / 1.2, MIN_ZOOM);\n        setZoom(newZoom);\n    }\n    \n    private void resetZoom() {\n        setZoom(1.0);\n    }\n    \n    private void fitToWindow() {\n        if (currentImage == null) {\n            return;\n        }\n        \n        double imageWidth = currentImage.getWidth();\n        double imageHeight = currentImage.getHeight();\n        double paneWidth = scrollPane.getWidth() - 20; // Account for padding\n        double paneHeight = scrollPane.getHeight() - 20;\n        \n        if (paneWidth <= 0 || paneHeight <= 0) {\n            return;\n        }\n        \n        double scaleX = paneWidth / imageWidth;\n        double scaleY = paneHeight / imageHeight;\n        double scale = Math.min(scaleX, scaleY);\n        \n        setZoom(Math.max(scale, MIN_ZOOM));\n    }\n    \n    private void setZoom(double zoom) {\n        zoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom));\n        currentZoom = zoom;\n        \n        if (currentImage != null) {\n            imageView.setFitWidth(currentImage.getWidth() * zoom);\n            imageView.setFitHeight(currentImage.getHeight() * zoom);\n        }\n        \n        // Update slider without triggering listener\n        zoomSlider.setValue(zoom);\n        \n        updateImageInfo();\n    }\n    \n    private void showLoading(boolean show) {\n        loadingIndicator.setVisible(show);\n        controlsPane.setDisable(show);\n    }\n    \n    private void showError(String message) {\n        imageView.setImage(null);\n        currentImage = null;\n        currentFile = null;\n        \n        statusLabel.setText(\"Error: \" + message);\n        imageInfoLabel.setText(\"\");\n        \n        // Show error in image area\n        VBox errorBox = new VBox(10);\n        errorBox.setAlignment(Pos.CENTER);\n        errorBox.setPadding(new Insets(50));\n        \n        Text errorIcon = new Text(\"⚠\");\n        errorIcon.setStyle(\"-fx-font-size: 48px; -fx-fill: #ff6b6b;\");\n        \n        Label errorLabel = new Label(message);\n        errorLabel.setStyle(\"-fx-font-size: 14px; -fx-text-fill: #666;\");\n        \n        errorBox.getChildren().addAll(errorIcon, errorLabel);\n        scrollPane.setContent(errorBox);\n    }\n    \n    private String getFileExtension(File file) {\n        String name = file.getName();\n        int lastDot = name.lastIndexOf('.');\n        return lastDot > 0 ? name.substring(lastDot + 1) : \"\";\n    }\n    \n    private String formatFileSize(long bytes) {\n        if (bytes < 1024) return bytes + \" B\";\n        if (bytes < 1024 * 1024) return new DecimalFormat(\"#.#\").format(bytes / 1024.0) + \" KB\";\n        if (bytes < 1024 * 1024 * 1024) return new DecimalFormat(\"#.#\").format(bytes / (1024.0 * 1024.0)) + \" MB\";\n        return new DecimalFormat(\"#.#\").format(bytes / (1024.0 * 1024.0 * 1024.0)) + \" GB\";\n    }\n    \n    /**\n     * Check if file format is supported\n     */\n    public static boolean isSupported(File file) {\n        if (file == null || !file.isFile()) {\n            return false;\n        }\n        \n        String extension = \"\";\n        String name = file.getName();\n        int lastDot = name.lastIndexOf('.');\n        if (lastDot > 0) {\n            extension = name.substring(lastDot + 1).toLowerCase();\n        }\n        \n        return SUPPORTED_FORMATS.contains(extension);\n    }\n    \n    /**\n     * Get current image\n     */\n    public Image getCurrentImage() {\n        return currentImage;\n    }\n    \n    /**\n     * Get current file\n     */\n    public File getCurrentFile() {\n        return currentFile;\n    }\n    \n    /**\n     * Get current zoom level\n     */\n    public double getCurrentZoom() {\n        return currentZoom;\n    }\n    \n    /**\n     * Clear the preview\n     */\n    public void clear() {\n        imageView.setImage(null);\n        currentImage = null;\n        currentFile = null;\n        currentZoom = 1.0;\n        statusLabel.setText(\"No image selected\");\n        imageInfoLabel.setText(\"\");\n        \n        // Reset scroll pane content\n        scrollPane.setContent(imageView);\n    }\n}"
+    }
+    
+    private void applyStyles() {
+        this.getStyleClass().add("image-preview-component");
+        imageView.getStyleClass().add("image-view");
+        scrollPane.getStyleClass().add("image-scroll-pane");
+        controlsPane.getStyleClass().add("image-controls");
+        statusLabel.getStyleClass().add("status-label");
+        imageInfoLabel.getStyleClass().add("image-info-label");
+        
+        // Button styling
+        zoomInButton.getStyleClass().addAll("zoom-button", "zoom-in");
+        zoomOutButton.getStyleClass().addAll("zoom-button", "zoom-out");
+        resetZoomButton.getStyleClass().addAll("zoom-button", "reset-zoom");
+        fitToWindowButton.getStyleClass().addAll("zoom-button", "fit-window");
+        
+        // Set button sizes
+        zoomInButton.setPrefSize(30, 30);
+        zoomOutButton.setPrefSize(30, 30);
+    }
+    
+    /**
+     * Load and display an image file
+     */
+    public void loadImage(File file) {
+        if (file == null || !file.exists() || !file.isFile()) {
+            showError("Invalid image file selected");
+            return;
+        }
+        
+        String extension = getFileExtension(file).toLowerCase();
+        if (!SUPPORTED_FORMATS.contains(extension)) {
+            showUnsupportedFormatError(extension);
+            return;
+        }
+        
+        // Check file size (limit to 50MB for images)
+        long maxSize = 50 * 1024 * 1024; // 50MB
+        if (file.length() > maxSize) {
+            showError("Image file too large (max 50MB): " + formatFileSize(file.length()));
+            return;
+        }
+        
+        this.currentFile = file;
+        showLoading(true);
+        statusLabel.setText("Loading " + file.getName() + "...");
+        
+        Task<Image> loadTask = new Task<Image>() {
+            @Override
+            protected Image call() throws Exception {
+                try (FileInputStream fis = new FileInputStream(file)) {
+                    Image image = new Image(fis);
+                    
+                    // Check if image loaded successfully
+                    if (image.isError()) {
+                        throw new Exception("Image format not supported or file corrupted");
+                    }
+                    
+                    // Check image dimensions (prevent extremely large images)
+                    if (image.getWidth() > 10000 || image.getHeight() > 10000) {
+                        throw new Exception("Image dimensions too large (max 10000x10000)");
+                    }
+                    
+                    return image;
+                }
+            }
+            
+            @Override
+            protected void succeeded() {
+                Platform.runLater(() -> {
+                    currentImage = getValue();
+                    if (currentImage != null && !currentImage.isError()) {
+                        displayImage();
+                        showLoading(false);
+                        updateImageInfo();
+                    } else {
+                        showError("Failed to load image: Image format not supported");
+                        showLoading(false);
+                    }
+                });
+            }
+            
+            @Override
+            protected void failed() {
+                Platform.runLater(() -> {
+                    Throwable exception = getException();
+                    String errorMessage = "Failed to load image";
+                    
+                    if (exception != null) {
+                        String exceptionMessage = exception.getMessage();
+                        if (exceptionMessage != null) {
+                            if (exceptionMessage.contains("format not supported")) {
+                                errorMessage = "Unsupported image format or corrupted file";
+                            } else if (exceptionMessage.contains("dimensions too large")) {
+                                errorMessage = "Image too large to display";
+                            } else if (exceptionMessage.contains("OutOfMemoryError")) {
+                                errorMessage = "Image too large for available memory";
+                            } else {
+                                errorMessage = "Failed to load image: " + exceptionMessage;
+                            }
+                        }
+                    }
+                    
+                    showError(errorMessage);
+                    showLoading(false);
+                });
+            }
+        };
+        
+        Thread loadThread = new Thread(loadTask);
+        loadThread.setDaemon(true);
+        loadThread.start();
+    }
+    
+    private void displayImage() {
+        if (currentImage == null) {
+            return;
+        }
+        
+        imageView.setImage(currentImage);
+        resetZoom();
+        
+        statusLabel.setText(currentFile.getName() + " loaded successfully");
+    }
+    
+    private void updateImageInfo() {
+        if (currentImage == null || currentFile == null) {
+            imageInfoLabel.setText("");
+            return;
+        }
+        
+        double width = currentImage.getWidth();
+        double height = currentImage.getHeight();
+        long fileSize = currentFile.length();
+        
+        String sizeText = formatFileSize(fileSize);
+        String dimensionsText = String.format("%.0f × %.0f", width, height);
+        String zoomText = String.format("%.0f%%", currentZoom * 100);
+        
+        imageInfoLabel.setText(String.format("%s | %s | %s | %s", 
+            dimensionsText, sizeText, getFileExtension(currentFile).toUpperCase(), zoomText));
+    }
+    
+    private void zoomIn() {
+        double newZoom = Math.min(currentZoom * 1.2, MAX_ZOOM);
+        setZoom(newZoom);
+    }
+    
+    private void zoomOut() {
+        double newZoom = Math.max(currentZoom / 1.2, MIN_ZOOM);
+        setZoom(newZoom);
+    }
+    
+    private void resetZoom() {
+        setZoom(1.0);
+    }
+    
+    private void fitToWindow() {
+        if (currentImage == null) {
+            return;
+        }
+        
+        double imageWidth = currentImage.getWidth();
+        double imageHeight = currentImage.getHeight();
+        double paneWidth = scrollPane.getWidth() - 20; // Account for padding
+        double paneHeight = scrollPane.getHeight() - 20;
+        
+        if (paneWidth <= 0 || paneHeight <= 0) {
+            return;
+        }
+        
+        double scaleX = paneWidth / imageWidth;
+        double scaleY = paneHeight / imageHeight;
+        double scale = Math.min(scaleX, scaleY);
+        
+        setZoom(Math.max(scale, MIN_ZOOM));
+    }
+    
+    private void setZoom(double zoom) {
+        zoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom));
+        currentZoom = zoom;
+        
+        if (currentImage != null) {
+            imageView.setFitWidth(currentImage.getWidth() * zoom);
+            imageView.setFitHeight(currentImage.getHeight() * zoom);
+        }
+        
+        // Update slider without triggering listener
+        zoomSlider.setValue(zoom);
+        
+        updateImageInfo();
+    }
+    
+    private void showLoading(boolean show) {
+        loadingIndicator.setVisible(show);
+        controlsPane.setDisable(show);
+    }
+    
+    private void showError(String message) {
+        imageView.setImage(null);
+        currentImage = null;
+        currentFile = null;
+        
+        statusLabel.setText("Error: " + message);
+        imageInfoLabel.setText("");
+        
+        // Show error in image area
+        VBox errorBox = new VBox(10);
+        errorBox.setAlignment(Pos.CENTER);
+        errorBox.setPadding(new Insets(50));
+        
+        Text errorIcon = new Text("⚠");
+        errorIcon.setStyle("-fx-font-size: 48px; -fx-fill: #ff6b6b;");
+        
+        Label errorLabel = new Label(message);
+        errorLabel.setStyle("-fx-font-size: 14px; -fx-text-fill: #666;");
+        errorLabel.setWrapText(true);
+        errorLabel.setMaxWidth(300);
+        
+        errorBox.getChildren().addAll(errorIcon, errorLabel);
+        scrollPane.setContent(errorBox);
+    }
+    
+    private void showUnsupportedFormatError(String extension) {
+        imageView.setImage(null);
+        currentImage = null;
+        currentFile = null;
+        
+        statusLabel.setText("Unsupported format: " + extension.toUpperCase());
+        imageInfoLabel.setText("");
+        
+        // Show unsupported format message
+        VBox errorBox = new VBox(15);
+        errorBox.setAlignment(Pos.CENTER);
+        errorBox.setPadding(new Insets(50));
+        
+        Text errorIcon = new Text("🚫");
+        errorIcon.setStyle("-fx-font-size: 48px;");
+        
+        Label titleLabel = new Label("Unsupported Image Format");
+        titleLabel.setStyle("-fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: #333;");
+        
+        Label messageLabel = new Label("Cannot preview ." + extension.toUpperCase() + " files");
+        messageLabel.setStyle("-fx-font-size: 14px; -fx-text-fill: #666;");
+        
+        Label supportedLabel = new Label("Supported formats: " + String.join(", ", SUPPORTED_FORMATS));
+        supportedLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #999;");
+        supportedLabel.setWrapText(true);
+        supportedLabel.setMaxWidth(400);
+        
+        errorBox.getChildren().addAll(errorIcon, titleLabel, messageLabel, supportedLabel);
+        scrollPane.setContent(errorBox);
+    }
+    
+    private String getFileExtension(File file) {
+        String name = file.getName();
+        int lastDot = name.lastIndexOf('.');
+        return lastDot > 0 ? name.substring(lastDot + 1) : "";
+    }
+    
+    private String formatFileSize(long bytes) {
+        if (bytes < 1024) return bytes + " B";
+        if (bytes < 1024 * 1024) return new DecimalFormat("#.#").format(bytes / 1024.0) + " KB";
+        if (bytes < 1024 * 1024 * 1024) return new DecimalFormat("#.#").format(bytes / (1024.0 * 1024.0)) + " MB";
+        return new DecimalFormat("#.#").format(bytes / (1024.0 * 1024.0 * 1024.0)) + " GB";
+    }
+    
+    /**
+     * Check if file format is supported
+     */
+    public static boolean isSupported(File file) {
+        if (file == null || !file.isFile()) {
+            return false;
+        }
+        
+        String extension = "";
+        String name = file.getName();
+        int lastDot = name.lastIndexOf('.');
+        if (lastDot > 0) {
+            extension = name.substring(lastDot + 1).toLowerCase();
+        }
+        
+        return SUPPORTED_FORMATS.contains(extension);
+    }
+    
+    /**
+     * Get current image
+     */
+    public Image getCurrentImage() {
+        return currentImage;
+    }
+    
+    /**
+     * Get current file
+     */
+    public File getCurrentFile() {
+        return currentFile;
+    }
+    
+    /**
+     * Get current zoom level
+     */
+    public double getCurrentZoom() {
+        return currentZoom;
+    }
+    
+    /**
+     * Clear the preview
+     */
+    public void clear() {
+        // Stop any ongoing loading tasks
+        stopCurrentTask();
+        
+        imageView.setImage(null);
+        currentImage = null;
+        currentFile = null;
+        currentZoom = 1.0;
+        statusLabel.setText("No image selected");
+        imageInfoLabel.setText("");
+        
+        // Reset scroll pane content
+        scrollPane.setContent(imageView);
+        
+        // Hide loading indicator
+        showLoading(false);
+    }
+    
+    /**
+     * Stop current loading task if any
+     */
+    private void stopCurrentTask() {
+        // This would be implemented if we kept references to running tasks
+        // For now, we rely on daemon threads being cleaned up automatically
+    }
+    
+    /**
+     * Cleanup resources when component is being disposed
+     */
+    public void dispose() {
+        clear();
+        
+        // Clear any cached images to free memory
+        if (currentImage != null) {
+            currentImage = null;
+        }
+        
+        // Remove event handlers to prevent memory leaks
+        zoomSlider.valueProperty().removeListener((obs, oldVal, newVal) -> {
+            if (!zoomSlider.isValueChanging()) {
+                setZoom(newVal.doubleValue());
+            }
+        });
+        
+        scrollPane.setOnScroll(null);
+    }
+}
