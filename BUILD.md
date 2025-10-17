@@ -45,7 +45,7 @@ mvn javafx:run
 mvn compile
 ```
 
-## Troubleshooting
+## Troubleshoot
 
 **JavaFX errors**: Make sure you're using Java 17+ with JavaFX support.
 
