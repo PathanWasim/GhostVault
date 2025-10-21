@@ -503,4 +503,24 @@ public class EnhancedFileManager extends VBox {
         
         dialog.showAndWait();
     }
+    
+    /**
+     * Load directory contents
+     */
+    public void loadDirectory(File directory) {
+        if (directory != null && directory.exists() && directory.isDirectory()) {
+            currentDirectory = directory;
+            refreshFileList();
+        }
+    }
+    
+    /**
+     * Get selected files
+     */
+    public java.util.List<File> getSelectedFiles() {
+        if (fileListView != null) {
+            return fileListView.getSelectionModel().getSelectedItems();
+        }
+        return new java.util.ArrayList<>();
+    }
 }

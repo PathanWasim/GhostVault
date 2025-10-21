@@ -256,19 +256,18 @@ public class UIBackendIntegrator {
                             "Backup created: " + backupFile.getName());
                         
                         Platform.runLater(() -> {
-                            onComplete.accept(new BackupResult(true, "Backup created successfully", backupFile.getPath()));
+                            onComplete.accept(new EncryptedBackupManager.BackupResult(true, "Backup created successfully: " + backupFile.getName()));
                         });
                         
                     } catch (Exception e) {
                         auditManager.logSystemOperation("BACKUP_FAILED", "Backup failed: " + e.getMessage());
                         Platform.runLater(() -> {
-                            onComplete.accept(new BackupResult(false, e.getMessage()));
+                            onComplete.accept(new EncryptedBackupManager.BackupResult(false, e.getMessage()));
                         });
                     }
                 });
             }
             
-            @Override
             public void restoreBackup(File backupFile, String password, File targetDirectory, 
                     Consumer<RestoreResult> onComplete) {
                 CompletableFuture.runAsync(() -> {
@@ -310,9 +309,10 @@ public class UIBackendIntegrator {
         });
         
         // Log UI events
-        NotificationSystem.getInstance().setOnNotificationShown((notification) -> {
-            auditManager.logUserActivity("NOTIFICATION", notification.getTitle() + ": " + notification.getMessage());
-        });
+        // TODO: Fix NotificationSystem integration
+        // NotificationSystem.getInstance().setOnNotificationShown((notification) -> {
+        //     auditManager.logUserActivity("NOTIFICATION", notification.getTitle() + ": " + notification.getMessage());
+        // });
     }
     
     /**

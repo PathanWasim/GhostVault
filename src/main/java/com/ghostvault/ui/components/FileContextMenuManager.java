@@ -328,4 +328,47 @@ public class FileContextMenuManager {
     public void setOnShareFile(Consumer<File> onShareFile) {
         this.onShareFile = onShareFile;
     }
+    
+    /**
+     * Set file preview callback
+     */
+    public void setOnFilePreview(Consumer<File> callback) {
+        this.onPreviewFile = callback;
+    }
+    
+    /**
+     * Set file open callback
+     */
+    public void setOnFileOpen(Consumer<File> callback) {
+        this.onOpenFile = callback;
+    }
+    
+    /**
+     * Set files delete callback
+     */
+    public void setOnFilesDelete(Consumer<java.util.List<File>> callback) {
+        this.onDeleteFile = (file) -> callback.accept(java.util.Arrays.asList(file));
+    }
+    
+    /**
+     * Set file rename callback
+     */
+    public void setOnFileRename(Consumer<File> callback) {
+        this.onRenameFile = callback;
+    }
+    
+    /**
+     * Set file properties callback
+     */
+    public void setOnFileProperties(Consumer<File> callback) {
+        this.onShowProperties = callback;
+    }
+    
+    /**
+     * Set refresh callback
+     */
+    public void setOnRefresh(Runnable callback) {
+        // Store as a consumer that ignores the file parameter
+        this.onShowInExplorer = (file) -> callback.run();
+    }
 }

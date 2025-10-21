@@ -438,4 +438,65 @@ public class UIUtils {
         separator.setStyle("-fx-background-color: #e0e0e0;");
         return separator;
     }
+    
+    /**
+     * Center stage on screen
+     */
+    public static void centerStage(javafx.stage.Stage stage) {
+        javafx.geometry.Rectangle2D screenBounds = javafx.stage.Screen.getPrimary().getVisualBounds();
+        stage.setX((screenBounds.getWidth() - stage.getWidth()) / 2);
+        stage.setY((screenBounds.getHeight() - stage.getHeight()) / 2);
+    }
+    
+    /**
+     * Memory utilities class
+     */
+    public static class MemoryUtils {
+        
+        /**
+         * Get used memory in bytes
+         */
+        public static long getUsedMemory() {
+            Runtime runtime = Runtime.getRuntime();
+            return runtime.totalMemory() - runtime.freeMemory();
+        }
+        
+        /**
+         * Get total memory in bytes
+         */
+        public static long getTotalMemory() {
+            return Runtime.getRuntime().totalMemory();
+        }
+        
+        /**
+         * Get memory usage percentage
+         */
+        public static double getMemoryUsagePercentage() {
+            Runtime runtime = Runtime.getRuntime();
+            long used = runtime.totalMemory() - runtime.freeMemory();
+            long total = runtime.totalMemory();
+            return (double) used / total * 100.0;
+        }
+        
+        /**
+         * Format memory size in human readable format
+         */
+        public static String formatMemorySize(long bytes) {
+            if (bytes < 1024) return bytes + " B";
+            int exp = (int) (Math.log(bytes) / Math.log(1024));
+            String pre = "KMGTPE".charAt(exp - 1) + "";
+            return String.format("%.1f %sB", bytes / Math.pow(1024, exp), pre);
+        }
+        
+        /**
+         * Format current memory usage
+         */
+        public static String formatMemoryUsage() {
+            long used = getUsedMemory();
+            long total = getTotalMemory();
+            double percentage = getMemoryUsagePercentage();
+            return String.format("Memory: %s / %s (%.1f%%)", 
+                formatMemorySize(used), formatMemorySize(total), percentage);
+        }
+    }
 }
