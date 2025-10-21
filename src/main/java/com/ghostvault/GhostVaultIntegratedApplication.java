@@ -5,14 +5,20 @@ import com.ghostvault.core.FileManager;
 import com.ghostvault.security.AdvancedSecurityManager;
 import com.ghostvault.security.SessionManager;
 import com.ghostvault.ui.controllers.MainApplicationController;
+import com.ghostvault.ui.controllers.AuthenticationController;
+import com.ghostvault.ui.controllers.ModeController;
 import com.ghostvault.ui.components.*;
 import com.ghostvault.ui.utils.UIUtils;
 import com.ghostvault.error.ErrorHandler;
 import com.ghostvault.audit.AuditManager;
 import javafx.application.Application;
 import javafx.application.Platform;
+import javafx.geometry.Pos;
 import javafx.scene.Scene;
+import javafx.scene.control.*;
+import javafx.scene.layout.*;
 import javafx.stage.Stage;
+import javafx.stage.StageStyle;
 
 /**
  * Complete Integrated GhostVault Application
@@ -43,31 +49,220 @@ public class GhostVaultIntegratedApplication extends Application {
         this.primaryStage = primaryStage;
         
         try {
-            // Initialize UI systems
-            initializeUISystem();
+            System.out.println("🚀 GhostVault starting...");
             
-            // Create and configure main controller
+            // Simple, direct approach that works
+            primaryStage.setTitle("GhostVault - Secure File Management System");
+            primaryStage.setResizable(true);
+            primaryStage.setMinWidth(600);
+            primaryStage.setMinHeight(400);
+            
+            // Check setup status and show appropriate screen
+            com.ghostvault.security.PasswordManager passwordManager = new com.ghostvault.security.PasswordManager();
+            
+            if (!passwordManager.isSetupComplete()) {
+                System.out.println("🔧 First time setup required");
+                showInitialSetup();
+            } else {
+                System.out.println("🔐 Setup complete, showing login");
+                showSimpleAuthentication();
+            }
+            
+        } catch (Exception e) {
+            System.err.println("❌ Startup error: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+    
+    /**
+     * Setup primary stage with proper window controls
+     */
+    private void setupPrimaryStage() {
+        System.out.println("🪟 Setting up primary stage...");
+        
+        // Basic window properties
+        primaryStage.setTitle("GhostVault - Secure File Management System");
+        primaryStage.setWidth(800);
+        primaryStage.setHeight(600);
+        primaryStage.setMinWidth(600);
+        primaryStage.setMinHeight(400);
+        
+        // CRITICAL: Ensure window has all standard controls
+        primaryStage.setResizable(true);
+        primaryStage.setMaximized(false);
+        
+        // Set proper close behavior
+        primaryStage.setOnCloseRequest(event -> {
+            System.out.println("🚪 Window close requested via window controls");
+            javafx.application.Platform.exit();
+        });
+        
+        // Center on screen
+        primaryStage.centerOnScreen();
+        
+        System.out.println("✅ Primary stage setup complete");
+    }
+    
+    /**
+     * Show professional authentication screen using AuthenticationController
+     */
+    private void showSimpleAuthentication() {
+        try {
+            System.out.println("🔐 Showing professional authentication screen...");
+            
+            // Create authentication controller
+            AuthenticationController authController = new AuthenticationController(primaryStage);
+            
+            // Set up authentication success handler
+            authController.setOnAuthenticationSuccess(mode -> {
+                System.out.println("✅ Authentication successful - Mode: " + mode);
+                showMainApplication(mode);
+            });
+            
+            // Set up authentication cancelled handler
+            authController.setOnAuthenticationCancelled(() -> {
+                System.out.println("❌ Authentication cancelled");
+                Platform.exit();
+            });
+            
+            // Show authentication screen
+            authController.show();
+            
+        } catch (Exception e) {
+            System.err.println("❌ Error showing authentication screen: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+    
+    /**
+     * Show initial setup wizard
+     */
+    private void showInitialSetup() {
+        try {
+            System.out.println("🔧 Showing initial setup wizard...");
+            
+            com.ghostvault.ui.controllers.InitialSetupController setupController = 
+                new com.ghostvault.ui.controllers.InitialSetupController(primaryStage);
+            
+            setupController.setOnSetupComplete(success -> {
+                if (success) {
+                    System.out.println("✅ Setup completed successfully");
+                    showSimpleAuthentication();
+                } else {
+                    System.out.println("❌ Setup cancelled");
+                    javafx.application.Platform.exit();
+                }
+            });
+            
+            setupController.show();
+            
+        } catch (Exception e) {
+            System.err.println("❌ Error showing initial setup: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+    
+    /**
+     * Show main application after authentication
+     */
+    private void showMainApplication(com.ghostvault.ui.controllers.ModeController.VaultMode mode) {
+        try {
+            System.out.println("🏠 Loading main application for mode: " + mode);
+            
+            // Create and configure main controller with the authenticated mode
             mainController = new MainApplicationController(primaryStage);
+            mainController.switchMode(mode);
             
-            // Integrate backend with UI
-            integrateBackendWithUI();
-            
-            // Setup window properties
-            setupWindow();
-            
-            // Create and show scene
+            // Create and show main scene
             Scene scene = mainController.createScene();
             primaryStage.setScene(scene);
             
-            // Apply theme and show
+            // Apply theme
             ModernThemeManager.applyTheme(scene);
-            primaryStage.show();
             
-            // Post-startup initialization
-            postStartupInitialization();
+            // Setup window properties for main application
+            primaryStage.setTitle("GhostVault - Secure File Management (" + getModeDisplayName(mode) + " Mode)");
+            primaryStage.setMinWidth(1000);
+            primaryStage.setMinHeight(700);
+            primaryStage.setWidth(1200);
+            primaryStage.setHeight(800);
+            
+            System.out.println("✅ Main application displayed for mode: " + mode);
             
         } catch (Exception e) {
-            handleStartupError(e);
+            System.err.println("❌ Error showing main application: " + e.getMessage());
+            e.printStackTrace();
+            
+            // Fallback to simple welcome screen if main controller fails
+            showFallbackMainApplication(mode);
+        }
+    }
+    
+    /**
+     * Fallback main application screen if the full controller fails
+     */
+    private void showFallbackMainApplication(com.ghostvault.ui.controllers.ModeController.VaultMode mode) {
+        try {
+            System.out.println("🔄 Showing fallback main application...");
+            
+            VBox root = new VBox(20);
+            root.setStyle("-fx-background-color: #1e1e1e; -fx-padding: 30; -fx-alignment: center;");
+            
+            Label title = new Label("🎉 Welcome to GhostVault!");
+            title.setStyle("-fx-font-size: 28px; -fx-text-fill: white; -fx-font-weight: bold;");
+            
+            Label message = new Label("Authentication successful! Your secure vault is ready.");
+            message.setStyle("-fx-font-size: 16px; -fx-text-fill: #4CAF50;");
+            
+            // Show mode information (but keep it subtle for security)
+            Label modeInfo = new Label("Vault Mode: " + getModeDisplayName(mode));
+            modeInfo.setStyle("-fx-font-size: 14px; -fx-text-fill: #2196F3;");
+            
+            Label info = new Label("File management interface is loading...");
+            info.setStyle("-fx-font-size: 14px; -fx-text-fill: #cccccc;");
+            
+            // Show mode-specific information
+            Label modeDetails = new Label(getModeDescription(mode));
+            modeDetails.setStyle("-fx-font-size: 12px; -fx-text-fill: #888888;");
+            modeDetails.setWrapText(true);
+            modeDetails.setMaxWidth(600);
+            
+            Button backButton = new Button("Back to Login");
+            backButton.setStyle("-fx-font-size: 14px; -fx-pref-width: 150; -fx-pref-height: 40; -fx-background-color: #2196F3; -fx-text-fill: white;");
+            backButton.setOnAction(e -> showSimpleAuthentication());
+            
+            root.getChildren().addAll(title, message, modeInfo, info, modeDetails, backButton);
+            
+            Scene scene = new Scene(root, 800, 600);
+            primaryStage.setScene(scene);
+            
+            System.out.println("✅ Fallback main application displayed");
+            
+        } catch (Exception e) {
+            System.err.println("❌ Error showing fallback main application: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+    
+    private String getModeDisplayName(com.ghostvault.ui.controllers.ModeController.VaultMode mode) {
+        switch (mode) {
+            case MASTER: return "Master";
+            case PANIC: return "Emergency";
+            case DECOY: return "Standard";
+            default: return "Unknown";
+        }
+    }
+    
+    private String getModeDescription(com.ghostvault.ui.controllers.ModeController.VaultMode mode) {
+        switch (mode) {
+            case MASTER: 
+                return "Full access to your secure vault with all files and features available.";
+            case PANIC: 
+                return "Emergency mode activated. System will perform secure cleanup operations.";
+            case DECOY: 
+                return "Standard access mode with limited file visibility for enhanced security.";
+            default: 
+                return "Unknown access mode.";
         }
     }
     
@@ -271,25 +466,40 @@ public class GhostVaultIntegratedApplication extends Application {
      * Setup window properties
      */
     private void setupWindow() {
+        System.out.println("🪟 Setting up window properties...");
+        
         primaryStage.setTitle("GhostVault - Secure File Management System");
-        primaryStage.setMinWidth(1200);
-        primaryStage.setMinHeight(800);
+        primaryStage.setMinWidth(800);
+        primaryStage.setMinHeight(600);
+        primaryStage.setWidth(1200);
+        primaryStage.setHeight(800);
         
-        // Set window icon if available - TODO: Add loadImageFromResources method to UIUtils
-        // try {
-        //     primaryStage.getIcons().add(UIUtils.loadImageFromResources("/icons/ghostvault-icon.png"));
-        // } catch (Exception e) {
-        //     // Icon not found, continue without it
-        // }
+        // Make sure window is resizable
+        primaryStage.setResizable(true);
+        primaryStage.setMaximized(false);
         
-        // Setup close request handler
+        // Set window icon if available
+        try {
+            // Try to load icon from resources
+            var iconStream = getClass().getResourceAsStream("/icons/ghostvault_64.png");
+            if (iconStream != null) {
+                primaryStage.getIcons().add(new javafx.scene.image.Image(iconStream));
+            }
+        } catch (Exception e) {
+            System.out.println("⚠️ Could not load window icon: " + e.getMessage());
+        }
+        
+        // Setup close request handler - but don't consume the event immediately
         primaryStage.setOnCloseRequest(event -> {
-            event.consume(); // Prevent immediate close
-            handleApplicationExit();
+            System.out.println("🚪 Window close requested");
+            // Allow normal close for now - we can add confirmation later
+            Platform.exit();
         });
         
         // Center window on screen
-        UIUtils.centerStage(primaryStage);
+        primaryStage.centerOnScreen();
+        
+        System.out.println("✅ Window properties set up successfully");
     }
     
     /**
@@ -473,6 +683,62 @@ public class GhostVaultIntegratedApplication extends Application {
      */
     public AdvancedSecurityManager getSecurityManager() {
         return securityManager;
+    }
+    
+    /**
+     * Show authentication screen and handle mode selection
+     */
+    private void showAuthentication() {
+        try {
+            System.out.println("🔐 Starting authentication flow...");
+            
+            // Create authentication controller
+            AuthenticationController authController = new AuthenticationController(primaryStage);
+            
+            // Set up authentication success handler
+            authController.setOnAuthenticationSuccess(this::onAuthenticationSuccess);
+            
+            // Set up authentication cancelled handler
+            authController.setOnAuthenticationCancelled(this::handleApplicationExit);
+            
+            // Show authentication screen
+            System.out.println("🔐 Showing authentication screen...");
+            authController.show();
+            
+        } catch (Exception e) {
+            System.err.println("❌ Error in authentication flow: " + e.getMessage());
+            e.printStackTrace();
+            handleStartupError(e);
+        }
+    }
+    
+    /**
+     * Handle successful authentication and mode determination
+     */
+    private void onAuthenticationSuccess(ModeController.VaultMode mode) {
+        try {
+            System.out.println("🔐 Authentication successful - Mode: " + mode);
+            
+            // Create and configure main controller with the authenticated mode
+            mainController = new MainApplicationController(primaryStage);
+            mainController.switchMode(mode);
+            
+            // Integrate backend with UI
+            integrateBackendWithUI();
+            
+            // Create and show main scene
+            Scene scene = mainController.createScene();
+            primaryStage.setScene(scene);
+            
+            // Apply theme
+            ModernThemeManager.applyTheme(scene);
+            
+            // Post-startup initialization
+            postStartupInitialization();
+            
+        } catch (Exception e) {
+            handleStartupError(e);
+        }
     }
     
     /**

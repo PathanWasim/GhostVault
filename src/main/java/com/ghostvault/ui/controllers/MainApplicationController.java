@@ -4,6 +4,7 @@ import com.ghostvault.ui.components.*;
 import com.ghostvault.ui.utils.UIUtils;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
+import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
@@ -12,6 +13,7 @@ import javafx.stage.Stage;
 import java.io.File;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -89,21 +91,17 @@ public class MainApplicationController {
             rootLayout.getStyleClass().add("main-application");
             rootLayout.setStyle("-fx-background-color: #2b2b2b;");
             
-            // Create a simple placeholder UI for now
-            VBox centerContent = new VBox(20);
-            centerContent.setStyle("-fx-padding: 50; -fx-alignment: center;");
+            // Create header (mode-agnostic)
+            header = createModeAgnosticHeader();
+            rootLayout.setTop(header);
             
-            Label titleLabel = new Label("GhostVault - Integrated Application");
-            titleLabel.setStyle("-fx-font-size: 24px; -fx-text-fill: white; -fx-font-weight: bold;");
+            // Create main content area
+            SplitPane mainContent = createMainContentArea();
+            rootLayout.setCenter(mainContent);
             
-            Label statusLabel = new Label("✅ Backend systems initialized successfully!");
-            statusLabel.setStyle("-fx-font-size: 16px; -fx-text-fill: #4CAF50;");
-            
-            Label modeLabel = new Label("Current Mode: " + currentMode.toString());
-            modeLabel.setStyle("-fx-font-size: 14px; -fx-text-fill: #cccccc;");
-            
-            centerContent.getChildren().addAll(titleLabel, statusLabel, modeLabel);
-            rootLayout.setCenter(centerContent);
+            // Create status bar (mode-agnostic)
+            HBox statusBar = createModeAgnosticStatusBar();
+            rootLayout.setBottom(statusBar);
             
             // Create scene
             mainScene = new Scene(rootLayout, 1400, 900);
@@ -129,6 +127,167 @@ public class MainApplicationController {
             mainScene = new Scene(fallback, 800, 600);
             return mainScene;
         }
+    }
+    
+    private ProfessionalHeader createModeAgnosticHeader() {
+        ProfessionalHeader header = new ProfessionalHeader();
+        header.setTitle("GhostVault");
+        header.setUserInfo("Secure Vault");
+        
+        // No mode indicators - identical across all modes for security
+        header.setSessionInfo("Active Session");
+        
+        return header;
+    }
+    
+    private SplitPane createMainContentArea() {
+        SplitPane mainSplitPane = new SplitPane();
+        mainSplitPane.setOrientation(javafx.geometry.Orientation.HORIZONTAL);
+        
+        // Left panel - File manager
+        VBox leftPanel = createFileManagerPanel();
+        
+        // Center panel - Preview area (placeholder for now)
+        VBox centerPanel = createPreviewPlaceholder();
+        
+        // Right panel - File info and operations
+        VBox rightPanel = createFileInfoPanel();
+        
+        mainSplitPane.getItems().addAll(leftPanel, centerPanel, rightPanel);
+        mainSplitPane.setDividerPositions(0.35, 0.75);
+        
+        return mainSplitPane;
+    }
+    
+    private VBox createFileManagerPanel() {
+        VBox panel = new VBox(10);
+        panel.setPadding(new Insets(10));
+        panel.setPrefWidth(400);
+        panel.getStyleClass().add("file-manager-panel");
+        panel.setStyle("-fx-background-color: #2b2b2b; -fx-border-color: #444444; -fx-border-width: 1;");
+        
+        // Panel title
+        Label title = new Label("Files");
+        title.getStyleClass().add("panel-title");
+        title.setStyle("-fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: white;");
+        
+        // Mode-aware file manager
+        ModeAwareFileManager modeAwareFileManager = new ModeAwareFileManager();
+        modeAwareFileManager.setCurrentMode(currentMode);
+        
+        // Set up event handlers
+        modeAwareFileManager.setOnFileSelected(this::handleFileSelected);
+        modeAwareFileManager.setOnFileDoubleClicked(this::handleFileDoubleClicked);
+        modeAwareFileManager.setOnSelectionChanged(this::handleSelectionChanged);
+        
+        panel.getChildren().addAll(title, modeAwareFileManager);
+        VBox.setVgrow(modeAwareFileManager, Priority.ALWAYS);
+        
+        return panel;
+    }
+    
+    private VBox createPreviewPlaceholder() {
+        VBox panel = new VBox(10);
+        panel.setPadding(new Insets(10));
+        panel.setPrefWidth(600);
+        panel.getStyleClass().add("preview-panel");
+        panel.setStyle("-fx-background-color: #2b2b2b; -fx-border-color: #444444; -fx-border-width: 1;");
+        
+        // Panel title
+        Label title = new Label("Preview");
+        title.getStyleClass().add("panel-title");
+        title.setStyle("-fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: white;");
+        
+        // Preview placeholder
+        Label placeholder = new Label("Select a file to preview");
+        placeholder.setStyle("-fx-font-size: 14px; -fx-text-fill: #cccccc;");
+        placeholder.setAlignment(Pos.CENTER);
+        
+        VBox placeholderContainer = new VBox();
+        placeholderContainer.setAlignment(Pos.CENTER);
+        placeholderContainer.getChildren().add(placeholder);
+        
+        panel.getChildren().addAll(title, placeholderContainer);
+        VBox.setVgrow(placeholderContainer, Priority.ALWAYS);
+        
+        return panel;
+    }
+    
+    private VBox createFileInfoPanel() {
+        VBox panel = new VBox(10);
+        panel.setPadding(new Insets(10));
+        panel.setPrefWidth(350);
+        panel.getStyleClass().add("file-info-panel");
+        panel.setStyle("-fx-background-color: #2b2b2b; -fx-border-color: #444444; -fx-border-width: 1;");
+        
+        // Panel title
+        Label title = new Label("File Information");
+        title.getStyleClass().add("panel-title");
+        title.setStyle("-fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: white;");
+        
+        // File info placeholder
+        Label infoPlaceholder = new Label("No file selected");
+        infoPlaceholder.setStyle("-fx-font-size: 14px; -fx-text-fill: #cccccc;");
+        
+        // Operations section
+        VBox operationsSection = createOperationsSection();
+        
+        panel.getChildren().addAll(title, infoPlaceholder, operationsSection);
+        
+        return panel;
+    }
+    
+    private VBox createOperationsSection() {
+        VBox section = new VBox(10);
+        section.setPadding(new Insets(15, 0, 0, 0));
+        
+        Label operationsTitle = new Label("Operations");
+        operationsTitle.setStyle("-fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: #4CAF50;");
+        
+        // Operation buttons - identical across all modes
+        Button uploadBtn = createOperationButton("Upload Files");
+        Button downloadBtn = createOperationButton("Download");
+        Button deleteBtn = createOperationButton("Delete");
+        deleteBtn.setStyle("-fx-background-color: #f44336; -fx-text-fill: white;");
+        
+        section.getChildren().addAll(operationsTitle, uploadBtn, downloadBtn, deleteBtn);
+        
+        return section;
+    }
+    
+    private Button createOperationButton(String text) {
+        Button button = new Button(text);
+        button.getStyleClass().addAll("operation-button");
+        button.setStyle("-fx-background-color: #4CAF50; -fx-text-fill: white; -fx-font-weight: bold;");
+        button.setMaxWidth(Double.MAX_VALUE);
+        button.setPrefHeight(35);
+        return button;
+    }
+    
+    private HBox createModeAgnosticStatusBar() {
+        HBox statusBar = new HBox(10);
+        statusBar.setPadding(new Insets(5, 10, 5, 10));
+        statusBar.getStyleClass().add("status-bar");
+        statusBar.setStyle("-fx-background-color: #1e1e1e; -fx-border-color: #444444; -fx-border-width: 1 0 0 0;");
+        
+        // Status indicators - no mode information for security
+        Label securityLabel = new Label("🔒 Secure");
+        securityLabel.setStyle("-fx-text-fill: #4CAF50; -fx-font-weight: bold;");
+        
+        Label fileCountLabel = new Label("Files: Loading...");
+        fileCountLabel.setStyle("-fx-text-fill: #cccccc;");
+        
+        // Spacer
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+        
+        // Version info
+        Label versionLabel = new Label("GhostVault v2.0");
+        versionLabel.setStyle("-fx-text-fill: #888888;");
+        
+        statusBar.getChildren().addAll(securityLabel, fileCountLabel, spacer, versionLabel);
+        
+        return statusBar;
     }
     
     private ProfessionalHeader createHeader() {
@@ -160,11 +319,11 @@ public class MainApplicationController {
         SplitPane mainSplitPane = new SplitPane();
         mainSplitPane.setOrientation(javafx.geometry.Orientation.HORIZONTAL);
         
-        // Left panel - File manager with drag/drop
+        // Left panel - File manager
         VBox leftPanel = createFileManagerPanel();
         
-        // Center panel - Preview area
-        VBox centerPanel = createPreviewPanel();
+        // Center panel - Preview area (placeholder for now)
+        VBox centerPanel = createPreviewPlaceholder();
         
         // Right panel - File info and operations
         VBox rightPanel = createFileInfoPanel();
@@ -175,92 +334,10 @@ public class MainApplicationController {
         return mainSplitPane;
     }
     
-    private VBox createFileManagerPanel() {
-        VBox panel = new VBox(10);
-        panel.setPadding(new Insets(10));
-        panel.setPrefWidth(400);
-        panel.getStyleClass().add("file-manager-panel");
-        
-        // Panel title
-        Label title = new Label("File Manager");
-        title.getStyleClass().add("panel-title");
-        
-        // Drag and drop zone
-        VBox dropZone = dragDropUploader.createDropZone();
-        dragDropUploader.setOnFilesDropped(this::handleFilesDropped);
-        
-        // File manager with all features
-        fileManager = new EnhancedFileManager();
-        fileManager.loadDirectory(currentDirectory);
-        
-        panel.getChildren().addAll(title, dropZone, fileManager);
-        VBox.setVgrow(fileManager, Priority.ALWAYS);
-        
-        return panel;
-    }
+
     
-    private VBox createPreviewPanel() {
-        VBox panel = new VBox(10);
-        panel.setPadding(new Insets(10));
-        panel.setPrefWidth(600);
-        panel.getStyleClass().add("preview-panel");
-        
-        // Panel title
-        Label title = new Label("File Preview");
-        title.getStyleClass().add("panel-title");
-        
-        // Preview tabs with all preview components
-        previewTabs = new TabPane();
-        previewTabs.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
-        
-        // Code preview tab
-        Tab codeTab = new Tab("Code");
-        codePreview = new CodePreviewComponent();
-        codeTab.setContent(codePreview);
-        
-        // Image preview tab
-        Tab imageTab = new Tab("Image");
-        imagePreview = new ImagePreviewComponent();
-        imageTab.setContent(imagePreview);
-        
-        // Media preview tab
-        Tab mediaTab = new Tab("Media");
-        Label mediaPlaceholder = new Label("Audio/Video preview will be shown here");
-        mediaPlaceholder.getStyleClass().add("placeholder-text");
-        ScrollPane mediaScroll = new ScrollPane(mediaPlaceholder);
-        mediaScroll.setFitToWidth(true);
-        mediaScroll.setFitToHeight(true);
-        mediaTab.setContent(mediaScroll);
-        
-        previewTabs.getTabs().addAll(codeTab, imageTab, mediaTab);
-        
-        panel.getChildren().addAll(title, previewTabs);
-        VBox.setVgrow(previewTabs, Priority.ALWAYS);
-        
-        return panel;
-    }
-    
-    private VBox createFileInfoPanel() {
-        VBox panel = new VBox(10);
-        panel.setPadding(new Insets(10));
-        panel.setPrefWidth(350);
-        panel.getStyleClass().add("file-info-panel");
-        
-        // Panel title
-        Label title = new Label("File Information");
-        title.getStyleClass().add("panel-title");
-        
-        // File info display with thumbnails
-        fileInfo = new DetailedFileInfoDisplay();
-        
-        // Operations panel with all file operations
-        VBox operationsPanel = createOperationsPanel();
-        
-        panel.getChildren().addAll(title, fileInfo, operationsPanel);
-        VBox.setVgrow(fileInfo, Priority.ALWAYS);
-        
-        return panel;
-    }
+
+
     
     private VBox createOperationsPanel() {
         VBox panel = new VBox(10);
@@ -623,5 +700,21 @@ public class MainApplicationController {
      */
     public void setModeChangeHandler(ModeChangeHandler handler) {
         // This would be implemented to use the handler for mode changes
+    }
+    
+    // File manager event handlers
+    private void handleFileSelected(File file) {
+        System.out.println("File selected: " + file.getName());
+        // Update file info panel when implemented
+    }
+    
+    private void handleFileDoubleClicked(File file) {
+        System.out.println("File double-clicked: " + file.getName());
+        // Open file or navigate to directory
+    }
+    
+    private void handleSelectionChanged(Set<File> selectedFiles) {
+        System.out.println("Selection changed: " + selectedFiles.size() + " files selected");
+        // Update operation buttons state
     }
 }

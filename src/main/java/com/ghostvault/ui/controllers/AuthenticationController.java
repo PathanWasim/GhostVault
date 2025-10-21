@@ -1,6 +1,8 @@
 package com.ghostvault.ui.controllers;
 
+import com.ghostvault.security.PasswordManager;
 import com.ghostvault.ui.components.ErrorHandlingSystem;
+import com.ghostvault.ui.components.ModernThemeManager;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -33,10 +35,8 @@ public class AuthenticationController {
     private ProgressIndicator authProgress;
     private Label statusLabel;
     
-    // Mode detection
-    private String masterPasswordHash;
-    private String panicPasswordHash;
-    private String decoyPasswordHash;
+    // Password management
+    private PasswordManager passwordManager;
     
     // Callbacks
     private Consumer<ModeController.VaultMode> onAuthenticationSuccess;
@@ -49,27 +49,17 @@ public class AuthenticationController {
     
     public AuthenticationController(Stage primaryStage) {
         this.primaryStage = primaryStage;
-        initializePasswords();
+        this.passwordManager = new PasswordManager();
         initializeComponents();
         setupLayout();
         setupEventHandlers();
     }
     
     /**
-     * Initialize password hashes for different modes
+     * Check if initial setup is required
      */
-    private void initializePasswords() {
-        // In a real implementation, these would be loaded from secure storage
-        // For demo purposes, using simple patterns:
-        
-        // Master mode: "master123" 
-        masterPasswordHash = hashPassword("master123");
-        
-        // Panic mode: "panic911" or "emergency"
-        panicPasswordHash = hashPassword("panic911");
-        
-        // Decoy mode: "decoy456" or any other password
-        decoyPasswordHash = hashPassword("decoy456");
+    public boolean isSetupRequired() {
+        return !passwordManager.isSetupComplete();
     }
     
     /**
@@ -149,7 +139,7 @@ public class AuthenticationController {
         
         // Create scene
         scene = new Scene(rootContainer, 800, 600);
-        scene.getStylesheets().add(getClass().getResource("/css/ultra-modern-theme.css").toExternalForm());
+        ModernThemeManager.applyTheme(scene);
     }
     
     /**
@@ -208,7 +198,7 @@ public class AuthenticationController {
         new Thread(() -> {
             try {
                 // Simulate authentication delay
-                Thread.sleep(1000);
+                Thread.sleep(800);
                 
                 // Detect mode based on password
                 ModeController.VaultMode detectedMode = detectMode(password);
@@ -229,37 +219,15 @@ public class AuthenticationController {
     }
     
     /**
-     * Detect vault mode based on password
+     * Detect vault mode based on password using PasswordManager
      */
     private ModeController.VaultMode detectMode(String password) {
-        String passwordHash = hashPassword(password);
-        
-        // Check for master mode
-        if (passwordHash.equals(masterPasswordHash)) {
-            return ModeController.VaultMode.MASTER;
+        try {
+            return passwordManager.authenticatePassword(password);
+        } catch (Exception e) {
+            ErrorHandlingSystem.handleError("Authentication error", e);
+            return null;
         }
-        
-        // Check for panic mode (multiple trigger passwords)
-        if (passwordHash.equals(panicPasswordHash) || 
-            password.toLowerCase().contains("emergency") ||
-            password.toLowerCase().contains("panic") ||
-            password.matches(".*911.*")) {
-            return ModeController.VaultMode.PANIC;
-        }
-        
-        // Check for decoy mode
-        if (passwordHash.equals(decoyPasswordHash)) {
-            return ModeController.VaultMode.DECOY;
-        }
-        
-        // Additional decoy triggers (wrong passwords that should look normal)
-        if (password.length() >= 6 && !password.equals("master123")) {
-            // Any reasonable-looking password that's not master or panic
-            // triggers decoy mode for plausible deniability
-            return ModeController.VaultMode.DECOY;
-        }
-        
-        return null; // Authentication failed
     }
     
     /**
@@ -339,30 +307,42 @@ public class AuthenticationController {
      * Show authentication progress
      */
     private void showProgress(String message) {
-        authProgress.setVisible(true);
-        statusLabel.setText(message);
-        statusLabel.setVisible(true);
-        loginButton.setDisable(true);
+        if (authProgress != null) {
+            authProgress.setVisible(true);
+        }
+        if (statusLabel != null) {
+            statusLabel.setText(message);
+            statusLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #4CAF50;");
+            statusLabel.setVisible(true);
+        }
+        // Note: loginButton is local in showLoginScreen, so we can't disable it here
     }
     
     /**
      * Hide authentication progress
      */
     private void hideProgress() {
-        authProgress.setVisible(false);
-        loginButton.setDisable(false);
+        if (authProgress != null) {
+            authProgress.setVisible(false);
+        }
+        // Note: loginButton is local in showLoginScreen, so we can't enable it here
     }
     
     /**
      * Show status message
      */
     private void showStatus(String message, boolean success) {
-        statusLabel.setText(message);
-        statusLabel.setVisible(true);
-        
-        // Apply success/error styling
-        statusLabel.getStyleClass().removeIf(cls -> cls.equals("success") || cls.equals("error"));
-        statusLabel.getStyleClass().add(success ? "success" : "error");
+        if (statusLabel != null) {
+            statusLabel.setText(message);
+            statusLabel.setVisible(true);
+            
+            // Apply success/error styling
+            if (success) {
+                statusLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #4CAF50;");
+            } else {
+                statusLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #ff6b6b;");
+            }
+        }
     }
     
     /**
@@ -401,18 +381,156 @@ public class AuthenticationController {
     }
     
     /**
-     * Show the authentication dialog
+     * Show the authentication dialog or setup wizard
      */
     public void show() {
-        primaryStage.setScene(scene);
-        primaryStage.setTitle("GhostVault - Authentication");
-        
-        if (!primaryStage.isShowing()) {
-            primaryStage.show();
+        // Check if initial setup is required
+        if (isSetupRequired()) {
+            showInitialSetup();
+        } else {
+            showLoginScreen();
         }
+    }
+    
+    /**
+     * Show initial setup wizard
+     */
+    private void showInitialSetup() {
+        System.out.println("🔧 Showing initial setup wizard...");
+        InitialSetupController setupController = new InitialSetupController(primaryStage);
+        setupController.setOnSetupComplete(success -> {
+            if (success) {
+                // Setup completed, show login screen
+                System.out.println("✅ Setup completed, showing login screen...");
+                showLoginScreen();
+            } else {
+                // Setup cancelled, exit application
+                System.out.println("❌ Setup cancelled, exiting...");
+                Platform.exit();
+            }
+        });
+        setupController.show();
+    }
+    
+    /**
+     * Show login screen
+     */
+    private void showLoginScreen() {
+        System.out.println("🔐 Showing login screen...");
         
-        // Focus password field
-        Platform.runLater(() -> passwordField.requestFocus());
+        try {
+            // Create properly aligned login screen
+            VBox loginRoot = new VBox(20);
+            loginRoot.setAlignment(Pos.CENTER);
+            loginRoot.setPadding(new Insets(40));
+            loginRoot.setStyle("-fx-background-color: #1e1e1e;");
+            
+            // Header section
+            VBox headerSection = new VBox(8);
+            headerSection.setAlignment(Pos.CENTER);
+            
+            Label titleLabel = new Label("🔒 GhostVault");
+            titleLabel.setStyle("-fx-font-size: 28px; -fx-font-weight: bold; -fx-text-fill: white;");
+            
+            Label subtitleLabel = new Label("Enter your vault password");
+            subtitleLabel.setStyle("-fx-font-size: 14px; -fx-text-fill: #cccccc;");
+            
+            headerSection.getChildren().addAll(titleLabel, subtitleLabel);
+            
+            // Login form section
+            VBox formSection = new VBox(15);
+            formSection.setAlignment(Pos.CENTER);
+            formSection.setMaxWidth(400);
+            formSection.setPadding(new Insets(20));
+            formSection.setStyle("-fx-background-color: #2b2b2b; -fx-background-radius: 10; -fx-border-color: #444444; -fx-border-width: 1; -fx-border-radius: 10;");
+            
+            // Password field
+            passwordField = new PasswordField();
+            passwordField.setPromptText("Enter your vault password");
+            passwordField.setPrefWidth(350);
+            passwordField.setPrefHeight(45);
+            passwordField.setStyle("-fx-font-size: 14px; -fx-background-color: #3a3a3a; -fx-text-fill: white; -fx-prompt-text-fill: #888888; -fx-background-radius: 6; -fx-border-color: #555555; -fx-border-width: 1; -fx-border-radius: 6;");
+            
+            // Button section
+            HBox buttonSection = new HBox(12);
+            buttonSection.setAlignment(Pos.CENTER);
+            
+            Button exitButton = new Button("Exit");
+            exitButton.setPrefWidth(100);
+            exitButton.setPrefHeight(40);
+            exitButton.setStyle("-fx-font-size: 14px; -fx-background-color: #666666; -fx-text-fill: white; -fx-background-radius: 6; -fx-border-radius: 6;");
+            exitButton.setOnMouseEntered(e -> exitButton.setStyle("-fx-font-size: 14px; -fx-background-color: #777777; -fx-text-fill: white; -fx-background-radius: 6; -fx-border-radius: 6;"));
+            exitButton.setOnMouseExited(e -> exitButton.setStyle("-fx-font-size: 14px; -fx-background-color: #666666; -fx-text-fill: white; -fx-background-radius: 6; -fx-border-radius: 6;"));
+            
+            Button loginButton = new Button("Unlock Vault");
+            loginButton.setPrefWidth(150);
+            loginButton.setPrefHeight(40);
+            loginButton.setStyle("-fx-font-size: 14px; -fx-background-color: #4CAF50; -fx-text-fill: white; -fx-background-radius: 6; -fx-border-radius: 6; -fx-font-weight: bold;");
+            loginButton.setOnMouseEntered(e -> loginButton.setStyle("-fx-font-size: 14px; -fx-background-color: #5CBF60; -fx-text-fill: white; -fx-background-radius: 6; -fx-border-radius: 6; -fx-font-weight: bold;"));
+            loginButton.setOnMouseExited(e -> loginButton.setStyle("-fx-font-size: 14px; -fx-background-color: #4CAF50; -fx-text-fill: white; -fx-background-radius: 6; -fx-border-radius: 6; -fx-font-weight: bold;"));
+            
+            buttonSection.getChildren().addAll(exitButton, loginButton);
+            
+            // Status section
+            VBox statusSection = new VBox(8);
+            statusSection.setAlignment(Pos.CENTER);
+            
+            authProgress = new ProgressIndicator();
+            authProgress.setPrefSize(24, 24);
+            authProgress.setVisible(false);
+            
+            statusLabel = new Label("");
+            statusLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #ff6b6b;");
+            statusLabel.setVisible(false);
+            
+            statusSection.getChildren().addAll(authProgress, statusLabel);
+            
+            formSection.getChildren().addAll(passwordField, buttonSection, statusSection);
+            
+            // Footer section
+            Label footerLabel = new Label("🛡️ Your data is protected with military-grade encryption");
+            footerLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #888888;");
+            
+            loginRoot.getChildren().addAll(headerSection, formSection, footerLabel);
+            
+            // Set up event handlers
+            loginButton.setOnAction(e -> {
+                String password = passwordField.getText();
+                System.out.println("🔐 Login attempted with password: " + (password.isEmpty() ? "[empty]" : "[" + password.length() + " chars]"));
+                authenticate();
+            });
+            
+            exitButton.setOnAction(e -> {
+                System.out.println("🚪 Exit button clicked");
+                Platform.exit();
+            });
+            
+            passwordField.setOnAction(e -> {
+                String password = passwordField.getText();
+                System.out.println("🔐 Enter key pressed with password: " + (password.isEmpty() ? "[empty]" : "[" + password.length() + " chars]"));
+                authenticate();
+            });
+            
+            // Create scene
+            Scene loginScene = new Scene(loginRoot, 600, 500);
+            ModernThemeManager.applyTheme(loginScene);
+            
+            primaryStage.setScene(loginScene);
+            primaryStage.setTitle("GhostVault - Secure File Management");
+            primaryStage.setResizable(false);
+            
+            if (!primaryStage.isShowing()) {
+                primaryStage.show();
+                System.out.println("✅ Login screen displayed");
+            }
+            
+            // Focus password field
+            Platform.runLater(() -> passwordField.requestFocus());
+            
+        } catch (Exception e) {
+            System.err.println("❌ Error showing login screen: " + e.getMessage());
+            e.printStackTrace();
+        }
     }
     
     /**
@@ -422,12 +540,20 @@ public class AuthenticationController {
         authenticationInProgress = false;
         failedAttempts = 0;
         
-        passwordField.clear();
-        passwordField.setDisable(false);
-        loginButton.setDisable(false);
+        if (passwordField != null) {
+            passwordField.clear();
+            passwordField.setDisable(false);
+        }
+        
+        if (loginButton != null) {
+            loginButton.setDisable(false);
+        }
         
         hideProgress();
-        statusLabel.setVisible(false);
+        
+        if (statusLabel != null) {
+            statusLabel.setVisible(false);
+        }
     }
     
     // Getters and Setters
@@ -448,20 +574,7 @@ public class AuthenticationController {
         return scene;
     }
     
-    /**
-     * Set custom password hashes (for configuration)
-     */
-    public void setMasterPasswordHash(String hash) {
-        this.masterPasswordHash = hash;
-    }
-    
-    public void setPanicPasswordHash(String hash) {
-        this.panicPasswordHash = hash;
-    }
-    
-    public void setDecoyPasswordHash(String hash) {
-        this.decoyPasswordHash = hash;
-    }
+
     
     /**
      * Get current failed attempts count
@@ -493,6 +606,9 @@ public class AuthenticationController {
     public void cleanup() {
         if (passwordField != null) {
             passwordField.clear();
+        }
+        if (passwordManager != null) {
+            passwordManager.cleanup();
         }
         // Clear any sensitive data
         if (scene != null) {
