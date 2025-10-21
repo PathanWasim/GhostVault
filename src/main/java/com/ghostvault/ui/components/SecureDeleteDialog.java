@@ -332,10 +332,12 @@ public class SecureDeleteDialog {
                 
                 for (int i = 0; i < totalFiles; i++) {
                     File file = filesToDelete.get(i);
+                    final File currentFile = file;
+                    final int currentIndex = i;
                     
                     Platform.runLater(() -> {
-                        currentFileLabel.setText("Deleting: " + file.getName());
-                        overallProgress.setProgress((double) i / totalFiles);
+                        currentFileLabel.setText("Deleting: " + currentFile.getName());
+                        overallProgress.setProgress((double) currentIndex / totalFiles);
                     });
                     
                     // Check for cancellation
@@ -344,10 +346,10 @@ public class SecureDeleteDialog {
                     }
                     
                     // Perform secure deletion
-                    secureDeleteFile(file);
+                    secureDeleteFile(currentFile);
                     
                     Platform.runLater(() -> {
-                        overallProgress.setProgress((double) (i + 1) / totalFiles);
+                        overallProgress.setProgress((double) (currentIndex + 1) / totalFiles);
                     });
                 }
                 
@@ -434,8 +436,10 @@ public class SecureDeleteDialog {
             int passes = selectedMethod.getPasses();
             
             for (int pass = 0; pass < passes; pass++) {
+                final int currentPass = pass;
+                final int totalPasses = passes;
                 Platform.runLater(() -> {
-                    statusLabel.setText(String.format("Pass %d of %d", pass + 1, passes));
+                    statusLabel.setText(String.format("Pass %d of %d", currentPass + 1, totalPasses));
                 });
                 
                 raf.seek(0);

@@ -302,7 +302,7 @@ public class GhostVaultIntegratedApplication extends Application {
                 "Secure file management system initialized successfully");
             
             // Start session
-            sessionManager.startSession("default_user");
+            sessionManager.startSession(primaryStage);
             
             // Log application start
             if (auditManager != null) {

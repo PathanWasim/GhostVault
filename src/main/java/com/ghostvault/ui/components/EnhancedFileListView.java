@@ -109,10 +109,8 @@ public class EnhancedFileListView extends ListView<File> {
         
         List<File> sortedFiles = new ArrayList<>(originalFiles);
         
-        Comparator<File> comparator = getComparator(currentSortCriteria);
-        if (!sortAscending) {
-            comparator = comparator.reversed();
-        }
+        Comparator<File> baseComparator = getComparator(currentSortCriteria);
+        final Comparator<File> finalComparator = sortAscending ? baseComparator : baseComparator.reversed();
         
         // Always sort directories first
         sortedFiles.sort((f1, f2) -> {
@@ -121,7 +119,7 @@ public class EnhancedFileListView extends ListView<File> {
             } else if (!f1.isDirectory() && f2.isDirectory()) {
                 return 1;
             } else {
-                return comparator.compare(f1, f2);
+                return finalComparator.compare(f1, f2);
             }
         });
         

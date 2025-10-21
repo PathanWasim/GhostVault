@@ -147,8 +147,11 @@ public class UIBackendIntegrator {
                             }
                         }
                         
+                        final int finalSuccessCount = successCount;
+                        final int finalFailureCount = failureCount;
+                        final String finalErrors = errors.toString();
                         Platform.runLater(() -> {
-                            onComplete.accept(new UploadResult(successCount, failureCount, errors.toString()));
+                            onComplete.accept(new UploadResult(finalSuccessCount, finalFailureCount, finalErrors));
                         });
                         
                     } catch (Exception e) {
