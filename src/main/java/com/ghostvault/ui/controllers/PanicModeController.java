@@ -196,10 +196,11 @@ public class PanicModeController extends ModeController {
                     count += countFilesRecursive(path);
                 }
             }
-            totalFiles.set(count);
+            final int finalCount = count;
+            totalFiles.set(finalCount);
             
             Platform.runLater(() -> {
-                statusLabel.setText(String.format("Ready to destroy %d files and directories", count));
+                statusLabel.setText(String.format("Ready to destroy %d files and directories", finalCount));
             });
         }).start();
     }

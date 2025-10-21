@@ -161,7 +161,15 @@ public class FileSearchAndFilterSystem extends VBox {
      */
     private void setupEventHandlers() {
         // Search bar events
-        searchBar.setOnSearchResults(this::handleSearchResults);
+        searchBar.setOnSearchResults(results -> {
+            List<File> fileResults = new ArrayList<>();
+            for (Object obj : results) {
+                if (obj instanceof File) {
+                    fileResults.add((File) obj);
+                }
+            }
+            handleSearchResults(fileResults);
+        });
         searchBar.setOnSearchTextChanged(this::handleSearchTextChanged);
         
         // Filter change events

@@ -223,10 +223,8 @@ public class EncryptedBackupManager {
             for (int i = 0; i < files.size(); i++) {
                 File file = files.get(i);
                 
-                if (task != null) {
-                    task.updateProgress((double)i, (double)files.size());
-                    task.updateMessage("Adding " + file.getName() + " to archive...");
-                }
+                // Progress updates must be called from within the Task's call() method
+                // TODO: Implement progress callback mechanism
                 
                 // Get relative path
                 String relativePath = baseDirectory.toPath().relativize(file.toPath()).toString();

@@ -532,13 +532,10 @@ public class MainApplicationController {
      * Authenticate user and determine mode
      */
     public void authenticate(String password) {
-        try {
-            ModeController.VaultMode detectedMode = authController.authenticate(password);
-            switchMode(detectedMode);
-        } catch (Exception e) {
-            ErrorHandlingSystem.handleError("Authentication failed", e, 
-                ErrorHandlingSystem.ErrorSeverity.WARNING);
-        }
+        // AuthenticationController handles authentication internally
+        // Set up callback to handle successful authentication
+        authController.setOnAuthenticationSuccess(this::switchMode);
+        authController.show();
     }
     
     /**
