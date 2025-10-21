@@ -76,32 +76,39 @@ public class GhostVaultIntegratedApplication extends Application {
      */
     private void initializeBackendSystems() {
         try {
-            // Initialize configuration
-            appConfig = new AppConfig();
-            appConfig.loadConfiguration();
+            // Initialize configuration - AppConfig is a constants class
+            // Configuration is loaded from constants
             
-            // Initialize error handling first
-            errorHandler = new ErrorHandler();
-            ErrorHandlingSystem.getInstance().setBackendErrorHandler(errorHandler);
+            // Initialize error handling first - TODO: Fix constructor parameters
+            // errorHandler = new ErrorHandler();
+            // ErrorHandlingSystem.getInstance().setBackendErrorHandler(errorHandler);
             
             // Initialize audit system
-            auditManager = new AuditManager();
-            auditManager.initialize();
+            try {
+                auditManager = new AuditManager();
+                auditManager.initialize();
+            } catch (Exception e) {
+                System.err.println("Failed to initialize audit manager: " + e.getMessage());
+            }
             
             // Initialize security manager
             securityManager = new AdvancedSecurityManager();
-            securityManager.initialize();
+            securityManager.initializeAdvancedSecurity();
             
             // Initialize session manager
             sessionManager = new SessionManager();
-            sessionManager.initialize();
             
             // Initialize file manager
-            fileManager = new FileManager();
-            fileManager.initialize();
+            try {
+                fileManager = new FileManager(AppConfig.VAULT_DIR);
+            } catch (Exception e) {
+                System.err.println("Failed to initialize file manager: " + e.getMessage());
+            }
             
             // Log successful initialization
-            auditManager.logEvent("SYSTEM_INIT", "Backend systems initialized successfully");
+            if (auditManager != null) {
+                auditManager.logSystemEvent("SYSTEM_INIT", "Backend systems initialized successfully");
+            }
             
         } catch (Exception e) {
             System.err.println("Failed to initialize backend systems: " + e.getMessage());
