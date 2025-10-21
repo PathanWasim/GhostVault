@@ -344,15 +344,13 @@ public class GhostVaultIntegratedApplication extends Application {
     private void handleApplicationExit() {
         try {
             // Show confirmation dialog
-            UIUtils.showConfirmationDialog(
+            boolean confirmed = UIUtils.showConfirmationDialog(
                 "Exit GhostVault", 
-                "Are you sure you want to exit?", 
-                "All unsaved work will be lost."
-            ).thenAccept(confirmed -> {
-                if (confirmed) {
-                    performGracefulShutdown();
-                }
-            });
+                "Are you sure you want to exit? All unsaved work will be lost."
+            );
+            if (confirmed) {
+                performGracefulShutdown();
+            }
             
         } catch (Exception e) {
             // Force shutdown if graceful shutdown fails
@@ -443,8 +441,7 @@ public class GhostVaultIntegratedApplication extends Application {
         Platform.runLater(() -> {
             UIUtils.showErrorDialog(
                 "Startup Error", 
-                "Failed to start GhostVault", 
-                "Error: " + e.getMessage() + "\n\nThe application will now exit."
+                "Failed to start GhostVault. Error: " + e.getMessage() + "\n\nThe application will now exit."
             );
             
             Platform.exit();

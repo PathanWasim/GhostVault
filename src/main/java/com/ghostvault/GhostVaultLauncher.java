@@ -68,7 +68,8 @@ public class GhostVaultLauncher {
         
         // Check configuration
         try {
-            AppConfig config = new AppConfig();
+            // AppConfig is a constants class, just check if it's accessible
+            String vaultDir = AppConfig.VAULT_DIR;
             System.out.println("   ✓ Configuration: Loaded");
         } catch (Exception e) {
             System.out.println("   ⚠ Configuration: Using defaults (" + e.getMessage() + ")");
@@ -116,8 +117,8 @@ public class GhostVaultLauncher {
                 try {
                     ErrorHandlingSystem.showErrorDialog(
                         "Launch Error",
-                        "Failed to start GhostVault",
-                        "Error: " + e.getMessage() + "\n\nPlease check the console for more details."
+                        "Failed to start GhostVault: " + e.getMessage() + "\n\nPlease check the console for more details.",
+                        e
                     );
                 } catch (Exception dialogError) {
                     // If even the error dialog fails, just exit

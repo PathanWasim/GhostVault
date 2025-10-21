@@ -727,8 +727,9 @@ public class VaultRestoreDialog {
                     break;
                 }
                 
+                final ZipEntry currentEntry = entry;
                 Platform.runLater(() -> {
-                    currentFileLabel.setText("Extracting: " + entry.getName());
+                    currentFileLabel.setText("Extracting: " + currentEntry.getName());
                     currentFileProgress.setProgress(0);
                 });
                 
