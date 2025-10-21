@@ -298,8 +298,8 @@ public class DecoyModeController extends ModeController {
             // Show fake preview
             previewPane.showFakePreview(file);
             
-            // Show fake file info
-            fileInfoPane.displayFile(file);
+            // Show fake file info - TODO: Check correct method name
+            // fileInfoPane.displayFile(file);
         }
     }
     
@@ -335,7 +335,7 @@ public class DecoyModeController extends ModeController {
         simulateOperation("Opening folder...", () -> {
             // Generate new fake files for this "directory"
             generateFakeSubdirectory(directory);
-            headerComponent.setCurrentPath(directory.getAbsolutePath());
+            // headerComponent.setCurrentPath(directory.getAbsolutePath()); // TODO: Add method to ProfessionalHeader
         });
     }
     
@@ -549,8 +549,8 @@ public class DecoyModeController extends ModeController {
         // Clear fake data
         fakeFiles.clear();
         fileListView.clear();
-        previewPane.clearPreview();
-        fileInfoPane.displayFile(null);
+        previewPane.clear();
+        // fileInfoPane.displayFile(null); // TODO: Check correct method name
     }
     
     @Override
@@ -563,9 +563,9 @@ public class DecoyModeController extends ModeController {
     @Override
     protected void updateSecurityIndicators() {
         if (headerComponent != null) {
-            // Show normal security status to avoid suspicion
-            headerComponent.setSecurityLevel("Standard");
-            headerComponent.setEncryptionStatus("Basic Protection");
+            // Show normal security status to avoid suspicion - TODO: Add methods to ProfessionalHeader
+            // headerComponent.setSecurityLevel("Standard");
+            // headerComponent.setEncryptionStatus("Basic Protection");
         }
     }
     

@@ -10,6 +10,7 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 
 import java.io.File;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
 
@@ -183,10 +184,14 @@ public class BatchOperationsBar extends VBox {
     
     public void setOnDownload(Consumer<List<Object>> callback) {
         // Convert to File consumer
-        this.onCopySelected = files -> {
+        this.onCopySelected = (List<File> files) -> {
             if (callback != null) {
                 List<Object> objectList = new ArrayList<>();
-                objectList.addAll(files);
+                if (files != null) {
+                    for (File file : files) {
+                        objectList.add(file);
+                    }
+                }
                 callback.accept(objectList);
             }
         };
@@ -194,10 +199,14 @@ public class BatchOperationsBar extends VBox {
     
     public void setOnDelete(Consumer<List<Object>> callback) {
         // Convert to File consumer
-        this.onDeleteSelected = files -> {
+        this.onDeleteSelected = (List<File> files) -> {
             if (callback != null) {
                 List<Object> objectList = new ArrayList<>();
-                objectList.addAll(files);
+                if (files != null) {
+                    for (File file : files) {
+                        objectList.add(file);
+                    }
+                }
                 callback.accept(objectList);
             }
         };
@@ -205,10 +214,14 @@ public class BatchOperationsBar extends VBox {
     
     public void setOnMove(Consumer<List<Object>> callback) {
         // Convert to File consumer
-        this.onMoveSelected = files -> {
+        this.onMoveSelected = (List<File> files) -> {
             if (callback != null) {
                 List<Object> objectList = new ArrayList<>();
-                objectList.addAll(files);
+                if (files != null) {
+                    for (File file : files) {
+                        objectList.add(file);
+                    }
+                }
                 callback.accept(objectList);
             }
         };
@@ -216,10 +229,14 @@ public class BatchOperationsBar extends VBox {
     
     public void setOnCopy(Consumer<List<Object>> callback) {
         // Convert to File consumer
-        this.onCopySelected = files -> {
+        this.onCopySelected = (List<File> files) -> {
             if (callback != null) {
                 List<Object> objectList = new ArrayList<>();
-                objectList.addAll(files);
+                if (files != null) {
+                    for (File file : files) {
+                        objectList.add(file);
+                    }
+                }
                 callback.accept(objectList);
             }
         };

@@ -67,7 +67,7 @@ public class BulkOperationsToolbar extends HBox {
             }
         });
         
-        moveSelectedButton = new Button(ModernIcons.CUT + " Move");
+        moveSelectedButton = new Button(ModernIcons.MOVE + " Move");
         moveSelectedButton.getStyleClass().addAll("button");
         moveSelectedButton.setOnAction(e -> {
             if (selectedFiles != null && !selectedFiles.isEmpty() && onMoveSelected != null) {
