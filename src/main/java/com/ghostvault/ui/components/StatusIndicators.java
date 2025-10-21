@@ -279,19 +279,19 @@ public class StatusIndicators {
     private static Color getStatusColor(StatusType status) {
         switch (status) {
             case SUCCESS: case COMPLETE: case ONLINE: case SECURE: case ENCRYPTED:
-                return ModernIcons.ICON_SUCCESS;
+                return Color.GREEN;
             case ERROR: case INSECURE:
-                return ModernIcons.ICON_DANGER;
+                return Color.RED;
             case WARNING: case DECRYPTED:
-                return ModernIcons.ICON_WARNING;
+                return Color.ORANGE;
             case INFO:
-                return ModernIcons.ICON_INFO;
+                return Color.BLUE;
             case LOADING: case SYNCING:
-                return ModernIcons.ICON_PRIMARY;
+                return Color.GRAY;
             case OFFLINE:
-                return ModernIcons.ICON_MUTED;
+                return Color.DARKGRAY;
             default:
-                return ModernIcons.ICON_MUTED;
+                return Color.GRAY;
         }
     }
     
