@@ -331,4 +331,16 @@ public class PanicModeExecutor {
         
         return size;
     }
+    
+    /**
+     * Activate panic mode with default settings
+     */
+    public void activatePanicMode() {
+        try {
+            Path vaultRoot = Paths.get(System.getProperty("user.home"), ".ghostvault");
+            executePanic(vaultRoot, false);
+        } catch (Exception e) {
+            System.err.println("Failed to activate panic mode: " + e.getMessage());
+        }
+    }
 }

@@ -16,7 +16,7 @@ public class KeyboardShortcutManager {
     
     private static KeyboardShortcutManager instance;
     private Map<KeyCombination, Runnable> shortcuts = new HashMap<>();
-    private Map<String, KeyCombination> namedShortcuts = new HashMap<>();
+    Map<String, KeyCombination> namedShortcuts = new HashMap<>();
     private Scene currentScene;
     
     private KeyboardShortcutManager() {

@@ -55,12 +55,12 @@ public class MainApplicationController {
         modeControllers = new HashMap<>();
         
         // Initialize mode controllers
-        modeControllers.put(ModeController.VaultMode.MASTER, new MasterModeController());
-        modeControllers.put(ModeController.VaultMode.PANIC, new PanicModeController());
-        modeControllers.put(ModeController.VaultMode.DECOY, new DecoyModeController());
+        modeControllers.put(ModeController.VaultMode.MASTER, new MasterModeController(primaryStage));
+        modeControllers.put(ModeController.VaultMode.PANIC, new PanicModeController(primaryStage));
+        modeControllers.put(ModeController.VaultMode.DECOY, new DecoyModeController(primaryStage));
         
         // Initialize authentication controller
-        authController = new AuthenticationController();
+        authController = new AuthenticationController(primaryStage);
         
         // Set current mode controller
         currentModeController = modeControllers.get(currentMode);
@@ -74,7 +74,7 @@ public class MainApplicationController {
         dragDropUploader = new DragDropFileUploader();
         
         // Initialize context menu manager
-        contextMenuManager = new FileContextMenuManager(fileOperations);
+        contextMenuManager = new FileContextMenuManager();
         setupContextMenuHandlers();
     }
     

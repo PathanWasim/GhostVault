@@ -21,7 +21,7 @@ import java.util.stream.Collectors;
 public class FileSearchAndFilterSystem extends VBox {
     
     // UI Components
-    private ModernSearchBar<File> searchBar;
+    private ModernSearchBar searchBar;
     private HBox filterBar;
     private ComboBox<String> fileTypeFilter;
     private ComboBox<String> sizeFilter;
@@ -57,7 +57,7 @@ public class FileSearchAndFilterSystem extends VBox {
      */
     private void initializeComponents() {
         // Search bar
-        searchBar = new ModernSearchBar<>();
+        searchBar = new ModernSearchBar();
         searchBar.setRealTimeSearch(true);
         searchBar.setMinSearchLength(1);
         searchBar.setSearchDelay(300);

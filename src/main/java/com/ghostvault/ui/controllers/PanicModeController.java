@@ -434,8 +434,10 @@ public class PanicModeController extends ModeController {
                     bytesWritten += bytesToWrite;
                 }
                 
-                // Force write to disk
-                channel.force(true);
+                // Force write to disk (if it's a FileChannel)
+                if (channel instanceof java.nio.channels.FileChannel) {
+                    ((java.nio.channels.FileChannel) channel).force(true);
+                }
             }
         }
         

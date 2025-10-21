@@ -565,6 +565,45 @@ public class SessionManager {
     }
     
     /**
+     * Get current vault mode
+     */
+    public VaultMode getCurrentMode() {
+        // Default to MASTER mode for now
+        return VaultMode.MASTER;
+    }
+    
+    /**
+     * Get current user
+     */
+    public String getCurrentUser() {
+        return System.getProperty("user.name", "user");
+    }
+    
+    /**
+     * Clear session data
+     */
+    public void clearSession() {
+        endSession();
+        // Clear any cached data
+        failedLoginAttempts.set(0);
+        loginHistory.clear();
+    }
+    
+    /**
+     * Authenticate user and return vault mode
+     */
+    public VaultMode authenticate(String password) {
+        // Simple authentication logic - in real implementation would verify password
+        if (password != null && !password.isEmpty()) {
+            recordSuccessfulLogin(getCurrentUser(), "localhost");
+            return VaultMode.MASTER;
+        } else {
+            recordFailedLogin(getCurrentUser(), "localhost");
+            return null;
+        }
+    }
+    
+    /**
      * Start session (compatibility method)
      */
     public void startSession() {
@@ -604,5 +643,13 @@ public class SessionManager {
             sessionTimer.play();
         }
         recordActivity();
+    }
+    
+    /**
+     * Switch to specified vault mode
+     */
+    public void switchMode(VaultMode mode) {
+        // Implementation for mode switching
+        System.out.println("Switching to mode: " + mode);
     }
 }

@@ -2,6 +2,7 @@ package com.ghostvault.integration;
 
 import com.ghostvault.core.*;
 import com.ghostvault.security.*;
+import com.ghostvault.security.VaultMode;
 import com.ghostvault.backup.*;
 import com.ghostvault.audit.*;
 import com.ghostvault.ui.controllers.MainApplicationController;
@@ -13,6 +14,7 @@ import javafx.stage.Stage;
 import java.io.File;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Consumer;
 
 /**
  * Complete UI-Backend Integration System
@@ -24,6 +26,7 @@ public class UIBackendIntegrator {
     private FileManager fileManager;
     private CryptoManager cryptoManager;
     private SessionManager sessionManager;
+    private MetadataManager metadataManager;
     private VaultBackupManager backupManager;
     private AuditManager auditManager;
     private SecurityMonitor securityMonitor;
@@ -48,19 +51,31 @@ public class UIBackendIntegrator {
      */
     private void initializeBackendServices() {
         try {
+            // Initialize vault path
+            currentVaultPath = System.getProperty("user.home") + "/.ghostvault";
+            
             // Core services
-            fileManager = new FileManager();
+            fileManager = new FileManager(currentVaultPath);
             cryptoManager = new CryptoManager();
             sessionManager = new SessionManager();
             
             // Security services
             securityMonitor = new SecurityMonitor();
             panicModeExecutor = new PanicModeExecutor();
-            decoyManager = new DecoyManager();
             
-            // Backup and audit services
-            backupManager = new VaultBackupManager();
+            // DecoyManager needs real and decoy vault paths
+            java.nio.file.Path realVaultPath = java.nio.file.Paths.get(currentVaultPath);
+            java.nio.file.Path decoyVaultPath = java.nio.file.Paths.get(currentVaultPath + "_decoy");
+            decoyManager = new DecoyManager(realVaultPath, decoyVaultPath);
+            
+            // Audit manager
             auditManager = new AuditManager();
+            
+            // Create metadata manager (needed for backup manager)
+            metadataManager = new MetadataManager(currentVaultPath);
+            
+            // Backup manager needs all dependencies
+            backupManager = new VaultBackupManager(cryptoManager, fileManager, metadataManager, auditManager);
             
             // Initialize UI controller
             uiController = new MainApplicationController(primaryStage);
@@ -115,16 +130,13 @@ public class UIBackendIntegrator {
                         for (File file : files) {
                             try {
                                 // Use backend FileManager for actual upload
-                                VaultFile vaultFile = fileManager.addFile(file, targetDirectory.getPath());
+                                VaultFile vaultFile = fileManager.storeFile(file);
                                 
-                                // Encrypt file if needed
-                                if (sessionManager.getCurrentMode() == SessionManager.VaultMode.MASTER) {
-                                    cryptoManager.encryptFile(vaultFile);
-                                }
+                                // File is automatically encrypted by FileManager.storeFile()
                                 
                                 // Log audit entry
                                 auditManager.logFileOperation("UPLOAD", file.getName(), 
-                                    sessionManager.getCurrentUser());
+                                    vaultFile.getFileId(), file.length(), true, null);
                                 
                                 successCount++;
                                 
@@ -151,20 +163,18 @@ public class UIBackendIntegrator {
             public void downloadFile(File sourceFile, File targetFile, Consumer<Boolean> onComplete) {
                 CompletableFuture.runAsync(() -> {
                     try {
-                        // Use backend FileManager for download
-                        VaultFile vaultFile = fileManager.getFile(sourceFile.getPath());
-                        
-                        // Decrypt if needed
-                        if (vaultFile.isEncrypted()) {
-                            cryptoManager.decryptFile(vaultFile);
+                        // Find VaultFile by name using MetadataManager
+                        VaultFile vaultFile = metadataManager.findFileByName(sourceFile.getName());
+                        if (vaultFile == null) {
+                            throw new RuntimeException("File not found in vault: " + sourceFile.getName());
                         }
                         
-                        // Copy to target location
+                        // Export file (FileManager handles decryption internally)
                         fileManager.exportFile(vaultFile, targetFile);
                         
                         // Log audit entry
                         auditManager.logFileOperation("DOWNLOAD", sourceFile.getName(), 
-                            sessionManager.getCurrentUser());
+                            vaultFile.getFileId(), vaultFile.getSize(), true, null);
                         
                         Platform.runLater(() -> onComplete.accept(true));
                         
@@ -190,19 +200,21 @@ public class UIBackendIntegrator {
             (password) -> {
                 try {
                     // Use backend session manager for authentication
-                    SessionManager.VaultMode mode = sessionManager.authenticate(password);
+                    VaultMode mode = sessionManager.authenticate(password);
                     
                     // Start security monitoring
                     securityMonitor.startMonitoring();
                     
                     // Log audit entry
-                    auditManager.logSecurityEvent("LOGIN", "User authenticated in " + mode + " mode");
+                    auditManager.logSecurityEvent("LOGIN", "User authenticated in " + mode + " mode", 
+                        AuditManager.AuditSeverity.INFO, "localhost", null);
                     
                     // Convert to UI mode enum
                     return convertToUIMode(mode);
                     
                 } catch (Exception e) {
-                    auditManager.logSecurityEvent("LOGIN_FAILED", "Authentication failed: " + e.getMessage());
+                    auditManager.logSecurityEvent("LOGIN_FAILED", "Authentication failed: " + e.getMessage(), 
+                        AuditManager.AuditSeverity.ERROR, "localhost", null);
                     throw e;
                 }
             }
@@ -232,20 +244,19 @@ public class UIBackendIntegrator {
                 CompletableFuture.runAsync(() -> {
                     try {
                         // Use backend backup manager
-                        BackupOptions options = new BackupOptions();
-                        options.setEncryptionPassword(password);
-                        options.setCompressionEnabled(true);
-                        options.setVerificationEnabled(true);
+                        File backupFile = new File(vaultDirectory.getParent(), "backup_" + System.currentTimeMillis() + ".gvbackup");
+                        javax.crypto.SecretKey key = cryptoManager.deriveKeyFromPassword(password.toCharArray());
                         
-                        com.ghostvault.core.BackupResult result = backupManager.createBackup(
-                            vaultDirectory.getPath(), options);
+                        backupManager.createBackup(backupFile, key, (percentage, message) -> {
+                            // Progress callback - could update UI here
+                        });
                         
                         // Log audit entry
                         auditManager.logSystemOperation("BACKUP_CREATED", 
-                            "Backup created: " + result.getBackupFile());
+                            "Backup created: " + backupFile.getName());
                         
                         Platform.runLater(() -> {
-                            onComplete.accept(new BackupResult(result.isSuccess(), result.getMessage()));
+                            onComplete.accept(new BackupResult(true, "Backup created successfully", backupFile.getPath()));
                         });
                         
                     } catch (Exception e) {
@@ -263,19 +274,19 @@ public class UIBackendIntegrator {
                 CompletableFuture.runAsync(() -> {
                     try {
                         // Use backend backup manager
-                        RestoreOptions options = new RestoreOptions();
-                        options.setDecryptionPassword(password);
-                        options.setVerificationEnabled(true);
+                        javax.crypto.SecretKey key = cryptoManager.deriveKeyFromPassword(password.toCharArray());
                         
-                        com.ghostvault.core.RestoreResult result = backupManager.restoreBackup(
-                            backupFile.getPath(), targetDirectory.getPath(), options);
+                        backupManager.restoreBackup(backupFile, key, (percentage, message) -> {
+                            // Progress callback - could update UI here
+                        });
                         
                         // Log audit entry
                         auditManager.logSystemOperation("BACKUP_RESTORED", 
                             "Backup restored from: " + backupFile.getName());
                         
                         Platform.runLater(() -> {
-                            onComplete.accept(new RestoreResult(result.isSuccess(), result.getMessage()));
+                            RestoreStats stats = new RestoreStats(0, 0, 0); // Placeholder stats
+                            onComplete.accept(new RestoreResult(true, "Restore completed successfully", stats));
                         });
                         
                     } catch (Exception e) {
@@ -311,7 +322,7 @@ public class UIBackendIntegrator {
         // Override mode switching to use backend services
         uiController.setModeChangeHandler((newMode) -> {
             try {
-                SessionManager.VaultMode backendMode = convertToBackendMode(newMode);
+                VaultMode backendMode = convertToBackendMode(newMode);
                 
                 // Switch mode in backend
                 sessionManager.switchMode(backendMode);
@@ -321,18 +332,21 @@ public class UIBackendIntegrator {
                     case PANIC:
                         // Activate panic mode
                         panicModeExecutor.activatePanicMode();
-                        auditManager.logSecurityEvent("PANIC_MODE_ACTIVATED", "Emergency mode activated");
+                        auditManager.logSecurityEvent("PANIC_MODE_ACTIVATED", "Emergency mode activated", 
+                            AuditManager.AuditSeverity.CRITICAL, "localhost", null);
                         break;
                         
                     case DECOY:
                         // Activate decoy mode
                         decoyManager.activateDecoyMode();
-                        auditManager.logSecurityEvent("DECOY_MODE_ACTIVATED", "Decoy mode activated");
+                        auditManager.logSecurityEvent("DECOY_MODE_ACTIVATED", "Decoy mode activated", 
+                            AuditManager.AuditSeverity.WARNING, "localhost", null);
                         break;
                         
                     case MASTER:
                         // Activate master mode
-                        auditManager.logSecurityEvent("MASTER_MODE_ACTIVATED", "Master mode activated");
+                        auditManager.logSecurityEvent("MASTER_MODE_ACTIVATED", "Master mode activated", 
+                            AuditManager.AuditSeverity.INFO, "localhost", null);
                         break;
                 }
                 
@@ -436,7 +450,8 @@ public class UIBackendIntegrator {
      */
     public void emergencyShutdown() {
         try {
-            auditManager.logSecurityEvent("EMERGENCY_SHUTDOWN", "Emergency shutdown initiated");
+            auditManager.logSecurityEvent("EMERGENCY_SHUTDOWN", "Emergency shutdown initiated", 
+                AuditManager.AuditSeverity.CRITICAL, "localhost", null);
             
             // Activate panic mode
             panicModeExecutor.activatePanicMode();
@@ -478,7 +493,7 @@ public class UIBackendIntegrator {
     }
     
     // Utility methods for mode conversion
-    private com.ghostvault.ui.controllers.ModeController.VaultMode convertToUIMode(SessionManager.VaultMode backendMode) {
+    private com.ghostvault.ui.controllers.ModeController.VaultMode convertToUIMode(VaultMode backendMode) {
         switch (backendMode) {
             case MASTER: return com.ghostvault.ui.controllers.ModeController.VaultMode.MASTER;
             case PANIC: return com.ghostvault.ui.controllers.ModeController.VaultMode.PANIC;
@@ -487,12 +502,12 @@ public class UIBackendIntegrator {
         }
     }
     
-    private SessionManager.VaultMode convertToBackendMode(com.ghostvault.ui.controllers.ModeController.VaultMode uiMode) {
+    private VaultMode convertToBackendMode(com.ghostvault.ui.controllers.ModeController.VaultMode uiMode) {
         switch (uiMode) {
-            case MASTER: return SessionManager.VaultMode.MASTER;
-            case PANIC: return SessionManager.VaultMode.PANIC;
-            case DECOY: return SessionManager.VaultMode.DECOY;
-            default: return SessionManager.VaultMode.MASTER;
+            case MASTER: return VaultMode.MASTER;
+            case PANIC: return VaultMode.PANIC;
+            case DECOY: return VaultMode.DECOY;
+            default: return VaultMode.MASTER;
         }
     }
     

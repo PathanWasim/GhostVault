@@ -637,6 +637,38 @@ public class SecurityMonitor {
     }
     
     /**
+     * Set threat detection callback
+     */
+    public void setOnThreatDetected(java.util.function.Consumer<ThreatInfo> callback) {
+        // Add a listener that calls the callback
+        alertListeners.add(alert -> {
+            ThreatInfo threat = new ThreatInfo(alert.getMessage(), ThreatLevel.HIGH);
+            callback.accept(threat);
+        });
+    }
+    
+    /**
+     * Threat information class
+     */
+    public static class ThreatInfo {
+        private final String description;
+        private final ThreatLevel severity;
+        
+        public ThreatInfo(String description, ThreatLevel severity) {
+            this.description = description;
+            this.severity = severity;
+        }
+        
+        public String getDescription() {
+            return description;
+        }
+        
+        public ThreatLevel getSeverity() {
+            return severity;
+        }
+    }
+    
+    /**
      * Security alert listener interface
      */
     public interface SecurityAlertListener {

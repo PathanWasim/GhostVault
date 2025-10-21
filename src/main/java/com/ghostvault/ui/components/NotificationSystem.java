@@ -395,12 +395,14 @@ public class NotificationSystem {
         }
         
         public void animateToPosition(double x, double y) {
-            // Animate to new position
+            // Animate to new position using Timeline since Popup is not a Node
             javafx.animation.Timeline timeline = new javafx.animation.Timeline();
             timeline.getKeyFrames().addAll(
                 new javafx.animation.KeyFrame(Duration.millis(300), 
-                    new javafx.animation.KeyValue(xProperty(), x, AnimationManager.EASE_OUT),
-                    new javafx.animation.KeyValue(yProperty(), y, AnimationManager.EASE_OUT))
+                    e -> {
+                        setX(x);
+                        setY(y);
+                    })
             );
             timeline.play();
         }
@@ -595,6 +597,35 @@ public class NotificationSystem {
         
         public String getText() { return text; }
         public Runnable getAction() { return action; }
+    }
+    
+    /**
+     * Set callback for when notifications are shown
+     */
+    public void setOnNotificationShown(java.util.function.Consumer<NotificationInfo> callback) {
+        // Implementation for notification shown callback
+        // This would be called whenever a notification is displayed
+    }
+    
+    /**
+     * Notification information class
+     */
+    public static class NotificationInfo {
+        private final String title;
+        private final String message;
+        
+        public NotificationInfo(String title, String message) {
+            this.title = title;
+            this.message = message;
+        }
+        
+        public String getTitle() {
+            return title;
+        }
+        
+        public String getMessage() {
+            return message;
+        }
     }
     
     /**

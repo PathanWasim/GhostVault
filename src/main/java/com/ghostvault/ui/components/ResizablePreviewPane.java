@@ -398,4 +398,17 @@ public class ResizablePreviewPane extends VBox {
     public double getPreferredWidth() {
         return isVisible ? getPrefWidth() : 0;
     }
+    
+    /**
+     * Show fake preview for decoy mode
+     */
+    public void showFakePreview(java.io.File file) {
+        // Show a fake preview that looks real but doesn't reveal actual content
+        clear();
+        if (file != null) {
+            Label fakeLabel = new Label("Fake preview for: " + file.getName());
+            fakeLabel.getStyleClass().add("fake-preview");
+            previewContainer.getChildren().add(fakeLabel);
+        }
+    }
 }

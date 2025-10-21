@@ -143,6 +143,16 @@ public class MetadataManager {
     }
     
     /**
+     * Find file by name
+     */
+    public VaultFile findFileByName(String fileName) {
+        return fileRegistry.values().stream()
+                .filter(file -> file.getOriginalName().equals(fileName))
+                .findFirst()
+                .orElse(null);
+    }
+    
+    /**
      * Get files by extension
      */
     public List<VaultFile> getFilesByExtension(String extension) {

@@ -4,6 +4,7 @@ import com.ghostvault.backup.VaultBackupManager;
 import com.ghostvault.core.DecoyManager;
 import com.ghostvault.core.FileManager;
 import com.ghostvault.core.MetadataManager;
+import com.ghostvault.ui.animations.AnimationManager;
 import javafx.animation.FadeTransition;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;

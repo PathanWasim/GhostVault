@@ -47,7 +47,10 @@ public class DecoyModeController extends ModeController {
     
     public DecoyModeController(Stage primaryStage) {
         super(primaryStage, VaultMode.DECOY);
-        this.decoyManager = new DecoyManager();
+        // Initialize DecoyManager with default paths
+        java.nio.file.Path realVaultPath = java.nio.file.Paths.get(System.getProperty("user.home"), ".ghostvault", "real");
+        java.nio.file.Path decoyVaultPath = java.nio.file.Paths.get(System.getProperty("user.home"), ".ghostvault", "decoy");
+        this.decoyManager = new DecoyManager(realVaultPath, decoyVaultPath);
     }
     
     @Override

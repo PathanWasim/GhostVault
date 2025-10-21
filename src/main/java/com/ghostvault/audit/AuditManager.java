@@ -249,6 +249,36 @@ public class AuditManager {
     }
     
     /**
+     * Log system event
+     */
+    public void logSystemEvent(String event, String description) {
+        logAuditEvent(AuditCategory.SYSTEM_EVENTS, AuditSeverity.INFO, 
+            event, description, null);
+    }
+    
+    /**
+     * Log system event with severity
+     */
+    public void logSystemEvent(String event, String description, String severity) {
+        AuditSeverity auditSeverity;
+        try {
+            auditSeverity = AuditSeverity.valueOf(severity.toUpperCase());
+        } catch (Exception e) {
+            auditSeverity = AuditSeverity.INFO;
+        }
+        logAuditEvent(AuditCategory.SYSTEM_EVENTS, auditSeverity, 
+            event, description, null);
+    }
+    
+    /**
+     * Log system operation
+     */
+    public void logSystemOperation(String operation, String description) {
+        logAuditEvent(AuditCategory.SYSTEM_EVENTS, AuditSeverity.INFO, 
+            operation, description, null);
+    }
+    
+    /**
      * Core audit logging method
      */
     private void logAuditEvent(AuditCategory category, AuditSeverity severity, 

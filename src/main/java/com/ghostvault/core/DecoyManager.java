@@ -1255,4 +1255,24 @@ public class DecoyManager {
             System.out.println("✓ Generated " + needed + " additional decoy files to reach minimum of " + minimumCount);
         }
     }
+    
+    /**
+     * Create a fake file object for UI display (doesn't create actual file)
+     */
+    public File createFakeFile(File parentDir, String fileName) {
+        return new File(parentDir, fileName);
+    }
+    
+    /**
+     * Activate decoy mode
+     */
+    public void activateDecoyMode() {
+        try {
+            // Ensure decoy vault exists and is populated
+            initializeDecoyVault();
+            System.out.println("✓ Decoy mode activated");
+        } catch (Exception e) {
+            System.err.println("✗ Failed to activate decoy mode: " + e.getMessage());
+        }
+    }
 }

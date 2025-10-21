@@ -487,10 +487,5 @@ public class AuthenticationController {
         this.authenticationProvider = provider;
     }
     
-    /**
-     * Get scene for integration
-     */
-    public Scene getScene() {
-        return scene;
-    }
+
 }

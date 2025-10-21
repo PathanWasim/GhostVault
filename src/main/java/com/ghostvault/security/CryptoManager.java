@@ -265,6 +265,28 @@ public class CryptoManager {
     }
     
     /**
+     * Derive key from password using PBKDF2
+     */
+    public SecretKey deriveKeyFromPassword(char[] password) throws GeneralSecurityException {
+        return deriveKeyFromPassword(password, "default_salt".getBytes());
+    }
+    
+    /**
+     * Derive key from password using PBKDF2 with salt
+     */
+    public SecretKey deriveKeyFromPassword(char[] password, byte[] salt) throws GeneralSecurityException {
+        try {
+            javax.crypto.spec.PBEKeySpec spec = new javax.crypto.spec.PBEKeySpec(password, salt, 100000, 256);
+            javax.crypto.SecretKeyFactory factory = javax.crypto.SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
+            byte[] keyBytes = factory.generateSecret(spec).getEncoded();
+            return new SecretKeySpec(keyBytes, "AES");
+        } finally {
+            // Clear password from memory
+            Arrays.fill(password, '\0');
+        }
+    }
+    
+    /**
      * Container for encrypted data (backward compatibility)
      * Note: HMAC field is deprecated and unused in GCM mode
      */

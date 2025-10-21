@@ -58,20 +58,16 @@ public class AnimationManager {
     public static Timeline fadeIn(Node node, Duration duration, Runnable onFinished) {
         node.setOpacity(0);
         
-        FadeTransition fade = new FadeTransition(duration, node);
-        fade.setFromValue(0);
-        fade.setToValue(1);
-        fade.setInterpolator(EASE_OUT);
+        // Create a timeline that does the same thing
+        Timeline timeline = new Timeline();
+        timeline.getKeyFrames().add(new KeyFrame(duration, new KeyValue(node.opacityProperty(), 1, EASE_OUT)));
         
         if (onFinished != null) {
-            fade.setOnFinished(e -> onFinished.run());
+            timeline.setOnFinished(e -> onFinished.run());
         }
         
-        Timeline timeline = new Timeline();
-        timeline.getKeyFrames().add(new KeyFrame(duration, fade.getKeyFrames().get(0).getValues().toArray(new KeyValue[0])));
-        
         getInstance().trackAnimation(node, timeline);
-        fade.play();
+        timeline.play();
         
         return timeline;
     }
@@ -88,20 +84,18 @@ public class AnimationManager {
     }
     
     public static Timeline fadeOut(Node node, Duration duration, Runnable onFinished) {
-        FadeTransition fade = new FadeTransition(duration, node);
-        fade.setFromValue(node.getOpacity());
-        fade.setToValue(0);
-        fade.setInterpolator(EASE_IN);
+        double currentOpacity = node.getOpacity();
+        
+        // Create a timeline that does the same thing
+        Timeline timeline = new Timeline();
+        timeline.getKeyFrames().add(new KeyFrame(duration, new KeyValue(node.opacityProperty(), 0, EASE_IN)));
         
         if (onFinished != null) {
-            fade.setOnFinished(e -> onFinished.run());
+            timeline.setOnFinished(e -> onFinished.run());
         }
         
-        Timeline timeline = new Timeline();
-        timeline.getKeyFrames().add(new KeyFrame(duration, fade.getKeyFrames().get(0).getValues().toArray(new KeyValue[0])));
-        
         getInstance().trackAnimation(node, timeline);
-        fade.play();
+        timeline.play();
         
         return timeline;
     }
@@ -515,6 +509,70 @@ public class AnimationManager {
         getInstance().stopAllActiveAnimations();
     }
     
+    /**
+     * Smooth scene transition
+     */
+    public static void smoothSceneTransition(javafx.stage.Stage stage, javafx.scene.Scene newScene, Runnable onComplete) {
+        if (stage.getScene() != null) {
+            fadeOut(stage.getScene().getRoot(), FAST, () -> {
+                stage.setScene(newScene);
+                fadeIn(newScene.getRoot(), FAST, onComplete);
+            });
+        } else {
+            stage.setScene(newScene);
+            if (onComplete != null) onComplete.run();
+        }
+    }
+    
+    /**
+     * Success glow animation
+     */
+    public static Timeline successGlow(Node node) {
+        return glow(node, Color.GREEN, NORMAL);
+    }
+    
+    /**
+     * Error glow animation
+     */
+    public static Timeline errorGlow(Node node) {
+        return glow(node, Color.RED, NORMAL);
+    }
+    
+    /**
+     * Continuous rotate animation
+     */
+    public static RotateTransition continuousRotate(Node node) {
+        RotateTransition rotate = new RotateTransition(Duration.seconds(2), node);
+        rotate.setFromAngle(0);
+        rotate.setToAngle(360);
+        rotate.setCycleCount(Timeline.INDEFINITE);
+        rotate.setInterpolator(Interpolator.LINEAR);
+        return rotate;
+    }
+    
+    /**
+     * Animate progress bar
+     */
+    public static Timeline animateProgress(javafx.scene.control.ProgressBar progressBar, double from, double to) {
+        Timeline timeline = new Timeline();
+        timeline.getKeyFrames().add(new KeyFrame(NORMAL, 
+            new KeyValue(progressBar.progressProperty(), to, EASE_OUT)));
+        return timeline;
+    }
+    
+    /**
+     * Typewriter effect
+     */
+    public static Timeline typewriter(javafx.scene.control.Label label, String text) {
+        Timeline timeline = new Timeline();
+        for (int i = 0; i <= text.length(); i++) {
+            final int index = i;
+            timeline.getKeyFrames().add(new KeyFrame(Duration.millis(i * 50), 
+                e -> label.setText(text.substring(0, index))));
+        }
+        return timeline;
+    }
+    
     // Private methods
     
     private void trackAnimation(Node node, Timeline timeline) {
@@ -568,6 +626,33 @@ public class AnimationManager {
         public void play() {
             sequence.play();
         }
+    }
+    
+    /**
+     * Slide out to right animation
+     */
+    public static Timeline slideOutToRight(Node node) {
+        return slideOutToRight(node, NORMAL, null);
+    }
+    
+    public static Timeline slideOutToRight(Node node, Duration duration, Runnable onFinished) {
+        TranslateTransition slide = new TranslateTransition(duration, node);
+        slide.setFromX(node.getTranslateX());
+        slide.setToX(node.getBoundsInParent().getWidth());
+        slide.setInterpolator(EASE_IN);
+        
+        if (onFinished != null) {
+            slide.setOnFinished(e -> onFinished.run());
+        }
+        
+        Timeline timeline = new Timeline();
+        timeline.getKeyFrames().add(new KeyFrame(duration, 
+            new KeyValue(node.translateXProperty(), node.getBoundsInParent().getWidth(), EASE_IN)));
+        
+        getInstance().trackAnimation(node, timeline);
+        slide.play();
+        
+        return timeline;
     }
     
     /**
