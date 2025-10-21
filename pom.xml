@@ -27,7 +27,7 @@
         <testfx.version>4.0.16-alpha</testfx.version>
         
         <!-- Main Class -->
-        <main.class>com.ghostvault.GhostVault</main.class>
+        <main.class>com.ghostvault.GhostVaultIntegratedApplication</main.class>
         <preloader.class>com.ghostvault.ui.SplashScreenPreloader</preloader.class>
     </properties>
 

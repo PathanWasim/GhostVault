@@ -28,7 +28,7 @@ public class AnimationManager {
     public static final Interpolator EASE_OUT = Interpolator.SPLINE(0.25, 0.46, 0.45, 0.94);
     public static final Interpolator EASE_IN = Interpolator.SPLINE(0.55, 0.06, 0.68, 0.19);
     public static final Interpolator EASE_IN_OUT = Interpolator.SPLINE(0.42, 0, 0.58, 1);
-    public static final Interpolator BOUNCE = Interpolator.SPLINE(0.68, -0.55, 0.265, 1.55);
+    public static final Interpolator BOUNCE = Interpolator.SPLINE(0.68, 0.0, 0.265, 1.0);
     
     private AnimationManager() {
         // Private constructor for singleton
