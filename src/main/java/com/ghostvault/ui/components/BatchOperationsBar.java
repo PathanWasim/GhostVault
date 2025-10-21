@@ -185,7 +185,8 @@ public class BatchOperationsBar extends VBox {
         // Convert to File consumer
         this.onCopySelected = files -> {
             if (callback != null) {
-                List<Object> objectList = new ArrayList<>(files);
+                List<Object> objectList = new ArrayList<>();
+                objectList.addAll(files);
                 callback.accept(objectList);
             }
         };
@@ -195,7 +196,8 @@ public class BatchOperationsBar extends VBox {
         // Convert to File consumer
         this.onDeleteSelected = files -> {
             if (callback != null) {
-                List<Object> objectList = new ArrayList<>(files);
+                List<Object> objectList = new ArrayList<>();
+                objectList.addAll(files);
                 callback.accept(objectList);
             }
         };
@@ -205,7 +207,8 @@ public class BatchOperationsBar extends VBox {
         // Convert to File consumer
         this.onMoveSelected = files -> {
             if (callback != null) {
-                List<Object> objectList = new ArrayList<>(files);
+                List<Object> objectList = new ArrayList<>();
+                objectList.addAll(files);
                 callback.accept(objectList);
             }
         };
@@ -215,7 +218,8 @@ public class BatchOperationsBar extends VBox {
         // Convert to File consumer
         this.onCopySelected = files -> {
             if (callback != null) {
-                List<Object> objectList = new ArrayList<>(files);
+                List<Object> objectList = new ArrayList<>();
+                objectList.addAll(files);
                 callback.accept(objectList);
             }
         };

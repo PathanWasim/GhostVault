@@ -239,11 +239,11 @@ public class DecoyModeController extends ModeController {
      * Setup event handlers with fake responses
      */
     private void setupEventHandlers() {
-        // Header events with fake responses
-        headerComponent.setOnMenuAction(this::showFakeMenu);
-        headerComponent.setOnSettingsAction(this::showFakeSettings);
-        headerComponent.setOnLogoutAction(this::fakeLogout);
-        headerComponent.setOnExitAction(this::exitApplication);
+        // Header events with fake responses - TODO: Add these methods to ProfessionalHeader
+        // headerComponent.setOnMenuAction(this::showFakeMenu);
+        // headerComponent.setOnSettingsAction(this::showFakeSettings);
+        // headerComponent.setOnLogoutAction(this::fakeLogout);
+        // headerComponent.setOnExitAction(this::exitApplication);
     }
     
     /**
