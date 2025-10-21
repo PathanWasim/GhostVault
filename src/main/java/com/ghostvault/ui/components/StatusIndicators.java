@@ -316,10 +316,10 @@ public class StatusIndicators {
     
     private static double getIconSize(Size size) {
         switch (size) {
-            case SMALL: return ModernIcons.ICON_SMALL;
-            case MEDIUM: return ModernIcons.ICON_MEDIUM;
-            case LARGE: return ModernIcons.ICON_LARGE;
-            default: return ModernIcons.ICON_MEDIUM;
+            case SMALL: return 16.0;
+            case MEDIUM: return 24.0;
+            case LARGE: return 32.0;
+            default: return 24.0;
         }
     }
     

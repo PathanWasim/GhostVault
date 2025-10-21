@@ -455,24 +455,5 @@ public class MasterModeController extends ModeController {
             "Invalid credentials for Master Mode access.");
     }
     
-    // Event handler methods
-    private void showMainMenu() {
-        // TODO: Implement main menu
-        System.out.println("Show main menu");
-    }
-    
-    private void showSettings() {
-        // TODO: Implement settings dialog
-        System.out.println("Show settings");
-    }
-    
-    private void logout() {
-        // TODO: Implement logout functionality
-        System.out.println("Logout");
-    }
-    
-    private void exitApplication() {
-        // TODO: Implement exit functionality
-        System.out.println("Exit application");
-    }
+    // Duplicate methods removed - already exist above
 }

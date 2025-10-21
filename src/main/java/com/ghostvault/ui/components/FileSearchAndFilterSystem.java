@@ -506,7 +506,7 @@ public class FileSearchAndFilterSystem extends VBox {
     /**
      * Clear all filters and reset to defaults
      */
-    private void clearAllFilters() {
+    public void clearAllFilters() {
         fileTypeFilter.setValue("All Files");
         sizeFilter.setValue("Any Size");
         dateFilter.setValue("Any Date");

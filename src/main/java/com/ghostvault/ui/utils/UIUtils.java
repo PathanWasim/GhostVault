@@ -448,15 +448,7 @@ public class UIUtils {
         stage.setY((screenBounds.getHeight() - stage.getHeight()) / 2);
     }
     
-    /**
-     * Get file extension from file
-     */
-    public static String getFileExtension(File file) {
-        if (file == null) return "";
-        String name = file.getName();
-        int lastDot = name.lastIndexOf('.');
-        return lastDot > 0 ? name.substring(lastDot + 1) : "";
-    }
+    // Duplicate method removed - already exists above
     
     /**
      * Check if file is an image file
