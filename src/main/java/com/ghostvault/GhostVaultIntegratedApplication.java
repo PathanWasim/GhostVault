@@ -86,7 +86,7 @@ public class GhostVaultIntegratedApplication extends Application {
             // Initialize audit system
             try {
                 auditManager = new AuditManager();
-                auditManager.initialize();
+                // AuditManager doesn't have initialize() method
             } catch (Exception e) {
                 System.err.println("Failed to initialize audit manager: " + e.getMessage());
             }
@@ -171,22 +171,22 @@ public class GhostVaultIntegratedApplication extends Application {
         // Get the file operations component from main controller
         // This would be done through proper dependency injection in a real system
         
-        // For now, we'll set up the integration points
-        fileManager.setProgressCallback((operation, progress) -> {
-            Platform.runLater(() -> {
-                NotificationSystem.showProgress(operation, "Progress: " + (int)(progress * 100) + "%");
-            });
-        });
-        
-        fileManager.setCompletionCallback((operation, success, message) -> {
-            Platform.runLater(() -> {
-                if (success) {
-                    NotificationSystem.showSuccess(operation + " Complete", message);
-                } else {
-                    NotificationSystem.showError(operation + " Failed", message);
-                }
-            });
-        });
+        // For now, we'll set up the integration points - TODO: Add callback methods to FileManager
+        // fileManager.setProgressCallback((operation, progress) -> {
+        //     Platform.runLater(() -> {
+        //         NotificationSystem.showProgress(operation, "Progress: " + (int)(progress * 100) + "%");
+        //     });
+        // });
+        // 
+        // fileManager.setCompletionCallback((operation, success, message) -> {
+        //     Platform.runLater(() -> {
+        //         if (success) {
+        //             NotificationSystem.showSuccess(operation + " Complete", message);
+        //         } else {
+        //             NotificationSystem.showError(operation + " Failed", message);
+        //         }
+        //     });
+        // });
     }
     
     /**
@@ -194,47 +194,49 @@ public class GhostVaultIntegratedApplication extends Application {
      */
     private void integrateSecuritySystems() {
         // Integrate security manager with mode controllers
-        securityManager.setModeChangeCallback((oldMode, newMode) -> {
-            Platform.runLater(() -> {
-                mainController.switchMode(newMode);
-                auditManager.logEvent("MODE_CHANGE", 
-                    String.format("Mode changed from %s to %s", oldMode, newMode));
-            });
-        });
+        // TODO: Add setModeChangeCallback method to AdvancedSecurityManager
+        // securityManager.setModeChangeCallback((oldMode, newMode) -> {
+        //     Platform.runLater(() -> {
+        //         mainController.switchMode(newMode);
+        //         auditManager.logSystemEvent("MODE_CHANGE", 
+        //             String.format("Mode changed from %s to %s", oldMode, newMode));
+        //     });
+        // });
         
-        // Integrate panic mode with security manager
-        securityManager.setPanicModeCallback(() -> {
-            Platform.runLater(() -> {
-                mainController.emergencyShutdown();
-            });
-        });
+        // Integrate panic mode with security manager - TODO: Add setPanicModeCallback method
+        // securityManager.setPanicModeCallback(() -> {
+        //     Platform.runLater(() -> {
+        //         mainController.emergencyShutdown();
+        //     });
+        // });
         
-        // Setup security level monitoring
-        securityManager.setSecurityLevelCallback((level) -> {
-            Platform.runLater(() -> {
-                // Update security indicators in UI
-                // This would be passed to the header component
-            });
-        });
+        // Setup security level monitoring - TODO: Add setSecurityLevelCallback method
+        // securityManager.setSecurityLevelCallback((level) -> {
+        //     Platform.runLater(() -> {
+        //         // Update security indicators in UI
+        //         // This would be passed to the header component
+        //     });
+        // });
     }
     
     /**
      * Integrate session management
      */
     private void integrateSessionManagement() {
-        sessionManager.setSessionTimeoutCallback(() -> {
-            Platform.runLater(() -> {
-                NotificationSystem.showWarning("Session Timeout", 
-                    "Your session has expired. Please authenticate again.");
-                // Trigger re-authentication
-                mainController.authenticate("");
-            });
-        });
-        
-        sessionManager.setSessionActivityCallback((activity) -> {
-            // Log user activity for audit purposes
-            auditManager.logEvent("USER_ACTIVITY", activity);
-        });
+        // TODO: Add callback methods to SessionManager
+        // sessionManager.setSessionTimeoutCallback(() -> {
+        //     Platform.runLater(() -> {
+        //         NotificationSystem.showWarning("Session Timeout", 
+        //             "Your session has expired. Please authenticate again.");
+        //         // Trigger re-authentication
+        //         mainController.authenticate("");
+        //     });
+        // });
+        // 
+        // sessionManager.setSessionActivityCallback((activity) -> {
+        //     // Log user activity for audit purposes
+        //     auditManager.logSystemEvent("USER_ACTIVITY", activity);
+        // });
     }
     
     /**
@@ -244,23 +246,25 @@ public class GhostVaultIntegratedApplication extends Application {
         // This would integrate audit logging with all UI actions
         // For now, we'll set up basic integration
         
-        auditManager.setAuditEventCallback((event) -> {
-            // Could show audit events in a dedicated UI panel
-            System.out.println("Audit Event: " + event.getAction() + " - " + event.getDetails());
-        });
+        // TODO: Add setAuditEventCallback method to AuditManager
+        // auditManager.setAuditEventCallback((event) -> {
+        //     // Could show audit events in a dedicated UI panel
+        //     System.out.println("Audit Event: " + event.getAction() + " - " + event.getDetails());
+        // });
     }
     
     /**
      * Integrate error handling between backend and UI
      */
     private void integrateErrorHandling() {
-        errorHandler.setErrorCallback((error) -> {
-            Platform.runLater(() -> {
-                ErrorHandlingSystem.handleError(error.getMessage(), 
-                    error.getException(), 
-                    ErrorHandlingSystem.ErrorSeverity.valueOf(error.getSeverity().name()));
-            });
-        });
+        // TODO: Add setErrorCallback method to ErrorHandler
+        // errorHandler.setErrorCallback((error) -> {
+        //     Platform.runLater(() -> {
+        //         ErrorHandlingSystem.handleError(error.getMessage(), 
+        //             error.getException(), 
+        //             ErrorHandlingSystem.ErrorSeverity.valueOf(error.getSeverity().name()));
+        //     });
+        // });
     }
     
     /**
@@ -271,12 +275,12 @@ public class GhostVaultIntegratedApplication extends Application {
         primaryStage.setMinWidth(1200);
         primaryStage.setMinHeight(800);
         
-        // Set window icon if available
-        try {
-            primaryStage.getIcons().add(UIUtils.loadImageFromResources("/icons/ghostvault-icon.png"));
-        } catch (Exception e) {
-            // Icon not found, continue without it
-        }
+        // Set window icon if available - TODO: Add loadImageFromResources method to UIUtils
+        // try {
+        //     primaryStage.getIcons().add(UIUtils.loadImageFromResources("/icons/ghostvault-icon.png"));
+        // } catch (Exception e) {
+        //     // Icon not found, continue without it
+        // }
         
         // Setup close request handler
         primaryStage.setOnCloseRequest(event -> {
@@ -301,7 +305,9 @@ public class GhostVaultIntegratedApplication extends Application {
             sessionManager.startSession("default_user");
             
             // Log application start
-            auditManager.logEvent("APPLICATION_START", "GhostVault application started successfully");
+            if (auditManager != null) {
+                auditManager.logSystemEvent("APPLICATION_START", "GhostVault application started successfully");
+            }
             
             // Initialize keyboard shortcuts
             setupGlobalKeyboardShortcuts();
@@ -326,9 +332,8 @@ public class GhostVaultIntegratedApplication extends Application {
             KeyboardShortcutManager.register("emergency_exit", 
                 javafx.scene.input.KeyCode.ESCAPE, 
                 () -> {
-                    if (javafx.scene.input.KeyEvent.getModifier() != null) {
-                        handleApplicationExit();
-                    }
+                    // TODO: Check for modifier keys properly
+                    handleApplicationExit();
                 });
         }
     }
@@ -361,7 +366,9 @@ public class GhostVaultIntegratedApplication extends Application {
     private void performGracefulShutdown() {
         try {
             // Log shutdown
-            auditManager.logEvent("APPLICATION_SHUTDOWN", "Graceful shutdown initiated");
+            if (auditManager != null) {
+                auditManager.logSystemEvent("APPLICATION_SHUTDOWN", "Graceful shutdown initiated");
+            }
             
             // Cleanup UI components
             if (mainController != null) {

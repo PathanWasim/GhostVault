@@ -182,9 +182,10 @@ public class FileInfoPanel extends VBox {
             }
         }
         
-        // Use icon based on file type
-        String icon = ModernIcons.getFileIcon(fileName);
-        Label iconLabel = ModernIcons.createIcon(icon, 64);
+        // Use icon based on file type - TODO: Add getFileIcon and createIcon methods to ModernIcons
+        String icon = ModernIcons.FOLDER; // Default icon
+        Label iconLabel = new Label(icon);
+        iconLabel.setStyle("-fx-font-size: 64px;");
         
         // Create a simple thumbnail with the icon
         StackPane iconContainer = new StackPane(iconLabel);

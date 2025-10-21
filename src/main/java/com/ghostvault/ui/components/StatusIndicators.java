@@ -71,7 +71,9 @@ public class StatusIndicators {
         double iconSize = getIconSize(size);
         Color color = getStatusColor(status);
         
-        Label iconLabel = ModernIcons.createIcon(icon, iconSize, color);
+        // TODO: Add createIcon method to ModernIcons
+        Label iconLabel = new Label(icon);
+        iconLabel.setStyle("-fx-font-size: " + iconSize + "px; -fx-text-fill: " + color.toString().replace("0x", "#") + ";");
         iconLabel.getStyleClass().addAll("status-icon", getSizeClass(size));
         
         // Add animation for loading status
@@ -265,11 +267,11 @@ public class StatusIndicators {
             case ERROR: return ModernIcons.ERROR;
             case WARNING: return ModernIcons.WARNING;
             case INFO: return ModernIcons.INFO;
-            case LOADING: case SYNCING: return ModernIcons.LOADING;
-            case OFFLINE: return ModernIcons.OFFLINE;
-            case ONLINE: return ModernIcons.ONLINE;
+            case LOADING: case SYNCING: return ModernIcons.SYNCING;
+            case OFFLINE: return ModernIcons.DISCONNECTED;
+            case ONLINE: return ModernIcons.CONNECTED;
             case SECURE: case ENCRYPTED: return ModernIcons.SECURE;
-            case INSECURE: case DECRYPTED: return ModernIcons.DECRYPTED;
+            case INSECURE: case DECRYPTED: return ModernIcons.VAULT;
             default: return ModernIcons.INFO;
         }
     }
