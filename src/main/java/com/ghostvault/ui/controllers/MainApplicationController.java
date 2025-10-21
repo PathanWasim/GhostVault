@@ -367,7 +367,7 @@ public class MainApplicationController {
         
         if (selectedFiles.size() == 1) {
             // Single file download
-            File file = selectedFiles.iterator().next().getFile();
+            File file = selectedFiles.iterator().next();
             String extension = UIUtils.getFileExtension(file);
             fileOperations.showFileSaveDialog(file.getName(), extension)
                 .thenAccept(targetFile -> {
@@ -385,9 +385,9 @@ public class MainApplicationController {
             fileOperations.showDirectoryChooser("Select Download Location")
                 .thenAccept(targetDirectory -> {
                     if (targetDirectory != null) {
-                        for (var item : selectedFiles) {
-                            File targetFile = new File(targetDirectory, item.getFile().getName());
-                            fileOperations.downloadFile(item.getFile(), targetFile, success -> {
+                        for (File file : selectedFiles) {
+                            File targetFile = new File(targetDirectory, file.getName());
+                            fileOperations.downloadFile(file, targetFile, success -> {
                                 // Individual file completion handled by notifications
                             });
                         }
@@ -403,9 +403,7 @@ public class MainApplicationController {
             return;
         }
         
-        java.util.List<File> filesToDelete = selectedFiles.stream()
-            .map(item -> item.getFile())
-            .collect(Collectors.toList());
+        java.util.List<File> filesToDelete = new java.util.ArrayList<>(selectedFiles);
         
         fileOperations.secureDeleteFiles(filesToDelete, result -> {
             if (result.hasErrors()) {

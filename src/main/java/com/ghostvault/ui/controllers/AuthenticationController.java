@@ -487,5 +487,17 @@ public class AuthenticationController {
         this.authenticationProvider = provider;
     }
     
+    /**
+     * Cleanup resources
+     */
+    public void cleanup() {
+        if (passwordField != null) {
+            passwordField.clear();
+        }
+        // Clear any sensitive data
+        if (scene != null) {
+            scene = null;
+        }
+    }
 
 }

@@ -563,4 +563,25 @@ public class VirtualizedFileListView extends VBox {
         updatePaginationControls();
         updateItemsInfo();
     }
+    
+    /**
+     * Get the selection model for this list view
+     */
+    public javafx.scene.control.MultipleSelectionModel<File> getSelectionModel() {
+        return fileListView.getSelectionModel();
+    }
+    
+    /**
+     * Select all files
+     */
+    public void selectAll() {
+        fileListView.getSelectionModel().selectAll();
+    }
+    
+    /**
+     * Clear selection
+     */
+    public void clearSelection() {
+        fileListView.getSelectionModel().clearSelection();
+    }
 }

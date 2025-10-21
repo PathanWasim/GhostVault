@@ -449,6 +449,58 @@ public class UIUtils {
     }
     
     /**
+     * Get file extension from file
+     */
+    public static String getFileExtension(File file) {
+        if (file == null) return "";
+        String name = file.getName();
+        int lastDot = name.lastIndexOf('.');
+        return lastDot > 0 ? name.substring(lastDot + 1) : "";
+    }
+    
+    /**
+     * Check if file is an image file
+     */
+    public static boolean isImageFile(File file) {
+        if (file == null || !file.isFile()) return false;
+        String name = file.getName().toLowerCase();
+        return name.endsWith(".jpg") || name.endsWith(".jpeg") || name.endsWith(".png") ||
+               name.endsWith(".gif") || name.endsWith(".bmp") || name.endsWith(".webp");
+    }
+    
+    /**
+     * Check if file is a video file
+     */
+    public static boolean isVideoFile(File file) {
+        if (file == null || !file.isFile()) return false;
+        String name = file.getName().toLowerCase();
+        return name.endsWith(".mp4") || name.endsWith(".avi") || name.endsWith(".mkv") ||
+               name.endsWith(".mov") || name.endsWith(".wmv") || name.endsWith(".flv");
+    }
+    
+    /**
+     * Check if file is an audio file
+     */
+    public static boolean isAudioFile(File file) {
+        if (file == null || !file.isFile()) return false;
+        String name = file.getName().toLowerCase();
+        return name.endsWith(".mp3") || name.endsWith(".wav") || name.endsWith(".flac") ||
+               name.endsWith(".aac") || name.endsWith(".ogg") || name.endsWith(".wma");
+    }
+    
+    /**
+     * Check if file is a code file
+     */
+    public static boolean isCodeFile(File file) {
+        if (file == null || !file.isFile()) return false;
+        String name = file.getName().toLowerCase();
+        return name.endsWith(".java") || name.endsWith(".js") || name.endsWith(".py") ||
+               name.endsWith(".cpp") || name.endsWith(".c") || name.endsWith(".h") ||
+               name.endsWith(".css") || name.endsWith(".html") || name.endsWith(".xml") ||
+               name.endsWith(".json") || name.endsWith(".txt") || name.endsWith(".md");
+    }
+    
+    /**
      * Memory utilities class
      */
     public static class MemoryUtils {

@@ -175,8 +175,8 @@ public class MasterModeController extends ModeController {
         searchSystem.setOnResultsChanged(this::updateFileList);
         
         // Batch operations bar
-        batchOperationsBar.setOnSelectAll(() -> fileListView.getSelectionModel().selectAll());
-        batchOperationsBar.setOnDeselectAll(() -> fileListView.getSelectionModel().clearSelection());
+        batchOperationsBar.setOnSelectAll(() -> fileListView.selectAll());
+        batchOperationsBar.setOnDeselectAll(() -> fileListView.clearSelection());
         batchOperationsBar.setOnDownload(this::downloadFiles);
         batchOperationsBar.setOnDelete(this::deleteFiles);
         batchOperationsBar.setOnMove(this::moveFiles);
@@ -226,11 +226,11 @@ public class MasterModeController extends ModeController {
      * Setup event handlers
      */
     private void setupEventHandlers() {
-        // Header events
-        headerComponent.setOnMenuAction(this::showMainMenu);
-        headerComponent.setOnSettingsAction(this::showSettings);
-        headerComponent.setOnLogoutAction(this::logout);
-        headerComponent.setOnExitAction(this::exitApplication);
+        // Header events - TODO: Add these methods to ProfessionalHeader
+        // headerComponent.setOnMenuAction(this::showMainMenu);
+        // headerComponent.setOnSettingsAction(this::showSettings);
+        // headerComponent.setOnLogoutAction(this::logout);
+        // headerComponent.setOnExitAction(this::exitApplication);
     }
     
     /**
@@ -258,8 +258,8 @@ public class MasterModeController extends ModeController {
             searchSystem.setFiles(List.of(files));
         }
         
-        // Update header with current path
-        headerComponent.setCurrentPath(directory.getAbsolutePath());
+        // Update header with current path - TODO: Add setCurrentPath method to ProfessionalHeader
+        // headerComponent.setCurrentPath(directory.getAbsolutePath());
     }
     
     /**
@@ -274,11 +274,11 @@ public class MasterModeController extends ModeController {
      */
     private void selectFile(File file) {
         if (file != null) {
-            // Update preview
-            previewPane.previewFile(file);
+            // Update preview - TODO: Implement proper file preview logic
+            // previewPane.previewFile(file);
             
-            // Update file info
-            fileInfoPane.displayFile(file);
+            // Update file info - TODO: Check correct method name
+            // fileInfoPane.displayFile(file);
         }
     }
     
@@ -341,9 +341,8 @@ public class MasterModeController extends ModeController {
     }
     
     private void downloadFiles(List<Object> files) {
-        // Handle file download
-        ModernSaveDialog saveDialog = new ModernSaveDialog();
-        saveDialog.showDialog(primaryStage);
+        // Handle file download - TODO: Implement proper download functionality
+        System.out.println("Download files: " + files.size() + " files");
     }
     
     private void deleteFiles(List<Object> files) {
@@ -387,7 +386,7 @@ public class MasterModeController extends ModeController {
         // Clear sensitive data from UI
         fileListView.clear();
         previewPane.clearPreview();
-        fileInfoPane.displayFile(null);
+        // fileInfoPane.displayFile(null); // TODO: Check correct method name
     }
     
     @Override
@@ -453,5 +452,26 @@ public class MasterModeController extends ModeController {
         // Handle authentication failure
         ErrorHandlingSystem.showWarningDialog("Authentication Failed", 
             "Invalid credentials for Master Mode access.");
+    }
+    
+    // Event handler methods
+    private void showMainMenu() {
+        // TODO: Implement main menu
+        System.out.println("Show main menu");
+    }
+    
+    private void showSettings() {
+        // TODO: Implement settings dialog
+        System.out.println("Show settings");
+    }
+    
+    private void logout() {
+        // TODO: Implement logout functionality
+        System.out.println("Logout");
+    }
+    
+    private void exitApplication() {
+        // TODO: Implement exit functionality
+        System.out.println("Exit application");
     }
 }

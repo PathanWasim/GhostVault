@@ -312,4 +312,26 @@ public class EncryptedBackupManager {
             return !success;
         }
     }
+    
+    /**
+     * Show restore dialog for selecting backup file
+     */
+    public void showRestoreDialog(File defaultDirectory) {
+        // TODO: Implement restore dialog
+        FileChooser fileChooser = new FileChooser();
+        fileChooser.setTitle("Select Backup File to Restore");
+        fileChooser.getExtensionFilters().add(
+            new FileChooser.ExtensionFilter("GhostVault Backup Files", "*.gvbackup")
+        );
+        if (defaultDirectory != null) {
+            fileChooser.setInitialDirectory(defaultDirectory);
+        }
+        
+        Stage stage = (Stage) parentStage;
+        File backupFile = fileChooser.showOpenDialog(stage);
+        if (backupFile != null) {
+            // TODO: Implement restore functionality
+            System.out.println("Selected backup file: " + backupFile.getAbsolutePath());
+        }
+    }
 }

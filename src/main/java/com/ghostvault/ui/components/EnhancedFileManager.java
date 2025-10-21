@@ -510,7 +510,7 @@ public class EnhancedFileManager extends VBox {
     public void loadDirectory(File directory) {
         if (directory != null && directory.exists() && directory.isDirectory()) {
             currentDirectory = directory;
-            refreshFileList();
+            refreshCurrentDirectory();
         }
     }
     
