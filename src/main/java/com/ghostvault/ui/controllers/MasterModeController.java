@@ -385,7 +385,7 @@ public class MasterModeController extends ModeController {
     public void deactivate() {
         // Clear sensitive data from UI
         fileListView.clear();
-        previewPane.clearPreview();
+        previewPane.clear();
         // fileInfoPane.displayFile(null); // TODO: Check correct method name
     }
     
@@ -409,8 +409,9 @@ public class MasterModeController extends ModeController {
     @Override
     protected void updateSecurityIndicators() {
         if (headerComponent != null) {
-            headerComponent.setSecurityLevel(secureMode ? "High Security" : "Standard");
-            headerComponent.setEncryptionStatus(secureMode ? "AES-256 Enabled" : "Basic Protection");
+            // TODO: Add setSecurityLevel and setEncryptionStatus methods to ProfessionalHeader
+            // headerComponent.setSecurityLevel(secureMode ? "High Security" : "Standard");
+            // headerComponent.setEncryptionStatus(secureMode ? "AES-256 Enabled" : "Basic Protection");
         }
     }
     
@@ -420,7 +421,7 @@ public class MasterModeController extends ModeController {
             // Save any pending changes
             // Clear caches
             if (previewPane != null) {
-                previewPane.clearPreview();
+                previewPane.clear();
             }
             
             // Clear file list

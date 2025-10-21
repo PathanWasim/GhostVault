@@ -408,7 +408,25 @@ public class ResizablePreviewPane extends VBox {
         if (file != null) {
             Label fakeLabel = new Label("Fake preview for: " + file.getName());
             fakeLabel.getStyleClass().add("fake-preview");
-            previewContainer.getChildren().add(fakeLabel);
+            this.getChildren().add(fakeLabel);
         }
+    }
+    
+    /**
+     * Clear all preview content
+     */
+    public void clear() {
+        Platform.runLater(() -> {
+            // Clear the main container (this VBox)
+            this.getChildren().clear();
+            
+            if (codePreview != null) {
+                codePreview.clear();
+            }
+            if (mediaPreview != null) {
+                mediaPreview.clear();
+            }
+            currentPreviewType = PreviewType.NONE;
+        });
     }
 }
