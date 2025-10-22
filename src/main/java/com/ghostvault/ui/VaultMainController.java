@@ -78,16 +78,8 @@ public class VaultMainController implements Initializable {
     private SessionManager sessionManager;
     private SecretKey encryptionKey;
     
-    // New feature managers
-    private SecurityDashboard securityDashboard;
-    private SystemTrayManager systemTrayManager;
-    private com.ghostvault.ai.SmartFileOrganizer smartOrganizer;
-    private com.ghostvault.security.SecureNotesManager notesManager;
-    
-    // Feature windows
-    private CompactNotesWindow notesWindow;
-    private CompactPasswordWindow passwordWindow;
-    private CompactAIWindow aiWindow;
+    // Feature Manager - handles all advanced features
+    private FeatureManager featureManager;
     
     // State Management
     private boolean isDecoyMode = false;
@@ -134,25 +126,14 @@ public class VaultMainController implements Initializable {
             }
         }
         
-        // Initialize AI organizer
-        try {
-            this.smartOrganizer = new com.ghostvault.ai.SmartFileOrganizer();
-            logMessage("🤖 AI organizer initialized");
-        } catch (Exception e) {
-            logMessage("⚠ Failed to initialize AI organizer: " + e.getMessage());
-        }
-        
-        // Initialize Notes and Password Manager
+        // Initialize Feature Manager with all advanced features
         try {
             String vaultPath = System.getProperty("user.home") + "/.ghostvault";
-            this.notesManager = new com.ghostvault.security.SecureNotesManager(vaultPath);
-            if (encryptionKey != null) {
-                notesManager.setEncryptionKey(encryptionKey);
-                notesManager.loadData();
-            }
-            logMessage("📝 Notes and Password Manager initialized");
+            this.featureManager = new FeatureManager(null, encryptionKey, vaultPath);
+            this.featureManager.initializeFeatures();
+            logMessage("🚀 All advanced features initialized through FeatureManager");
         } catch (Exception e) {
-            logMessage("⚠ Failed to initialize Notes Manager: " + e.getMessage());
+            logMessage("⚠ Failed to initialize FeatureManager: " + e.getMessage());
         }
         
         refreshFileList();
@@ -1784,64 +1765,22 @@ public class VaultMainController implements Initializable {
         updateStatus();
     }
     
-    /**
-     * Initialize advanced features
-     */
-    private void initializeAdvancedFeatures() {
-        try {
-            // Initialize Smart File Organizer
-            smartOrganizer = new com.ghostvault.ai.SmartFileOrganizer();
-            
-            // Initialize Security Dashboard
-            securityDashboard = new SecurityDashboard(null, null);
-            
-            // Initialize Secure Notes Manager
-            notesManager = new com.ghostvault.security.SecureNotesManager(System.getProperty("user.home") + "/.ghostvault");
-            if (encryptionKey != null) {
-                notesManager.setEncryptionKey(encryptionKey);
-                notesManager.loadData();
-            }
-            
-            logMessage("🚀 Advanced features initialized");
-            
-        } catch (Exception e) {
-            logMessage("⚠ Failed to initialize advanced features: " + e.getMessage());
-        }
-    }
+
     
     /**
      * Handle security dashboard
      */
     @FXML
     private void handleDashboard() {
-        try {
-            if (securityDashboard == null) {
-                securityDashboard = new SecurityDashboard();
-            }
-            
-            // Update dashboard with real vault data
-            updateDashboardData();
-            
-            securityDashboard.show();
+        if (featureManager != null) {
+            featureManager.showDashboard(allVaultFiles);
             logMessage("📊 Security Dashboard opened - Real-time monitoring active");
-        } catch (Exception e) {
-            logMessage("⚠ Error opening security dashboard: " + e.getMessage());
-            showError("Dashboard Error", "Could not open security dashboard: " + e.getMessage());
+        } else {
+            showError("Dashboard Error", "Feature manager not initialized");
         }
     }
     
-    /**
-     * Original dashboard method - keeping for compatibility
-     */
-    private void handleDashboardOld() {
-        if (securityDashboard != null) {
-            securityDashboard.updateFileCount(allVaultFiles.size());
-            securityDashboard.show(); // Use regular show instead of showInParent
-            logMessage("📊 Security Dashboard opened - Real-time monitoring active");
-        } else {
-            showError("Dashboard Error", "Security dashboard is not available.");
-        }
-    }
+
     
 
     
@@ -1853,16 +1792,11 @@ public class VaultMainController implements Initializable {
      */
     @FXML
     private void handleNotes() {
-        if (notesManager != null) {
-            try {
-                showNotesManager();
-                logMessage("📝 Secure Notes Manager activated - " + notesManager.getNotes().size() + " encrypted notes available");
-            } catch (Exception e) {
-                logMessage("⚠ Error accessing notes: " + e.getMessage());
-                showError("Notes Error", "Could not access secure notes: " + e.getMessage());
-            }
+        if (featureManager != null) {
+            featureManager.showNotes();
+            logMessage("📝 Secure Notes Manager activated");
         } else {
-            showError("Notes Error", "Secure notes manager is not available. Please restart the application.");
+            showError("Notes Error", "Feature manager not initialized");
         }
     }
     
@@ -1871,67 +1805,19 @@ public class VaultMainController implements Initializable {
      */
     @FXML
     private void handlePasswords() {
-        if (notesManager != null) {
-            try {
-                showPasswordManager();
-                logMessage("🔑 Password Manager activated - " + notesManager.getPasswords().size() + " passwords secured");
-            } catch (Exception e) {
-                logMessage("⚠ Error accessing passwords: " + e.getMessage());
-                showError("Password Manager Error", "Could not access password manager: " + e.getMessage());
-            }
+        if (featureManager != null) {
+            featureManager.showPasswords();
+            logMessage("🔑 Password Manager activated");
         } else {
-            showError("Password Manager Error", "Password manager is not available. Please restart the application.");
+            showError("Password Manager Error", "Feature manager not initialized");
         }
     }
     
 
     
-    /**
-     * Update dashboard with real vault data
-     */
-    private void updateDashboardData() {
-        if (securityDashboard != null) {
-            // Update with real file count
-            int fileCount = allVaultFiles.size();
-            
-            // Calculate security score based on real data
-            int securityScore = calculateSecurityScore();
-            
-            // Update threat level based on actual conditions
-            String threatLevel = calculateThreatLevel();
-            
-            // Update dashboard metrics
-            securityDashboard.updateMetrics(fileCount, securityScore, threatLevel, 1);
-            
-            logMessage("📊 Dashboard updated with real vault data: " + fileCount + " files, security score: " + securityScore);
-        }
-    }
+
     
-    /**
-     * Calculate security score based on vault state
-     */
-    private int calculateSecurityScore() {
-        int score = 70; // Base score
-        
-        // Bonus for having files encrypted
-        if (!allVaultFiles.isEmpty()) {
-            score += 10;
-        }
-        
-        // Bonus for having backups (simplified check)
-        if (backupManager != null) {
-            score += 10;
-        }
-        
-        // Bonus for having notes/passwords secured
-        if (notesManager != null) {
-            score += 5;
-            if (!notesManager.getNotes().isEmpty()) score += 3;
-            if (!notesManager.getPasswords().isEmpty()) score += 2;
-        }
-        
-        return Math.min(score, 100);
-    }
+
     
     /**
      * Calculate threat level based on system state
@@ -1952,83 +1838,19 @@ public class VaultMainController implements Initializable {
      */
     @FXML
     private void handleFileManager() {
-        try {
-            if (aiWindow == null) {
-                aiWindow = new CompactAIWindow(smartOrganizer, allVaultFiles);
-            }
-            aiWindow.show();
+        if (featureManager != null) {
+            featureManager.showAIFeatures(allVaultFiles);
             logMessage("🤖 AI Enhanced window opened - Smart analysis and features available");
-        } catch (Exception e) {
-            logMessage("⚠ Error opening AI window: " + e.getMessage());
-            showError("AI Error", "Could not open AI window: " + e.getMessage());
+        } else {
+            showError("AI Error", "Feature manager not initialized");
         }
     }
     
 
     
-    /**
-     * Enable AI features in the main vault
-     */
-    private void enableAIFeatures() {
-        try {
-            // Update search field placeholder to show AI capabilities
-            if (searchField != null) {
-                searchField.setPromptText("🤖 AI Search: Try 'recent work files', 'large images', 'financial documents'...");
-                logMessage("🧠 AI search engine activated");
-            }
-            
-            // Show AI analysis if available
-            if (smartOrganizer != null && !allVaultFiles.isEmpty()) {
-                logMessage("🗂️ Smart file categorization enabled for " + allVaultFiles.size() + " files");
-                logMessage("🔍 Natural language processing ready");
-                
-                // Show quick AI analysis
-                Platform.runLater(() -> {
-                    try {
-                        showAIAnalysis();
-                    } catch (Exception e) {
-                        logMessage("⚠ Error showing AI analysis: " + e.getMessage());
-                    }
-                });
-            } else {
-                logMessage("💡 AI features ready - upload files to see smart organization");
-            }
-            
-        } catch (Exception e) {
-            logMessage("⚠ Error in enableAIFeatures: " + e.getMessage());
-            throw e;
-        }
-    }
+
     
-    /**
-     * Show compact notes manager window
-     */
-    private void showNotesManager() {
-        try {
-            if (notesWindow == null) {
-                notesWindow = new CompactNotesWindow(notesManager);
-            }
-            notesWindow.show();
-        } catch (Exception e) {
-            logMessage("⚠ Error opening notes window: " + e.getMessage());
-            showError("Notes Error", "Could not open notes manager: " + e.getMessage());
-        }
-    }
-    
-    /**
-     * Show compact password manager window
-     */
-    private void showPasswordManager() {
-        try {
-            if (passwordWindow == null) {
-                passwordWindow = new CompactPasswordWindow(notesManager);
-            }
-            passwordWindow.show();
-        } catch (Exception e) {
-            logMessage("⚠ Error opening password window: " + e.getMessage());
-            showError("Password Error", "Could not open password manager: " + e.getMessage());
-        }
-    }
+
 
     
 
@@ -2039,51 +1861,12 @@ public class VaultMainController implements Initializable {
      * Show AI analysis of current vault files
      */
     private void showAIAnalysis() {
-        if (smartOrganizer != null && !allVaultFiles.isEmpty()) {
-            Map<String, Object> stats = smartOrganizer.getFileStatistics(allVaultFiles);
-            
-            int totalFiles = (Integer) stats.get("totalFiles");
-            long totalSize = (Long) stats.get("totalSize");
-            
-            @SuppressWarnings("unchecked")
-            Map<com.ghostvault.ai.SmartFileOrganizer.FileCategory, Long> categoryStats = 
-                (Map<com.ghostvault.ai.SmartFileOrganizer.FileCategory, Long>) stats.get("categoryDistribution");
-            
-            StringBuilder analysis = new StringBuilder();
-            analysis.append("🤖 AI Vault Analysis\n\n");
-            analysis.append("📊 Overview:\n");
-            analysis.append("• Total Files: ").append(totalFiles).append("\n");
-            analysis.append("• Total Size: ").append(formatFileSize(totalSize)).append("\n\n");
-            
-            analysis.append("📁 File Categories:\n");
-            categoryStats.entrySet().stream()
-                .sorted(Map.Entry.<com.ghostvault.ai.SmartFileOrganizer.FileCategory, Long>comparingByValue().reversed())
-                .limit(5)
-                .forEach(entry -> {
-                    analysis.append("• ").append(entry.getKey().getIcon()).append(" ")
-                        .append(entry.getKey().getDisplayName()).append(": ")
-                        .append(entry.getValue()).append(" files\n");
-                });
-            
-            // Find duplicates
-            Map<String, List<VaultFile>> duplicates = smartOrganizer.findDuplicates(allVaultFiles);
-            analysis.append("\n🔍 Duplicate Analysis:\n");
-            if (duplicates.isEmpty()) {
-                analysis.append("• ✅ No duplicates found\n");
-            } else {
-                analysis.append("• ⚠️ Found ").append(duplicates.size()).append(" potential duplicate groups\n");
-            }
-            
-            // Organization suggestions
-            List<String> suggestions = smartOrganizer.getOrganizationSuggestions(allVaultFiles);
-            analysis.append("\n💡 AI Recommendations:\n");
-            suggestions.stream().limit(3).forEach(suggestion -> 
-                analysis.append("• ").append(suggestion).append("\n"));
-            
-            showInfo("🤖 AI Vault Analysis", analysis.toString());
-            logMessage("🧠 AI analysis completed for " + totalFiles + " files");
+        if (featureManager != null) {
+            String analysis = featureManager.getAIAnalysis(allVaultFiles);
+            showInfo("🤖 AI Vault Analysis", analysis);
+            logMessage("🧠 AI analysis completed for " + allVaultFiles.size() + " files");
         } else {
-            showInfo("🤖 AI Analysis", "No files in vault to analyze.\n\nUpload some files first to see AI-powered insights!");
+            showInfo("🤖 AI Analysis", "Feature manager not initialized");
         }
     }
     
@@ -2119,7 +1902,7 @@ public class VaultMainController implements Initializable {
                 sessionLabel.setText("Session: Active");
             }
             
-            // Dashboard updates are handled by SecurityDashboard itself
+            // Status updated successfully
         });
     }
     
@@ -2199,6 +1982,11 @@ public class VaultMainController implements Initializable {
     private void clearSensitiveData() {
         if (encryptionKey != null) {
             encryptionKey = null;
+        }
+        
+        // Cleanup feature manager
+        if (featureManager != null) {
+            featureManager.cleanup();
         }
         
         fileList.clear();
