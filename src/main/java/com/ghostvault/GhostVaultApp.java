@@ -17,7 +17,7 @@ import javafx.stage.Stage;
 public class GhostVaultApp extends Application {
     
     private Stage primaryStage;
-    private boolean isSetupComplete = false;
+    private boolean isSetupComplete;
     
     @Override
     public void start(Stage primaryStage) {
@@ -31,18 +31,56 @@ public class GhostVaultApp extends Application {
         primaryStage.setMinWidth(600);
         primaryStage.setMinHeight(500);
         
-        // Check if setup is needed
+        // Check if setup is needed by checking saved configuration
+        try {
+            com.ghostvault.security.PasswordManager passwordManager = new com.ghostvault.security.PasswordManager();
+            isSetupComplete = passwordManager.isSetupComplete();
+        } catch (Exception e) {
+            System.err.println("Error checking setup status: " + e.getMessage());
+            isSetupComplete = false;
+        }
+        
         if (!isSetupComplete) {
-            showSetupWizard();
+            showModernSetupWizard();
         } else {
             showLoginScreen();
         }
     }
     
     /**
-     * Show the three-password setup wizard
+     * Show the modern setup wizard with single password entry
      */
-    private void showSetupWizard() {
+    private void showModernSetupWizard() {
+        System.out.println("🔧 Showing setup wizard");
+        
+        try {
+            com.ghostvault.ui.controllers.InitialSetupController setupController = 
+                new com.ghostvault.ui.controllers.InitialSetupController(primaryStage);
+            
+            setupController.setOnSetupComplete(success -> {
+                if (success) {
+                    isSetupComplete = true;
+                    showLoginScreen();
+                } else {
+                    System.out.println("Setup cancelled");
+                    Platform.exit();
+                }
+            });
+            
+            setupController.show();
+            System.out.println("✅ Setup wizard displayed");
+            
+        } catch (Exception e) {
+            System.err.println("Error showing setup wizard: " + e.getMessage());
+            e.printStackTrace();
+            showFallbackSetupWizard();
+        }
+    }
+    
+    /**
+     * Fallback setup wizard if modern one fails
+     */
+    private void showFallbackSetupWizard() {
         System.out.println("🔧 Showing setup wizard");
         
         VBox root = new VBox(25);
@@ -207,8 +245,16 @@ public class GhostVaultApp extends Application {
      */
     private void completeSetup() {
         System.out.println("✅ Setup completed");
-        isSetupComplete = true;
-        showLoginScreen();
+        try {
+            // Save setup completion status
+            com.ghostvault.security.PasswordManager passwordManager = new com.ghostvault.security.PasswordManager();
+            passwordManager.markSetupComplete();
+            isSetupComplete = true;
+            showLoginScreen();
+        } catch (Exception e) {
+            System.err.println("Error saving setup completion: " + e.getMessage());
+            showLoginScreen(); // Continue anyway
+        }
     }
     
     /**
@@ -325,9 +371,19 @@ public class GhostVaultApp extends Application {
                 vaultController.initializeDecoyMode(decoyManager);
             } else {
                 // Initialize master mode with full functionality
-                String vaultPath = System.getProperty("user.home") + "/.ghostvault";
-                com.ghostvault.core.FileManager fileManager = new com.ghostvault.core.FileManager(vaultPath);
-                com.ghostvault.core.MetadataManager metadataManager = new com.ghostvault.core.MetadataManager(vaultPath);
+                String vaultPath = com.ghostvault.config.AppConfig.getVaultDir();
+                
+                com.ghostvault.core.FileManager fileManager;
+                com.ghostvault.core.MetadataManager metadataManager;
+                
+                try {
+                    fileManager = new com.ghostvault.core.FileManager(vaultPath);
+                    metadataManager = new com.ghostvault.core.MetadataManager(vaultPath + "/metadata.enc");
+                } catch (Exception e) {
+                    System.err.println("❌ Failed to initialize vault: " + e.getMessage());
+                    showFallbackMainApplication("ERROR - " + e.getMessage());
+                    return;
+                }
                 
                 // Create backup manager with proper dependencies
                 com.ghostvault.security.CryptoManager cryptoManager = new com.ghostvault.security.CryptoManager();
@@ -344,7 +400,8 @@ public class GhostVaultApp extends Application {
             // Create and show scene with proper styling
             Scene scene = new Scene(root, 1200, 800);
             
-            // CSS styling would be applied here if available
+            // Apply password manager theme
+            com.ghostvault.ui.theme.PasswordManagerTheme.applyPasswordManagerTheme(scene);
             
             primaryStage.setScene(scene);
             primaryStage.setTitle("GhostVault - Secure File Management (" + mode + " Mode)");

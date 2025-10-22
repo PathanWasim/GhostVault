@@ -122,7 +122,9 @@ public class VaultMainController implements Initializable {
                 metadataManager.loadMetadata();
                 logMessage("📋 Metadata loaded successfully");
             } catch (Exception e) {
-                logMessage("⚠ Could not load metadata: " + e.getMessage());
+                String userFriendlyError = com.ghostvault.util.ErrorHandler.handleMetadataError(e);
+                logMessage("⚠ " + userFriendlyError);
+                com.ghostvault.util.ErrorHandler.logTechnicalError(e, "Metadata loading");
             }
         }
         
@@ -167,11 +169,80 @@ public class VaultMainController implements Initializable {
         fileListView.setItems(filteredFileList);
         operationProgress.setVisible(false);
         
+        // Apply comprehensive text styling using StyleManager
+        applyUITextStyling();
+        
         // Setup context menu for file list
         setupFileListContextMenu();
         
         // Setup drag and drop
         setupDragAndDrop();
+    }
+    
+    /**
+     * Apply password manager styling to all UI components
+     */
+    private void applyUITextStyling() {
+        // Apply password manager theme to the entire scene
+        if (mainContent != null && mainContent.getScene() != null) {
+            com.ghostvault.ui.theme.PasswordManagerTheme.applyPasswordManagerTheme(mainContent.getScene());
+        }
+        
+        // Apply specific styling to main components
+        if (fileListView != null) {
+            com.ghostvault.ui.theme.PasswordManagerTheme.applyThemeToNode(fileListView);
+        }
+        if (searchField != null) {
+            com.ghostvault.ui.theme.PasswordManagerTheme.applyThemeToNode(searchField);
+        }
+        if (logArea != null) {
+            com.ghostvault.ui.theme.PasswordManagerTheme.applyThemeToNode(logArea);
+        }
+        
+        // Apply styling to labels with proper visibility
+        if (fileCountLabel != null) {
+            com.ghostvault.ui.theme.PasswordManagerTheme.applyThemeToNode(fileCountLabel);
+        }
+        if (vaultSizeLabel != null) {
+            com.ghostvault.ui.theme.PasswordManagerTheme.applyThemeToNode(vaultSizeLabel);
+        }
+        if (encryptionLabel != null) {
+            com.ghostvault.ui.theme.PasswordManagerTheme.applyThemeToNode(encryptionLabel);
+        }
+        if (operationStatusLabel != null) {
+            com.ghostvault.ui.theme.PasswordManagerTheme.applyThemeToNode(operationStatusLabel);
+        }
+        if (sessionLabel != null) {
+            com.ghostvault.ui.theme.PasswordManagerTheme.applyThemeToNode(sessionLabel);
+        }
+        
+        // Apply styling to main content areas
+        if (mainContent != null) {
+            com.ghostvault.ui.theme.PasswordManagerTheme.applyThemeToNode(mainContent);
+            // Set password manager background color
+            mainContent.setStyle("-fx-background-color: #0F172A;");
+        }
+        if (dashboardOverlay != null) {
+            com.ghostvault.ui.theme.PasswordManagerTheme.applyThemeToNode(dashboardOverlay);
+        }
+        
+        // Apply styling to toolbar buttons with password manager theme
+        if (uploadButton != null) {
+            com.ghostvault.ui.theme.PasswordManagerTheme.applyThemeToNode(uploadButton);
+            uploadButton.getStyleClass().add("primary");
+        }
+        if (downloadButton != null) {
+            com.ghostvault.ui.theme.PasswordManagerTheme.applyThemeToNode(downloadButton);
+            downloadButton.getStyleClass().add("success");
+        }
+        if (deleteButton != null) {
+            com.ghostvault.ui.theme.PasswordManagerTheme.applyThemeToNode(deleteButton);
+            deleteButton.getStyleClass().add("danger");
+        }
+        if (previewButton != null) {
+            com.ghostvault.ui.theme.PasswordManagerTheme.applyThemeToNode(previewButton);
+            previewButton.getStyleClass().add("secondary");
+        }
     }
     
     /**
@@ -493,8 +564,32 @@ public class VaultMainController implements Initializable {
         showOperationProgress("Uploading files...");
         logMessage("📁 Processing " + files.size() + " file(s) for upload...");
         
+        // Validate vault structure first
+        com.ghostvault.util.FileUploadValidator.ValidationResult vaultValidation = 
+            com.ghostvault.util.FileUploadValidator.validateVaultStructure();
+        
+        if (!vaultValidation.isValid()) {
+            hideOperationProgress();
+            logMessage("❌ Vault validation failed: " + vaultValidation.getErrorMessage());
+            showError("Vault Error", vaultValidation.getErrorMessage());
+            return;
+        }
+        
+        // Validate all files first
+        File[] fileArray = files.toArray(new File[0]);
+        com.ghostvault.util.FileUploadValidator.ValidationResult filesValidation = 
+            com.ghostvault.util.FileUploadValidator.validateMultipleFiles(fileArray);
+        
+        if (!filesValidation.isValid()) {
+            hideOperationProgress();
+            logMessage("❌ File validation failed: " + filesValidation.getErrorMessage());
+            showError("File Validation Error", filesValidation.getErrorMessage());
+            return;
+        }
+        
         int successCount = 0;
         int totalFiles = files.size();
+        StringBuilder errorSummary = new StringBuilder();
         
         for (int i = 0; i < files.size(); i++) {
             File file = files.get(i);
@@ -511,11 +606,15 @@ public class VaultMainController implements Initializable {
                     successCount++;
                     logMessage("✓ Uploaded and encrypted: " + file.getName());
                 } else {
-                    logMessage("⚠ File manager or metadata manager not initialized");
+                    String error = "File manager or metadata manager not initialized";
+                    logMessage("⚠ " + error);
+                    errorSummary.append(file.getName()).append(": ").append(error).append("\n");
                     break;
                 }
             } catch (Exception e) {
-                logMessage("✗ Failed to upload " + file.getName() + ": " + e.getMessage());
+                String userFriendlyError = com.ghostvault.util.ErrorHandler.handleFileUploadError(e, file.getName());
+                logMessage("✗ " + userFriendlyError);
+                errorSummary.append(file.getName()).append(": ").append(userFriendlyError).append("\n");
             }
         }
         
@@ -524,9 +623,16 @@ public class VaultMainController implements Initializable {
         if (successCount > 0) {
             logMessage("🔄 Refreshing file list...");
             refreshFileList();
-            showNotification("Upload Complete", "Successfully uploaded " + successCount + " file(s)");
+            
+            if (successCount == totalFiles) {
+                showNotification("Upload Complete", "Successfully uploaded " + successCount + " file(s)");
+            } else {
+                showNotification("Partial Success", 
+                    "Uploaded " + successCount + " of " + totalFiles + " files.\n\nErrors:\n" + errorSummary.toString());
+            }
         } else {
             logMessage("❌ No files were uploaded successfully");
+            showError("Upload Failed", "No files could be uploaded.\n\nErrors:\n" + errorSummary.toString());
         }
     }
     
@@ -1951,12 +2057,16 @@ public class VaultMainController implements Initializable {
     }
     
     /**
-     * Log message to activity area
+     * Log message to activity area with password manager styling
      */
     private void logMessage(String message) {
         Platform.runLater(() -> {
-            logArea.appendText(message + "\n");
-            logArea.setScrollTop(Double.MAX_VALUE);
+            if (logArea != null) {
+                logArea.appendText(message + "\n");
+                logArea.setScrollTop(Double.MAX_VALUE);
+                // Apply password manager theme styling
+                com.ghostvault.ui.theme.PasswordManagerTheme.applyThemeToNode(logArea);
+            }
         });
     }
     

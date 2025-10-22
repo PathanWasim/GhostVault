@@ -24,12 +24,20 @@ public class FileManager {
     private SecretKey encryptionKey;
     
     public FileManager(String vaultPath) throws Exception {
-        this.vaultPath = vaultPath;
         this.cryptoManager = new CryptoManager();
         
-        // Ensure vault directories exist
-        FileUtils.ensureDirectoryExists(vaultPath);
-        FileUtils.ensureDirectoryExists(AppConfig.FILES_DIR);
+        // Validate and create vault structure
+        com.ghostvault.util.FileUploadValidator.ValidationResult result = 
+            com.ghostvault.util.FileUploadValidator.validateVaultStructure();
+        
+        if (!result.isValid()) {
+            throw new Exception("Failed to initialize vault: " + result.getErrorMessage());
+        }
+        
+        // Set vault path to the validated location
+        this.vaultPath = AppConfig.getVaultDir();
+        
+        System.out.println("✅ Vault initialized at: " + this.vaultPath);
     }
     
     /**
@@ -67,7 +75,7 @@ public class FileManager {
             CryptoManager.EncryptedData encryptedData = CryptoManager.EncryptedData.fromCombinedData(encryptedBytes);
             
             // Write encrypted file to vault
-            Path encryptedFilePath = Paths.get(AppConfig.FILES_DIR, encryptedFileName);
+            Path encryptedFilePath = Paths.get(AppConfig.getVaultDir(), "files", encryptedFileName);
             FileUtils.writeEncryptedFile(encryptedFilePath, encryptedData);
             
             // Create VaultFile metadata
@@ -96,7 +104,7 @@ public class FileManager {
             throw new IllegalStateException("Encryption key not set");
         }
         
-        Path encryptedFilePath = Paths.get(AppConfig.FILES_DIR, vaultFile.getEncryptedName());
+        Path encryptedFilePath = Paths.get(AppConfig.getVaultDir(), "files", vaultFile.getEncryptedName());
         
         if (!Files.exists(encryptedFilePath)) {
             throw new FileNotFoundException("Encrypted file not found: " + vaultFile.getEncryptedName());
