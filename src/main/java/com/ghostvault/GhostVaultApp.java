@@ -18,6 +18,7 @@ public class GhostVaultApp extends Application {
     
     private Stage primaryStage;
     private boolean isSetupComplete;
+    private com.ghostvault.ui.SystemTrayManager systemTrayManager;
     
     @Override
     public void start(Stage primaryStage) {
@@ -30,6 +31,23 @@ public class GhostVaultApp extends Application {
         primaryStage.setResizable(true);
         primaryStage.setMinWidth(600);
         primaryStage.setMinHeight(500);
+        
+        // Initialize system tray if supported
+        if (com.ghostvault.ui.SystemTrayManager.isSystemTraySupported()) {
+            systemTrayManager = new com.ghostvault.ui.SystemTrayManager(primaryStage);
+            if (systemTrayManager.initializeSystemTray()) {
+                System.out.println("✅ System tray initialized");
+                
+                // Handle window close to minimize to tray instead of exit
+                primaryStage.setOnCloseRequest(e -> {
+                    e.consume(); // Prevent default close
+                    systemTrayManager.minimizeToTray();
+                });
+            }
+        }
+        
+        // Initialize notification system
+        com.ghostvault.ui.components.NotificationSystem.initialize(primaryStage);
         
         // Check if setup is needed by checking saved configuration
         try {

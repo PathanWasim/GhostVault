@@ -18,6 +18,7 @@ import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
+import com.ghostvault.ui.animations.AnimationManager;
 
 import javax.crypto.SecretKey;
 import java.io.ByteArrayInputStream;
@@ -80,6 +81,9 @@ public class VaultMainController implements Initializable {
     
     // Feature Manager - handles all advanced features
     private FeatureManager featureManager;
+    
+    // Accessibility Manager
+    private com.ghostvault.ui.AccessibilityManager accessibilityManager;
     
     // State Management
     private boolean isDecoyMode = false;
@@ -172,6 +176,9 @@ public class VaultMainController implements Initializable {
         // Apply comprehensive text styling using StyleManager
         applyUITextStyling();
         
+        // Initialize accessibility features
+        initializeAccessibility();
+        
         // Setup context menu for file list
         setupFileListContextMenu();
         
@@ -226,23 +233,35 @@ public class VaultMainController implements Initializable {
             com.ghostvault.ui.theme.PasswordManagerTheme.applyThemeToNode(dashboardOverlay);
         }
         
-        // Apply styling to toolbar buttons with password manager theme
+        // Apply styling to toolbar buttons with password manager theme and animations
         if (uploadButton != null) {
             com.ghostvault.ui.theme.PasswordManagerTheme.applyThemeToNode(uploadButton);
             uploadButton.getStyleClass().add("primary");
+            addButtonHoverAnimation(uploadButton);
         }
         if (downloadButton != null) {
             com.ghostvault.ui.theme.PasswordManagerTheme.applyThemeToNode(downloadButton);
             downloadButton.getStyleClass().add("success");
+            addButtonHoverAnimation(downloadButton);
         }
         if (deleteButton != null) {
             com.ghostvault.ui.theme.PasswordManagerTheme.applyThemeToNode(deleteButton);
             deleteButton.getStyleClass().add("danger");
+            addButtonHoverAnimation(deleteButton);
         }
         if (previewButton != null) {
             com.ghostvault.ui.theme.PasswordManagerTheme.applyThemeToNode(previewButton);
             previewButton.getStyleClass().add("secondary");
+            addButtonHoverAnimation(previewButton);
         }
+        
+        // Add hover animations to navigation buttons
+        if (dashboardButton != null) addButtonHoverAnimation(dashboardButton);
+        if (notesButton != null) addButtonHoverAnimation(notesButton);
+        if (passwordsButton != null) addButtonHoverAnimation(passwordsButton);
+        if (fileManagerButton != null) addButtonHoverAnimation(fileManagerButton);
+        if (settingsButton != null) addButtonHoverAnimation(settingsButton);
+        if (logoutButton != null) addButtonHoverAnimation(logoutButton);
     }
     
     /**
@@ -475,6 +494,10 @@ public class VaultMainController implements Initializable {
                         handleNotes();
                         event.consume();
                         break;
+                    case T: // Ctrl+T - Switch Theme
+                        switchTheme();
+                        event.consume();
+                        break;
                     case P: // Ctrl+P - Passwords
                         handlePasswords();
                         event.consume();
@@ -491,29 +514,7 @@ public class VaultMainController implements Initializable {
             } else {
                 switch (event.getCode()) {
                     case F1: // Help
-                        if (uiManager != null) {
-                            // Show help
-                            showInfo("Keyboard Shortcuts", 
-                                "File Operations:\n" +
-                                "• Ctrl+O - Upload files\n" +
-                                "• Ctrl+S - Download selected file\n" +
-                                "• Enter - Download selected file\n" +
-                                "• Space - Preview selected file\n" +
-                                "• Delete - Delete selected file\n\n" +
-                                "Vault Operations:\n" +
-                                "• Ctrl+B - Create backup\n" +
-                                "• Ctrl+R - Restore from backup\n" +
-                                "• F5 - Refresh file list\n\n" +
-                                "Advanced Features:\n" +
-                                "• Ctrl+D - Security Dashboard\n" +
-                                "• Ctrl+N - Secure Notes\n" +
-                                "• Ctrl+P - Password Manager\n" +
-                                "• Ctrl+M - AI Mode (Smart Search)\n\n" +
-                                "Navigation:\n" +
-                                "• Ctrl+F - Focus search box\n" +
-                                "• Ctrl+Q - Logout\n" +
-                                "• F1 - Show this help");
-                        }
+                        showHelpSystem();
                         event.consume();
                         break;
                     case ESCAPE: // Clear search
@@ -1520,9 +1521,19 @@ public class VaultMainController implements Initializable {
             logMessage("⚠ Error loading file list: " + e.getMessage());
         }
         
-        // Apply current search filter
-        filterFileList(searchField.getText());
-        updateStatus();
+        // Apply current search filter with animation
+        Platform.runLater(() -> {
+            if (fileListView != null) {
+                AnimationManager.fadeOut(fileListView, AnimationManager.FAST, () -> {
+                    filterFileList(searchField.getText());
+                    updateStatus();
+                    AnimationManager.fadeIn(fileListView, AnimationManager.NORMAL);
+                });
+            } else {
+                filterFileList(searchField.getText());
+                updateStatus();
+            }
+        });
     }
     
     /**
@@ -1874,16 +1885,208 @@ public class VaultMainController implements Initializable {
 
     
     /**
-     * Handle security dashboard
+     * Handle security dashboard - show security overview
      */
     @FXML
     private void handleDashboard() {
-        if (featureManager != null) {
-            featureManager.showDashboard(allVaultFiles);
-            logMessage("📊 Security Dashboard opened - Real-time monitoring active");
-        } else {
-            showError("Dashboard Error", "Feature manager not initialized");
+        try {
+            // Toggle dashboard overlay visibility with animation
+            if (dashboardOverlay != null) {
+                isDashboardVisible = !isDashboardVisible;
+                
+                if (isDashboardVisible) {
+                    dashboardOverlay.setVisible(true);
+                    updateDashboardInfo();
+                    // Animate dashboard in
+                    AnimationManager.fadeIn(dashboardOverlay, AnimationManager.NORMAL);
+                    AnimationManager.slideInFromTop(dashboardOverlay, AnimationManager.NORMAL, null);
+                    logMessage("📊 Security Dashboard opened - Real-time monitoring active");
+                } else {
+                    // Animate dashboard out
+                    AnimationManager.fadeOut(dashboardOverlay, AnimationManager.FAST, () -> {
+                        dashboardOverlay.setVisible(false);
+                    });
+                    logMessage("📊 Security Dashboard closed");
+                }
+            } else {
+                // Fallback: Show security info in a dialog
+                showSecurityInfo();
+            }
+        } catch (Exception e) {
+            logMessage("⚠ Dashboard error: " + e.getMessage());
+            showError("Dashboard Error", "Could not open security dashboard: " + e.getMessage());
         }
+    }
+    
+    /**
+     * Update dashboard information
+     */
+    private void updateDashboardInfo() {
+        if (dashboardOverlay == null) return;
+        
+        try {
+            // Update dashboard with current vault statistics
+            Platform.runLater(() -> {
+                // Clear existing content
+                dashboardOverlay.getChildren().clear();
+                
+                // Create dashboard content
+                Label titleLabel = new Label("🔒 Security Dashboard");
+                titleLabel.setStyle("-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: #F8FAFC;");
+                
+                Label filesLabel = new Label("📁 Files in Vault: " + allVaultFiles.size());
+                filesLabel.setStyle("-fx-font-size: 14px; -fx-text-fill: #CBD5E1;");
+                
+                Label sizeLabel = new Label("💾 Total Size: " + calculateTotalVaultSize());
+                sizeLabel.setStyle("-fx-font-size: 14px; -fx-text-fill: #CBD5E1;");
+                
+                Label encryptionLabel = new Label("🔐 Encryption: AES-256-GCM");
+                encryptionLabel.setStyle("-fx-font-size: 14px; -fx-text-fill: #10B981;");
+                
+                Label sessionLabel = new Label("⏱️ Session: Active");
+                sessionLabel.setStyle("-fx-font-size: 14px; -fx-text-fill: #10B981;");
+                
+                // Add close button
+                Button closeButton = new Button("✕ Close");
+                closeButton.setStyle("-fx-background-color: #EF4444; -fx-text-fill: white; -fx-border-radius: 4px; -fx-background-radius: 4px;");
+                closeButton.setOnAction(e -> {
+                    isDashboardVisible = false;
+                    dashboardOverlay.setVisible(false);
+                    logMessage("📊 Security Dashboard closed");
+                });
+                
+                dashboardOverlay.getChildren().addAll(titleLabel, filesLabel, sizeLabel, encryptionLabel, sessionLabel, closeButton);
+                dashboardOverlay.setSpacing(10);
+                dashboardOverlay.setStyle("-fx-background-color: rgba(30, 41, 59, 0.95); -fx-padding: 20px; -fx-border-color: #475569; -fx-border-width: 1px; -fx-border-radius: 8px; -fx-background-radius: 8px;");
+            });
+        } catch (Exception e) {
+            logMessage("⚠ Error updating dashboard: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Show security info in a dialog (fallback)
+     */
+    private void showSecurityInfo() {
+        String info = String.format(
+            "🔒 GhostVault Security Status\n\n" +
+            "📁 Files in Vault: %d\n" +
+            "💾 Total Size: %s\n" +
+            "🔐 Encryption: AES-256-GCM\n" +
+            "⏱️ Session: Active\n" +
+            "🛡️ Mode: %s",
+            allVaultFiles.size(),
+            calculateTotalVaultSize(),
+            isDecoyMode ? "Decoy Mode" : "Master Mode"
+        );
+        
+        showNotification("Security Dashboard", info);
+    }
+    
+    /**
+     * Calculate total vault size
+     */
+    private String calculateTotalVaultSize() {
+        long totalSize = 0;
+        for (VaultFile file : allVaultFiles) {
+            totalSize += file.getSize();
+        }
+        return formatFileSize(totalSize);
+    }
+    
+    /**
+     * Switch between light and dark themes
+     */
+    private void switchTheme() {
+        try {
+            if (mainContent != null && mainContent.getScene() != null) {
+                Scene scene = mainContent.getScene();
+                
+                // Toggle between themes with animation
+                AnimationManager.fadeOut(mainContent, AnimationManager.FAST, () -> {
+                    // Check current theme and switch
+                    if (scene.getStylesheets().contains(getClass().getResource("/css/password-manager-theme.css").toExternalForm())) {
+                        // Switch to light theme
+                        scene.getStylesheets().clear();
+                        scene.getStylesheets().add(getClass().getResource("/css/light-theme.css").toExternalForm());
+                        logMessage("🌞 Switched to Light Theme");
+                        showNotification("Theme Changed", "Switched to Light Theme");
+                    } else {
+                        // Switch to dark theme
+                        scene.getStylesheets().clear();
+                        scene.getStylesheets().add(getClass().getResource("/css/password-manager-theme.css").toExternalForm());
+                        logMessage("🌙 Switched to Dark Theme");
+                        showNotification("Theme Changed", "Switched to Dark Theme");
+                    }
+                    
+                    // Re-apply theme to all components
+                    com.ghostvault.ui.theme.PasswordManagerTheme.applyThemeToNode(mainContent);
+                    
+                    // Animate back in
+                    AnimationManager.fadeIn(mainContent, AnimationManager.NORMAL);
+                });
+            }
+        } catch (Exception e) {
+            logMessage("⚠ Theme switch error: " + e.getMessage());
+            showError("Theme Error", "Could not switch theme: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Show advanced file manager options
+     */
+    private void showAdvancedFileManager() {
+        // Create a dialog with advanced file management options
+        Alert dialog = new Alert(Alert.AlertType.INFORMATION);
+        dialog.setTitle("Advanced File Manager");
+        dialog.setHeaderText("Enhanced File Operations");
+        
+        String content = String.format(
+            "📁 Current Vault Status:\n" +
+            "• Files: %d\n" +
+            "• Total Size: %s\n" +
+            "• Mode: %s\n\n" +
+            "🔧 Available Operations:\n" +
+            "• Bulk file operations (Select multiple files)\n" +
+            "• File search and filtering (Use search box)\n" +
+            "• Drag & drop upload support\n" +
+            "• Secure file deletion with overwrite\n" +
+            "• Encrypted backup and restore\n" +
+            "• File integrity verification\n\n" +
+            "⌨️ Keyboard Shortcuts:\n" +
+            "• Ctrl+O: Upload files\n" +
+            "• Ctrl+S: Download selected\n" +
+            "• Delete: Secure delete\n" +
+            "• F5: Refresh file list\n" +
+            "• Ctrl+F: Focus search",
+            allVaultFiles.size(),
+            calculateTotalVaultSize(),
+            isDecoyMode ? "Decoy Mode" : "Master Mode"
+        );
+        
+        dialog.setContentText(content);
+        
+        // Apply password manager theme
+        dialog.getDialogPane().getStylesheets().add(
+            getClass().getResource("/css/password-manager-theme.css").toExternalForm());
+        dialog.getDialogPane().getStyleClass().add("dialog-pane");
+        
+        dialog.showAndWait();
+    }
+    
+    /**
+     * Add hover animation to buttons
+     */
+    private void addButtonHoverAnimation(Button button) {
+        if (button == null) return;
+        
+        button.setOnMouseEntered(e -> {
+            AnimationManager.pulse(button, 1.05, AnimationManager.FAST);
+        });
+        
+        button.setOnMousePressed(e -> {
+            AnimationManager.scaleIn(button);
+        });
     }
     
 
@@ -1898,11 +2101,18 @@ public class VaultMainController implements Initializable {
      */
     @FXML
     private void handleNotes() {
-        if (featureManager != null) {
-            featureManager.showNotes();
+        try {
+            // Create secure notes manager if needed
+            com.ghostvault.security.SecureNotesManager notesManager = 
+                new com.ghostvault.security.SecureNotesManager(encryptionKey);
+            
+            com.ghostvault.ui.CompactNotesWindow notesWindow = 
+                new com.ghostvault.ui.CompactNotesWindow(notesManager);
+            notesWindow.show();
             logMessage("📝 Secure Notes Manager activated");
-        } else {
-            showError("Notes Error", "Feature manager not initialized");
+        } catch (Exception e) {
+            logMessage("⚠ Notes error: " + e.getMessage());
+            showError("Notes Error", "Could not open secure notes: " + e.getMessage());
         }
     }
     
@@ -1940,15 +2150,17 @@ public class VaultMainController implements Initializable {
     }
     
     /**
-     * Show AI Enhanced window
+     * Handle advanced file manager - enhanced file management features
      */
     @FXML
     private void handleFileManager() {
-        if (featureManager != null) {
-            featureManager.showAIFeatures(allVaultFiles);
-            logMessage("🤖 AI Enhanced window opened - Smart analysis and features available");
-        } else {
-            showError("AI Error", "Feature manager not initialized");
+        try {
+            // Show advanced file management options
+            showAdvancedFileManager();
+            logMessage("📁 Advanced File Manager opened - Enhanced file operations available");
+        } catch (Exception e) {
+            logMessage("⚠ File Manager error: " + e.getMessage());
+            showError("File Manager Error", "Could not open advanced file manager: " + e.getMessage());
         }
     }
     
@@ -2034,6 +2246,9 @@ public class VaultMainController implements Initializable {
         Platform.runLater(() -> {
             operationProgress.setVisible(true);
             operationStatusLabel.setText(operation);
+            // Animate progress indicator
+            AnimationManager.fadeIn(operationProgress, AnimationManager.FAST);
+            AnimationManager.pulse(operationProgress);
         });
     }
     
@@ -2051,7 +2266,10 @@ public class VaultMainController implements Initializable {
      */
     private void hideOperationProgress() {
         Platform.runLater(() -> {
-            operationProgress.setVisible(false);
+            // Animate progress indicator out
+            AnimationManager.fadeOut(operationProgress, AnimationManager.FAST, () -> {
+                operationProgress.setVisible(false);
+            });
             operationStatusLabel.setText("");
         });
     }
@@ -2146,30 +2364,85 @@ public class VaultMainController implements Initializable {
     // =========================== NOTIFICATION HELPERS ===========================
     
     private void showNotification(String title, String message) {
-        if (uiManager != null) {
-            uiManager.showInfo(title, message);
+        com.ghostvault.ui.components.NotificationSystem.showInfo(title, message);
+        // Add success glow to main content
+        if (mainContent != null) {
+            AnimationManager.successGlow(mainContent);
         }
     }
     
     private void showWarning(String title, String message) {
-        if (uiManager != null) {
-            uiManager.showWarning(title, message);
+        com.ghostvault.ui.components.NotificationSystem.showWarning(title, message);
+        // Add warning pulse to main content
+        if (mainContent != null) {
+            AnimationManager.pulse(mainContent, 1.05, AnimationManager.FAST);
         }
     }
     
     private void showError(String title, String message) {
-        if (uiManager != null) {
-            uiManager.showError(title, message);
+        com.ghostvault.ui.components.NotificationSystem.showError(title, message);
+        // Add error shake and glow to main content
+        if (mainContent != null) {
+            AnimationManager.shake(mainContent);
+            AnimationManager.errorGlow(mainContent);
         }
     }
     
     private void showInfo(String title, String message) {
-        if (uiManager != null) {
-            uiManager.showInfo(title, message);
-        }
+        com.ghostvault.ui.components.NotificationSystem.showInfo(title, message);
     }
     
     private boolean showConfirmation(String title, String message) {
         return uiManager != null && uiManager.showConfirmation(title, message);
+    }
+    
+    /**
+     * Initialize accessibility features
+     */
+    private void initializeAccessibility() {
+        try {
+            if (mainContent != null && mainContent.getScene() != null) {
+                accessibilityManager = new com.ghostvault.ui.AccessibilityManager();
+                accessibilityManager.initializeAccessibility(mainContent.getScene());
+                logMessage("♿ Accessibility features initialized");
+            }
+        } catch (Exception e) {
+            logMessage("⚠ Accessibility initialization failed: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Show comprehensive help system
+     */
+    private void showHelpSystem() {
+        try {
+            com.ghostvault.ui.HelpSystem helpSystem = new com.ghostvault.ui.HelpSystem();
+            helpSystem.showHelp((javafx.stage.Stage) mainContent.getScene().getWindow());
+            logMessage("📖 Help system opened");
+        } catch (Exception e) {
+            logMessage("⚠ Help system not available: " + e.getMessage());
+            // Fallback to basic help
+            showInfo("Keyboard Shortcuts", 
+                "File Operations:\n" +
+                "• Ctrl+O - Upload files\n" +
+                "• Ctrl+S - Download selected file\n" +
+                "• Enter - Download selected file\n" +
+                "• Space - Preview selected file\n" +
+                "• Delete - Delete selected file\n\n" +
+                "Vault Operations:\n" +
+                "• Ctrl+B - Create backup\n" +
+                "• Ctrl+R - Restore from backup\n" +
+                "• F5 - Refresh file list\n\n" +
+                "Advanced Features:\n" +
+                "• Ctrl+D - Security Dashboard\n" +
+                "• Ctrl+N - Secure Notes\n" +
+                "• Ctrl+P - Password Manager\n" +
+                "• Ctrl+M - Advanced File Manager\n" +
+                "• Ctrl+T - Switch Theme (Dark/Light)\n\n" +
+                "Navigation:\n" +
+                "• Ctrl+F - Focus search box\n" +
+                "• Ctrl+Q - Logout\n" +
+                "• F1 - Show this help");
+        }
     }
 }
