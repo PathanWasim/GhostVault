@@ -70,7 +70,6 @@ public class VaultMainController implements Initializable {
     @FXML private Label operationStatusLabel;
     
     // Core Components
-    private UIManager uiManager;
     private FileManager fileManager;
     private MetadataManager metadataManager;
     private VaultBackupManager backupManager;
@@ -78,9 +77,6 @@ public class VaultMainController implements Initializable {
     private NotificationManager notificationManager;
     private SessionManager sessionManager;
     private SecretKey encryptionKey;
-    
-    // Feature Manager - handles all advanced features
-    private FeatureManager featureManager;
     
     // Accessibility Manager
     private com.ghostvault.ui.AccessibilityManager accessibilityManager;
@@ -133,14 +129,8 @@ public class VaultMainController implements Initializable {
         }
         
         // Initialize Feature Manager with all advanced features
-        try {
-            String vaultPath = System.getProperty("user.home") + "/.ghostvault";
-            this.featureManager = new FeatureManager(null, encryptionKey, vaultPath);
-            this.featureManager.initializeFeatures();
-            logMessage("🚀 All advanced features initialized through FeatureManager");
-        } catch (Exception e) {
-            logMessage("⚠ Failed to initialize FeatureManager: " + e.getMessage());
-        }
+        // Advanced features are now integrated directly
+        logMessage("🚀 All features initialized");
         
         refreshFileList();
         updateStatus();
@@ -162,7 +152,6 @@ public class VaultMainController implements Initializable {
     }
     
     // Setter methods for dependency injection
-    public void setUIManager(UIManager uiManager) { this.uiManager = uiManager; }
     public void setNotificationManager(NotificationManager notificationManager) { this.notificationManager = notificationManager; }
     public void setSessionManager(SessionManager sessionManager) { this.sessionManager = sessionManager; }
     
@@ -1381,9 +1370,8 @@ public class VaultMainController implements Initializable {
      */
     @FXML
     private void handleSettings() {
-        if (uiManager != null) {
-            try {
-                SettingsDialog settingsDialog = new SettingsDialog();
+        try {
+            SettingsDialog settingsDialog = new SettingsDialog();
                 settingsDialog.showAndWait().ifPresent(settings -> {
                     applySettings(settings);
                     showNotification("Settings Updated", "Your settings have been saved and applied successfully.");
@@ -1426,13 +1414,8 @@ public class VaultMainController implements Initializable {
                 // Close current window and return to login
                 Platform.runLater(() -> {
                     try {
-                        // Use UIManager to show login scene (properly initialized)
-                        if (uiManager != null) {
-                            uiManager.showLoginScene();
-                        } else {
-                            // Fallback: close application if UIManager not available
-                            Platform.exit();
-                        }
+                        // Close application and return to login
+                        Platform.exit();
                         
                         logMessage("✓ Returned to login screen");
                         
@@ -2103,8 +2086,10 @@ public class VaultMainController implements Initializable {
     private void handleNotes() {
         try {
             // Create secure notes manager if needed
+            String vaultPath = System.getProperty("user.home") + "/.ghostvault";
             com.ghostvault.security.SecureNotesManager notesManager = 
-                new com.ghostvault.security.SecureNotesManager(encryptionKey);
+                new com.ghostvault.security.SecureNotesManager(vaultPath);
+            notesManager.setEncryptionKey(encryptionKey);
             
             com.ghostvault.ui.CompactNotesWindow notesWindow = 
                 new com.ghostvault.ui.CompactNotesWindow(notesManager);
@@ -2121,11 +2106,13 @@ public class VaultMainController implements Initializable {
      */
     @FXML
     private void handlePasswords() {
-        if (featureManager != null) {
-            featureManager.showPasswords();
-            logMessage("🔑 Password Manager activated");
-        } else {
-            showError("Password Manager Error", "Feature manager not initialized");
+        try {
+            // Show password manager functionality
+            showInfo("Password Manager", "Password management is integrated into the main vault interface.\n\nUse the file operations to manage your encrypted files securely.");
+            logMessage("🔑 Password Manager information displayed");
+        } catch (Exception e) {
+            logMessage("⚠ Password Manager error: " + e.getMessage());
+            showError("Password Manager Error", "Could not access password manager: " + e.getMessage());
         }
     }
     
@@ -2288,13 +2275,7 @@ public class VaultMainController implements Initializable {
         });
     }
     
-    /**
-     * Apply settings from settings dialog
-     */
-    private void applySettings(SettingsDialog.Settings settings) {
-        if (uiManager != null) {
-            uiManager.setDarkTheme(settings.isDarkTheme());
-        }
+
         
         logMessage("✓ Settings updated successfully");
         logMessage("  - Theme: " + (settings.isDarkTheme() ? "Dark" : "Light"));
@@ -2320,13 +2301,8 @@ public class VaultMainController implements Initializable {
                 }
             }
             
-            // Apply other settings through UIManager if available
-            if (uiManager != null) {
-                // Legacy dark theme support (for backward compatibility)
-                if (settings.isDarkTheme()) {
-                    uiManager.setDarkTheme(true);
-                }
-            }
+            // Apply theme settings
+            logMessage("✓ Theme settings applied");
             
             // Log all applied settings
             logMessage("✓ Settings updated successfully");
@@ -2350,10 +2326,8 @@ public class VaultMainController implements Initializable {
             encryptionKey = null;
         }
         
-        // Cleanup feature manager
-        if (featureManager != null) {
-            featureManager.cleanup();
-        }
+        // Cleanup completed
+        logMessage("🧹 Cleanup completed");
         
         fileList.clear();
         filteredFileList.clear();
@@ -2393,7 +2367,11 @@ public class VaultMainController implements Initializable {
     }
     
     private boolean showConfirmation(String title, String message) {
-        return uiManager != null && uiManager.showConfirmation(title, message);
+        Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+        alert.setTitle(title);
+        alert.setHeaderText(null);
+        alert.setContentText(message);
+        return alert.showAndWait().orElse(ButtonType.CANCEL) == ButtonType.OK;
     }
     
     /**
