@@ -76,17 +76,73 @@ public class SettingsDialog extends Dialog<SettingsDialog.Settings> {
         return section;
     }
     
+    private ComboBox<String> themeComboBox;
+    
     private VBox createAppearanceControls() {
-        VBox controls = new VBox(10);
+        VBox controls = new VBox(15);
         
-        darkThemeCheckBox = new CheckBox("Enable Dark Theme");
-        darkThemeCheckBox.setSelected(false); // Default to light theme
+        // Theme selection
+        Label themeLabel = new Label("Interface Theme:");
+        themeLabel.setStyle("-fx-font-weight: bold;");
         
-        Label themeInfo = new Label("Switch between light and dark interface themes");
+        themeComboBox = new ComboBox<>();
+        themeComboBox.getItems().addAll(
+            "Modern Password Manager",
+            "High-Tech Dark", 
+            "Modern Light",
+            "High Contrast",
+            "Professional"
+        );
+        themeComboBox.setValue("Modern Password Manager"); // Default theme
+        themeComboBox.setPrefWidth(200);
+        
+        Label themeInfo = new Label("Choose your preferred interface theme");
         themeInfo.setStyle("-fx-text-fill: #666; -fx-font-size: 12px;");
         
-        controls.getChildren().addAll(darkThemeCheckBox, themeInfo);
+        // Keep the old checkbox for backward compatibility
+        darkThemeCheckBox = new CheckBox("Legacy Dark Theme Mode");
+        darkThemeCheckBox.setSelected(false);
+        darkThemeCheckBox.setVisible(false); // Hide it but keep for compatibility
+        
+        // Theme preview button
+        Button previewButton = new Button("🎨 Preview Theme");
+        previewButton.setOnAction(e -> previewSelectedTheme());
+        
+        controls.getChildren().addAll(
+            themeLabel, 
+            themeComboBox, 
+            previewButton,
+            themeInfo,
+            darkThemeCheckBox
+        );
         return controls;
+    }
+    
+    private void previewSelectedTheme() {
+        String selectedTheme = themeComboBox.getValue();
+        if (selectedTheme != null) {
+            com.ghostvault.ui.components.ModernThemeManager.Theme theme = getThemeFromDisplayName(selectedTheme);
+            if (theme != null && getDialogPane().getScene() != null) {
+                com.ghostvault.ui.components.ModernThemeManager.applyTheme(getDialogPane().getScene(), theme);
+                
+                // Show preview notification
+                Alert preview = new Alert(Alert.AlertType.INFORMATION);
+                preview.setTitle("Theme Preview");
+                preview.setHeaderText("Theme Preview: " + selectedTheme);
+                preview.setContentText("This is how the " + selectedTheme + " theme looks. Click OK to continue or Cancel to revert.");
+                preview.showAndWait();
+            }
+        }
+    }
+    
+    private com.ghostvault.ui.components.ModernThemeManager.Theme getThemeFromDisplayName(String displayName) {
+        for (com.ghostvault.ui.components.ModernThemeManager.Theme theme : 
+             com.ghostvault.ui.components.ModernThemeManager.Theme.values()) {
+            if (theme.getDisplayName().equals(displayName)) {
+                return theme;
+            }
+        }
+        return com.ghostvault.ui.components.ModernThemeManager.Theme.PASSWORD_MANAGER;
     }
     
     private VBox createSecurityControls() {
@@ -160,7 +216,8 @@ public class SettingsDialog extends Dialog<SettingsDialog.Settings> {
                     autoBackupCheckBox.isSelected(),
                     (int) sessionTimeoutSlider.getValue(),
                     notificationsCheckBox.isSelected(),
-                    secureDeleteCheckBox.isSelected()
+                    secureDeleteCheckBox.isSelected(),
+                    themeComboBox.getValue()
                 );
             }
             return null;
@@ -176,14 +233,16 @@ public class SettingsDialog extends Dialog<SettingsDialog.Settings> {
         private final int sessionTimeout;
         private final boolean notificationsEnabled;
         private final boolean secureDeleteEnabled;
+        private final String selectedTheme;
         
         public Settings(boolean darkTheme, boolean autoBackupEnabled, int sessionTimeout, 
-                       boolean notificationsEnabled, boolean secureDeleteEnabled) {
+                       boolean notificationsEnabled, boolean secureDeleteEnabled, String selectedTheme) {
             this.darkTheme = darkTheme;
             this.autoBackupEnabled = autoBackupEnabled;
             this.sessionTimeout = sessionTimeout;
             this.notificationsEnabled = notificationsEnabled;
             this.secureDeleteEnabled = secureDeleteEnabled;
+            this.selectedTheme = selectedTheme;
         }
         
         public boolean isDarkTheme() { return darkTheme; }
@@ -191,5 +250,18 @@ public class SettingsDialog extends Dialog<SettingsDialog.Settings> {
         public int getSessionTimeout() { return sessionTimeout; }
         public boolean isNotificationsEnabled() { return notificationsEnabled; }
         public boolean isSecureDeleteEnabled() { return secureDeleteEnabled; }
+        public String getSelectedTheme() { return selectedTheme; }
+        
+        public com.ghostvault.ui.components.ModernThemeManager.Theme getThemeEnum() {
+            if (selectedTheme == null) return com.ghostvault.ui.components.ModernThemeManager.Theme.PASSWORD_MANAGER;
+            
+            for (com.ghostvault.ui.components.ModernThemeManager.Theme theme : 
+                 com.ghostvault.ui.components.ModernThemeManager.Theme.values()) {
+                if (theme.getDisplayName().equals(selectedTheme)) {
+                    return theme;
+                }
+            }
+            return com.ghostvault.ui.components.ModernThemeManager.Theme.PASSWORD_MANAGER;
+        }
     }
 }

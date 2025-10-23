@@ -279,4 +279,173 @@ public class StyleManager {
             region.getChildrenUnmodifiable().forEach(StyleManager::applyStylesToChildren);
         }
     }
+    
+    /**
+     * Apply component-specific styling based on component type and context
+     */
+    public static void applyComponentSpecificStyling(Node component, String componentType) {
+        if (component == null || componentType == null) return;
+        
+        switch (componentType.toLowerCase()) {
+            case "toolbar":
+                applyToolbarStyling(component);
+                break;
+            case "sidebar":
+                applySidebarStyling(component);
+                break;
+            case "card":
+                applyCardStyling(component);
+                break;
+            case "modal":
+                applyModalStyling(component);
+                break;
+            case "notification":
+                applyNotificationStyling(component);
+                break;
+            case "form":
+                applyFormStyling(component);
+                break;
+            default:
+                applyTextStyles(component);
+                break;
+        }
+    }
+    
+    /**
+     * Apply toolbar-specific styling
+     */
+    private static void applyToolbarStyling(Node toolbar) {
+        String style = String.format(
+            "-fx-background-color: %s; " +
+            "-fx-border-color: #555555; " +
+            "-fx-border-width: 0 0 1px 0; " +
+            "-fx-padding: 8px 16px;",
+            DARKER_BACKGROUND
+        );
+        toolbar.setStyle(style);
+    }
+    
+    /**
+     * Apply sidebar-specific styling
+     */
+    private static void applySidebarStyling(Node sidebar) {
+        String style = String.format(
+            "-fx-background-color: %s; " +
+            "-fx-border-color: #555555; " +
+            "-fx-border-width: 0 1px 0 0; " +
+            "-fx-padding: 16px;",
+            DARKER_BACKGROUND
+        );
+        sidebar.setStyle(style);
+    }
+    
+    /**
+     * Apply card-specific styling
+     */
+    private static void applyCardStyling(Node card) {
+        String style = String.format(
+            "-fx-background-color: %s; " +
+            "-fx-border-color: #555555; " +
+            "-fx-border-width: 1px; " +
+            "-fx-border-radius: 8px; " +
+            "-fx-background-radius: 8px; " +
+            "-fx-padding: 16px; " +
+            "-fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.2), 4, 0, 0, 2);",
+            DARK_BACKGROUND
+        );
+        card.setStyle(style);
+    }
+    
+    /**
+     * Apply modal-specific styling
+     */
+    private static void applyModalStyling(Node modal) {
+        String style = String.format(
+            "-fx-background-color: %s; " +
+            "-fx-border-color: #666666; " +
+            "-fx-border-width: 2px; " +
+            "-fx-border-radius: 12px; " +
+            "-fx-background-radius: 12px; " +
+            "-fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.5), 20, 0, 0, 8);",
+            DARK_BACKGROUND
+        );
+        modal.setStyle(style);
+    }
+    
+    /**
+     * Apply notification-specific styling
+     */
+    private static void applyNotificationStyling(Node notification) {
+        String style = String.format(
+            "-fx-background-color: %s; " +
+            "-fx-border-color: %s; " +
+            "-fx-border-width: 1px; " +
+            "-fx-border-radius: 8px; " +
+            "-fx-background-radius: 8px; " +
+            "-fx-padding: 12px 16px; " +
+            "-fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.3), 8, 0, 0, 4);",
+            DARK_BACKGROUND, SUCCESS_COLOR
+        );
+        notification.setStyle(style);
+    }
+    
+    /**
+     * Apply form-specific styling
+     */
+    private static void applyFormStyling(Node form) {
+        String style = String.format(
+            "-fx-background-color: %s; " +
+            "-fx-padding: 20px; " +
+            "-fx-spacing: 12px;",
+            DARK_BACKGROUND
+        );
+        form.setStyle(style);
+    }
+    
+    /**
+     * Create CSS animation for smooth transitions
+     */
+    public static String createTransitionCSS(String property, String duration) {
+        return String.format("-fx-transition: %s %s ease-in-out;", property, duration);
+    }
+    
+    /**
+     * Apply hover effects to interactive components
+     */
+    public static void applyHoverEffects(Node component) {
+        if (component == null) return;
+        
+        String originalStyle = component.getStyle();
+        
+        component.setOnMouseEntered(e -> {
+            String hoverStyle = originalStyle + " -fx-scale-x: 1.02; -fx-scale-y: 1.02;";
+            component.setStyle(hoverStyle);
+        });
+        
+        component.setOnMouseExited(e -> {
+            component.setStyle(originalStyle);
+        });
+    }
+    
+    /**
+     * Apply focus effects to input components
+     */
+    public static void applyFocusEffects(Node component) {
+        if (component == null) return;
+        
+        String originalStyle = component.getStyle();
+        
+        component.focusedProperty().addListener((obs, wasFocused, isNowFocused) -> {
+            if (isNowFocused) {
+                String focusStyle = originalStyle + String.format(
+                    " -fx-border-color: %s; -fx-border-width: 2px; " +
+                    "-fx-effect: dropshadow(gaussian, %s, 4, 0, 0, 0);",
+                    SUCCESS_COLOR, SUCCESS_COLOR + "44"
+                );
+                component.setStyle(focusStyle);
+            } else {
+                component.setStyle(originalStyle);
+            }
+        });
+    }
 }

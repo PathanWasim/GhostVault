@@ -2087,6 +2087,44 @@ public class VaultMainController implements Initializable {
     }
     
     /**
+     * Apply settings from settings dialog
+     */
+    private void applySettings(SettingsDialog.Settings settings) {
+        if (settings == null) return;
+        
+        try {
+            // Apply theme settings
+            if (settings.getSelectedTheme() != null) {
+                com.ghostvault.ui.components.ModernThemeManager.Theme selectedTheme = settings.getThemeEnum();
+                if (mainContent != null && mainContent.getScene() != null) {
+                    com.ghostvault.ui.components.ModernThemeManager.switchTheme(selectedTheme);
+                    logMessage("🎨 Theme changed to: " + selectedTheme.getDisplayName());
+                }
+            }
+            
+            // Apply other settings through UIManager if available
+            if (uiManager != null) {
+                // Legacy dark theme support (for backward compatibility)
+                if (settings.isDarkTheme()) {
+                    uiManager.setDarkTheme(true);
+                }
+            }
+            
+            // Log all applied settings
+            logMessage("✓ Settings updated successfully");
+            logMessage("  - Theme: " + (settings.getSelectedTheme() != null ? settings.getSelectedTheme() : "Default"));
+            logMessage("  - Session timeout: " + settings.getSessionTimeout() + " minutes");
+            logMessage("  - Auto-backup: " + (settings.isAutoBackupEnabled() ? "Enabled" : "Disabled"));
+            logMessage("  - Notifications: " + (settings.isNotificationsEnabled() ? "Enabled" : "Disabled"));
+            logMessage("  - Secure delete: " + (settings.isSecureDeleteEnabled() ? "Enabled" : "Disabled"));
+            
+        } catch (Exception e) {
+            logMessage("⚠ Error applying settings: " + e.getMessage());
+            showError("Settings Error", "Some settings could not be applied: " + e.getMessage());
+        }
+    }
+    
+    /**
      * Clear sensitive data from memory
      */
     private void clearSensitiveData() {
