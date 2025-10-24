@@ -2275,16 +2275,6 @@ public class VaultMainController implements Initializable {
         });
     }
     
-
-        
-        logMessage("✓ Settings updated successfully");
-        logMessage("  - Theme: " + (settings.isDarkTheme() ? "Dark" : "Light"));
-        logMessage("  - Session timeout: " + settings.getSessionTimeout() + " minutes");
-        logMessage("  - Auto-backup: " + (settings.isAutoBackupEnabled() ? "Enabled" : "Disabled"));
-        logMessage("  - Notifications: " + (settings.isNotificationsEnabled() ? "Enabled" : "Disabled"));
-        logMessage("  - Secure delete: " + (settings.isSecureDeleteEnabled() ? "Enabled" : "Disabled"));
-    }
-    
     /**
      * Apply settings from settings dialog
      */
