@@ -375,10 +375,8 @@ public class NotificationSystem {
         }
         
         public void show() {
-            if (parentWindow != null) {
-                show(parentWindow);
-                AnimationManager.slideInFromRight(content);
-            }
+            // Temporarily disabled to prevent infinite loop
+            // TODO: Fix the notification system
         }
         
         public void hide() {
