@@ -293,12 +293,19 @@ public class GhostVaultApp extends Application {
         Label subtitle = new Label("Enter your vault password");
         subtitle.setStyle("-fx-font-size: 16px; -fx-text-fill: #cccccc;");
         
-        // Password input
+        // Password input container for better width control
+        VBox passwordContainer = new VBox();
+        passwordContainer.setAlignment(Pos.CENTER);
+        passwordContainer.setMaxWidth(400);
+        
         PasswordField passwordField = new PasswordField();
         passwordField.setPromptText("Password");
         passwordField.setPrefWidth(350);
+        passwordField.setMaxWidth(350);
         passwordField.setPrefHeight(50);
         passwordField.setStyle("-fx-font-size: 16px; -fx-background-color: #2b2b2b; -fx-text-fill: white; -fx-prompt-text-fill: #888888; -fx-background-radius: 8;");
+        
+        passwordContainer.getChildren().add(passwordField);
         
         // Buttons
         HBox buttonBox = new HBox(15);
@@ -325,7 +332,7 @@ public class GhostVaultApp extends Application {
         // Enter key support
         passwordField.setOnAction(e -> unlockButton.fire());
         
-        root.getChildren().addAll(title, subtitle, passwordField, buttonBox, statusLabel);
+        root.getChildren().addAll(title, subtitle, passwordContainer, buttonBox, statusLabel);
         
         Scene scene = new Scene(root, 600, 500);
         primaryStage.setScene(scene);
