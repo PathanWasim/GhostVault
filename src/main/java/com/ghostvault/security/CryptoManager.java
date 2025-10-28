@@ -265,15 +265,25 @@ public class CryptoManager {
     }
     
     /**
-     * Derive key from password using PBKDF2
+     * Derive key from password using deterministic key derivation
+     * Uses EnhancedKeyManager for consistent key generation across sessions
      */
     public SecretKey deriveKeyFromPassword(char[] password) throws GeneralSecurityException {
-        return deriveKeyFromPassword(password, "default_salt".getBytes());
+        try {
+            String passwordString = new String(password);
+            EnhancedKeyManager keyManager = new EnhancedKeyManager();
+            return keyManager.deriveKey(passwordString);
+        } finally {
+            // Clear password from memory
+            Arrays.fill(password, '\0');
+        }
     }
     
     /**
-     * Derive key from password using PBKDF2 with salt
+     * Derive key from password using PBKDF2 with salt (legacy method)
+     * @deprecated Use deriveKeyFromPassword(char[]) for deterministic key generation
      */
+    @Deprecated
     public SecretKey deriveKeyFromPassword(char[] password, byte[] salt) throws GeneralSecurityException {
         try {
             javax.crypto.spec.PBEKeySpec spec = new javax.crypto.spec.PBEKeySpec(password, salt, 100000, 256);
@@ -284,6 +294,21 @@ public class CryptoManager {
             // Clear password from memory
             Arrays.fill(password, '\0');
         }
+    }
+    
+    /**
+     * Derive key from password string (convenience method)
+     */
+    public SecretKey deriveKeyFromPassword(String password) throws GeneralSecurityException {
+        EnhancedKeyManager keyManager = new EnhancedKeyManager();
+        return keyManager.deriveKey(password);
+    }
+    
+    /**
+     * Get enhanced key manager instance for advanced key operations
+     */
+    public EnhancedKeyManager getEnhancedKeyManager() {
+        return new EnhancedKeyManager();
     }
     
     /**

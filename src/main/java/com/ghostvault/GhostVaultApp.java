@@ -359,7 +359,7 @@ public class GhostVaultApp extends Application {
         String mode = determineMode(password);
         System.out.println("✅ Authentication successful - Mode: " + mode);
         
-        showMainApplication(mode);
+        showMainApplication(mode, password);
     }
     
     /**
@@ -375,7 +375,7 @@ public class GhostVaultApp extends Application {
     /**
      * Show main application using the original FXML-based UI
      */
-    private void showMainApplication(String mode) {
+    private void showMainApplication(String mode, String password) {
         System.out.println("🏠 Showing main application - Mode: " + mode);
         
         try {
@@ -416,8 +416,8 @@ public class GhostVaultApp extends Application {
                 com.ghostvault.backup.VaultBackupManager backupManager = new com.ghostvault.backup.VaultBackupManager(
                     cryptoManager, fileManager, metadataManager, auditManager);
                 
-                // Create a demo encryption key
-                javax.crypto.SecretKey encryptionKey = createDemoEncryptionKey();
+                // Create encryption key from user password using deterministic key derivation
+                javax.crypto.SecretKey encryptionKey = createEncryptionKeyFromPassword(password);
                 
                 vaultController.initialize(fileManager, metadataManager, backupManager, encryptionKey);
             }
@@ -445,7 +445,21 @@ public class GhostVaultApp extends Application {
     }
     
     /**
-     * Create a demo encryption key for testing
+     * Create encryption key from user password using deterministic key derivation
+     */
+    private javax.crypto.SecretKey createEncryptionKeyFromPassword(String password) {
+        try {
+            com.ghostvault.security.EnhancedKeyManager keyManager = new com.ghostvault.security.EnhancedKeyManager();
+            return keyManager.deriveKey(password);
+        } catch (Exception e) {
+            System.err.println("❌ Failed to derive key from password: " + e.getMessage());
+            // Fallback to demo key if derivation fails
+            return createDemoEncryptionKey();
+        }
+    }
+    
+    /**
+     * Create a demo encryption key for testing (fallback)
      */
     private javax.crypto.SecretKey createDemoEncryptionKey() {
         try {

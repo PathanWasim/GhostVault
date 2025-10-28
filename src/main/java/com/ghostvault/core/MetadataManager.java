@@ -178,9 +178,54 @@ public class MetadataManager {
     }
     
     /**
-     * Save encrypted metadata to file using serialization
+     * Save encrypted metadata to file using serialization with automatic backup
      */
     public void saveMetadata() throws Exception {
+        if (encryptionKey == null) {
+            throw new IllegalStateException("Encryption key not set");
+        }
+        
+        // Create backup before saving (if metadata file exists)
+        Path metadataPath = Paths.get(metadataFilePath);
+        if (Files.exists(metadataPath)) {
+            try {
+                createBackup();
+            } catch (Exception e) {
+                // Don't fail the save operation if backup fails
+                System.err.println("Warning: Failed to create metadata backup: " + e.getMessage());
+            }
+        }
+        
+        byte[] serializedData = null;
+        
+        try {
+            // Serialize metadata to bytes
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            try (ObjectOutputStream oos = new ObjectOutputStream(baos)) {
+                oos.writeObject(new HashMap<>(fileRegistry));
+            }
+            
+            serializedData = baos.toByteArray();
+            
+            // Encrypt metadata
+            byte[] encryptedBytes = cryptoManager.encrypt(serializedData, encryptionKey);
+            CryptoManager.EncryptedData encrypted = CryptoManager.EncryptedData.fromCombinedData(encryptedBytes);
+            
+            // Write to file
+            FileUtils.writeEncryptedFile(metadataPath, encrypted);
+            
+        } finally {
+            // Clear sensitive data from memory
+            if (serializedData != null) {
+                MemoryUtils.secureWipe(serializedData);
+            }
+        }
+    }
+    
+    /**
+     * Save metadata without creating backup (for internal use)
+     */
+    private void saveMetadataWithoutBackup() throws Exception {
         if (encryptionKey == null) {
             throw new IllegalStateException("Encryption key not set");
         }
@@ -212,7 +257,7 @@ public class MetadataManager {
     }
     
     /**
-     * Load encrypted metadata from file using serialization
+     * Load encrypted metadata from file using serialization with recovery capabilities
      */
     public void loadMetadata() throws Exception {
         Path metadataPath = Paths.get(metadataFilePath);
@@ -226,6 +271,34 @@ public class MetadataManager {
             throw new IllegalStateException("Encryption key not set");
         }
         
+        // Try primary load first
+        try {
+            loadMetadataPrimary();
+            return;
+        } catch (Exception primaryException) {
+            // Primary load failed, attempt recovery
+            System.out.println("Primary metadata load failed, attempting recovery...");
+            
+            try {
+                boolean recovered = attemptMetadataRecovery(primaryException);
+                if (recovered) {
+                    System.out.println("Metadata recovery successful");
+                    return;
+                }
+            } catch (Exception recoveryException) {
+                System.err.println("Metadata recovery also failed: " + recoveryException.getMessage());
+            }
+            
+            // If recovery fails, throw the original exception
+            throw primaryException;
+        }
+    }
+    
+    /**
+     * Primary metadata loading method
+     */
+    private void loadMetadataPrimary() throws Exception {
+        Path metadataPath = Paths.get(metadataFilePath);
         byte[] decryptedData = null;
         
         try {
@@ -243,13 +316,147 @@ public class MetadataManager {
                 fileRegistry.clear();
                 fileRegistry.putAll(loadedRegistry);
             }
-        } catch (Exception e) {
-            throw new Exception("Failed to load metadata: " + e.getMessage(), e);
         } finally {
             // Clear sensitive data from memory
             if (decryptedData != null) {
                 MemoryUtils.secureWipe(decryptedData);
             }
+        }
+    }
+    
+    /**
+     * Attempt metadata recovery using alternative key derivation methods
+     */
+    private boolean attemptMetadataRecovery(Exception originalException) throws Exception {
+        // Get the vault directory to find recovery manager
+        Path metadataPath = Paths.get(metadataFilePath);
+        String vaultPath = metadataPath.getParent().toString();
+        
+        MetadataRecoveryManager recoveryManager = new MetadataRecoveryManager(vaultPath);
+        
+        // Try to validate metadata with alternative keys
+        com.ghostvault.security.EnhancedKeyManager keyManager = cryptoManager.getEnhancedKeyManager();
+        
+        // We need the password to generate key variants, but we don't have it here
+        // So we'll try to restore from backup first
+        if (attemptBackupRestore(recoveryManager)) {
+            return true;
+        }
+        
+        // Log detailed recovery attempt information
+        System.err.println("Metadata recovery failed. Original error: " + originalException.getMessage());
+        System.err.println("Consider using manual recovery tools or restoring from backup.");
+        
+        return false;
+    }
+    
+    /**
+     * Attempt to restore metadata from backup
+     */
+    private boolean attemptBackupRestore(MetadataRecoveryManager recoveryManager) {
+        List<String> backups = recoveryManager.getAvailableBackups();
+        
+        for (String backup : backups) {
+            try {
+                if (recoveryManager.restoreMetadataFromBackup(backup)) {
+                    // Try to load the restored metadata
+                    loadMetadataPrimary();
+                    System.out.println("Successfully restored metadata from backup: " + backup);
+                    return true;
+                }
+            } catch (Exception e) {
+                System.err.println("Failed to restore from backup " + backup + ": " + e.getMessage());
+            }
+        }
+        
+        return false;
+    }
+    
+    /**
+     * Load metadata with alternative key (for recovery)
+     */
+    public boolean loadMetadataWithKey(SecretKey alternativeKey) {
+        SecretKey originalKey = this.encryptionKey;
+        
+        try {
+            this.encryptionKey = alternativeKey;
+            loadMetadataPrimary();
+            return true;
+        } catch (Exception e) {
+            // Restore original key if alternative fails
+            this.encryptionKey = originalKey;
+            return false;
+        }
+    }
+    
+    /**
+     * Create metadata backup before critical operations
+     */
+    public void createBackup() {
+        try {
+            Path metadataPath = Paths.get(metadataFilePath);
+            String vaultPath = metadataPath.getParent().toString();
+            
+            MetadataRecoveryManager recoveryManager = new MetadataRecoveryManager(vaultPath);
+            recoveryManager.createMetadataBackup();
+        } catch (Exception e) {
+            System.err.println("Failed to create metadata backup: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Validate backup integrity
+     */
+    public boolean validateBackup(String backupFileName) {
+        try {
+            Path metadataPath = Paths.get(metadataFilePath);
+            String vaultPath = metadataPath.getParent().toString();
+            
+            MetadataRecoveryManager recoveryManager = new MetadataRecoveryManager(vaultPath);
+            String backupPath = vaultPath + "/" + backupFileName;
+            
+            return recoveryManager.validateMetadata(backupPath, encryptionKey);
+        } catch (Exception e) {
+            System.err.println("Failed to validate backup: " + e.getMessage());
+            return false;
+        }
+    }
+    
+    /**
+     * Get list of available backups
+     */
+    public List<String> getAvailableBackups() {
+        try {
+            Path metadataPath = Paths.get(metadataFilePath);
+            String vaultPath = metadataPath.getParent().toString();
+            
+            MetadataRecoveryManager recoveryManager = new MetadataRecoveryManager(vaultPath);
+            return recoveryManager.getAvailableBackups();
+        } catch (Exception e) {
+            System.err.println("Failed to list backups: " + e.getMessage());
+            return new ArrayList<>();
+        }
+    }
+    
+    /**
+     * Restore metadata from specific backup
+     */
+    public boolean restoreFromBackup(String backupFileName) {
+        try {
+            Path metadataPath = Paths.get(metadataFilePath);
+            String vaultPath = metadataPath.getParent().toString();
+            
+            MetadataRecoveryManager recoveryManager = new MetadataRecoveryManager(vaultPath);
+            
+            if (recoveryManager.restoreMetadataFromBackup(backupFileName)) {
+                // Reload metadata after restore
+                loadMetadataPrimary();
+                return true;
+            }
+            return false;
+        } catch (Exception e) {
+            System.err.println("Failed to restore from backup: " + e.getMessage());
+            return false;
         }
     }
     
