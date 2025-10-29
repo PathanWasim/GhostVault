@@ -49,8 +49,7 @@ public class PasswordVaultManager {
         Path passwordsPath = Paths.get(passwordsFilePath);
         
         if (!Files.exists(passwordsPath)) {
-            // Create sample passwords for demo
-            createSamplePasswords();
+            // No existing passwords file - start with empty vault
             return;
         }
         
@@ -251,47 +250,7 @@ public class PasswordVaultManager {
                 .collect(Collectors.joining());
     }
     
-    /**
-     * Create sample passwords for demo
-     */
-    private void createSamplePasswords() {
-        try {
-            // Create different passwords based on vault mode (this would be determined by context)
-            PasswordEntry entry1 = new PasswordEntry("Gmail Account", "user@gmail.com", "SecurePass123!", "https://gmail.com");
-            entry1.setCategory("Email");
-            entry1.setNotes("Personal email account");
-            
-            PasswordEntry entry2 = new PasswordEntry("Bank Account", "john.doe", "BankPass456#", "https://bank.com");
-            entry2.setCategory("Banking");
-            entry2.setNotes("Main checking account");
-            entry2.setFavorite(true);
-            
-            PasswordEntry entry3 = new PasswordEntry("Work Portal", "j.doe", "WorkSecure789$", "https://company.com");
-            entry3.setCategory("Work");
-            entry3.setNotes("Company intranet access");
-            
-            PasswordEntry entry4 = new PasswordEntry("Amazon", "johndoe123", "ShopPass321!", "https://amazon.com");
-            entry4.setCategory("Shopping");
-            
-            PasswordEntry entry5 = new PasswordEntry("Crypto Wallet", "cryptouser", "CryptoSecure999#", "https://coinbase.com");
-            entry5.setCategory("Crypto");
-            entry5.setNotes("Main cryptocurrency wallet");
-            entry5.setFavorite(true);
-            
-            passwords.put(entry1.getId(), entry1);
-            passwords.put(entry2.getId(), entry2);
-            passwords.put(entry3.getId(), entry3);
-            passwords.put(entry4.getId(), entry4);
-            passwords.put(entry5.getId(), entry5);
-            
-            if (encryptionKey != null) {
-                savePasswords();
-            }
-            
-        } catch (Exception e) {
-            System.err.println("Failed to create sample passwords: " + e.getMessage());
-        }
-    }
+
     
     /**
      * Calculate password strength (0-100)
