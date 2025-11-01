@@ -1,6 +1,7 @@
 package com.ghostvault.security;
 
-import com.ghostvault.config.AppConfig;
+// import com.ghostvault.config.AppConfig; // Using constants instead
+import com.ghostvault.util.MemoryUtils;
 
 import javax.crypto.*;
 import javax.crypto.spec.GCMParameterSpec;
@@ -225,7 +226,7 @@ public class CryptoManager {
      * Generate cryptographically secure salt
      */
     public byte[] generateSalt() {
-        return generateSecureRandom(AppConfig.SALT_SIZE);
+        return generateSecureRandom(32); // Default salt size
     }
     
     /**

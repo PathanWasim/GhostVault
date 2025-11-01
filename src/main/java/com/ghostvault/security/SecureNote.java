@@ -62,6 +62,10 @@ public class SecureNote implements Serializable {
     public LocalDateTime getModifiedDate() { return modifiedDate; }
     public void setModifiedDate(LocalDateTime modifiedDate) { this.modifiedDate = modifiedDate; }
     
+    // Alias methods for compatibility
+    public LocalDateTime getLastModified() { return modifiedDate; }
+    public void setLastModified(LocalDateTime lastModified) { this.modifiedDate = lastModified; }
+    
     public boolean isPinned() { return isPinned; }
     public void setPinned(boolean pinned) { 
         this.isPinned = pinned;
