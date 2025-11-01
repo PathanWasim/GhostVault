@@ -1,8 +1,7 @@
 package com.ghostvault.audit;
 
 /**
- * Simple stub for AuditManager to maintain compatibility
- * Enterprise audit features removed for simplicity
+ * Audit manager for security logging
  */
 public class AuditManager {
     
@@ -10,28 +9,18 @@ public class AuditManager {
         INFO, WARNING, ERROR, CRITICAL
     }
     
-    public AuditManager() {
-        // Simple stub constructor
+    public void logEvent(String message, AuditSeverity severity, String source, String details) {
+        System.out.println("[AUDIT] " + severity + " - " + message + " (Source: " + source + ")");
+        if (details != null && !details.isEmpty()) {
+            System.out.println("  Details: " + details);
+        }
     }
     
-    public void logSecurityEvent(String eventType, String description, AuditSeverity severity, 
-                                String userId, String details) {
-        // Stub implementation - no actual logging
-        System.out.println("[AUDIT] " + severity + ": " + eventType + " - " + description);
+    public void logSecurityEvent(String event, String details) {
+        logEvent(event, AuditSeverity.WARNING, "Security", details);
     }
     
-    public void logSystemEvent(String eventType, String description) {
-        // Stub implementation
-        System.out.println("[SYSTEM] " + eventType + ": " + description);
-    }
-    
-    public void logSystemOperation(String operation, String details) {
-        // Stub implementation
-        System.out.println("[OPERATION] " + operation + ": " + details);
-    }
-    
-    public java.util.List<String> getAuditLogs() {
-        // Return empty list for compatibility
-        return new java.util.ArrayList<>();
+    public void logSystemEvent(String event) {
+        logEvent(event, AuditSeverity.INFO, "System", null);
     }
 }

@@ -788,11 +788,8 @@ public class VaultMainController implements Initializable {
                     // Create a temporary VaultFile for decryption attempt
                     com.ghostvault.model.VaultFile tempVaultFile = new com.ghostvault.model.VaultFile(
                         "unknown_file",
-                        uuidPart,
-                        uuidPart + ".enc",
                         encryptedFile.length(),
-                        "unknown",
-                        System.currentTimeMillis()
+                        "application/octet-stream"
                     );
                     
                     // Attempt to retrieve/decrypt
@@ -1665,7 +1662,7 @@ public class VaultMainController implements Initializable {
                 
                 // Create the backup with enhanced error handling
                 try {
-                    backupManager.createBackup(backupLocation, encryptionKey, null);
+                    backupManager.createBackup(backupLocation, encryptionKey);
                 } catch (Exception backupError) {
                     hideOperationProgress();
                     
@@ -1776,7 +1773,7 @@ public class VaultMainController implements Initializable {
                     
                     // Perform the restore with enhanced error handling
                     try {
-                        backupManager.restoreBackup(backupFile, encryptionKey, null);
+                        backupManager.restoreBackup(backupFile, encryptionKey);
                         
                         // Reload metadata from restored file
                         if (metadataManager != null) {
@@ -4229,7 +4226,7 @@ public class VaultMainController implements Initializable {
     /**
      * Apply settings (simplified implementation)
      */
-    private void applySettings(Object settings) {
+    private void applySettings(com.ghostvault.config.Settings settings) {
         if (settings == null) return;
         
         try {
