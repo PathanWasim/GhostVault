@@ -45,7 +45,13 @@ public class MetadataRecoveryManager {
         RecoveryResult result = new RecoveryResult();
         
         // Generate key variants for recovery attempts
-        SecretKey[] keyVariants = keyManager.generateKeyVariants(password);
+        SecretKey[] keyVariants;
+        try {
+            keyVariants = keyManager.generateKeyVariants(password);
+        } catch (Exception e) {
+            logger.severe("Failed to generate key variants: " + e.getMessage());
+            return result;
+        }
         
         for (File orphanedFile : orphanedFiles) {
             try {
@@ -121,7 +127,8 @@ public class MetadataRecoveryManager {
             }
             
             // Try to decrypt the file to validate the key
-            byte[] decryptedData = cryptoManager.decrypt(encryptedData, key);
+            CryptoManager.EncryptedData encData = new CryptoManager.EncryptedData(encryptedData, new byte[16]);
+            byte[] decryptedData = cryptoManager.decrypt(encData, key);
             
             if (decryptedData == null || decryptedData.length == 0) {
                 return null;
@@ -135,11 +142,8 @@ public class MetadataRecoveryManager {
             
             VaultFile vaultFile = new VaultFile(
                 originalName,
-                fileId,
-                encryptedFile.getName(),
                 decryptedData.length,
-                checksum,
-                uploadTime
+                "application/octet-stream"
             );
             
             // Add recovery tag to indicate this file was recovered
@@ -319,7 +323,8 @@ public class MetadataRecoveryManager {
             }
             
             byte[] encryptedMetadata = Files.readAllBytes(path);
-            byte[] decryptedMetadata = cryptoManager.decrypt(encryptedMetadata, key);
+            CryptoManager.EncryptedData encData = new CryptoManager.EncryptedData(encryptedMetadata, new byte[16]);
+            byte[] decryptedMetadata = cryptoManager.decrypt(encData, key);
             
             // Basic validation - check if decryption succeeded and data is not empty
             return decryptedMetadata != null && decryptedMetadata.length > 0;

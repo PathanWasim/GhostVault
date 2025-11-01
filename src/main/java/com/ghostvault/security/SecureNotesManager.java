@@ -46,4 +46,22 @@ public class SecureNotesManager {
     public void saveNotes() throws Exception {
         // Simple stub implementation
     }
+    
+    public void loadData() throws Exception {
+        // Stub implementation
+    }
+    
+    public List<SecureNote> getNotes() {
+        return new ArrayList<>(notes);
+    }
+    
+    public void addNote(String title, String content, String category, List<String> tags) throws Exception {
+        SecureNote note = new SecureNote(title, content);
+        note.setCategory(category);
+        notes.add(note);
+    }
+    
+    public void deleteNote(String id) throws Exception {
+        notes.removeIf(n -> n.getId().equals(id));
+    }
 }

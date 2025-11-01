@@ -50,6 +50,10 @@ public class VaultFile {
     public void setModifiedDate(LocalDateTime modifiedDate) { this.modifiedDate = modifiedDate; }
     public void setExtension(String extension) { this.extension = extension; }
     
+    public void setTags(String tags) {
+        // Stub implementation for tags
+    }
+    
     @Override
     public String toString() {
         return fileName;

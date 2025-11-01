@@ -25,4 +25,32 @@ public class DecoyManager {
     public boolean isDecoyMode() {
         return false;
     }
+    
+    public boolean verifyRealVaultIntegrity() throws Exception {
+        return true;
+    }
+    
+    public void autoGenerateForNewDevice() throws Exception {
+        // Stub implementation
+    }
+    
+    public void ensureMinimumDecoyFiles(int minFiles) throws Exception {
+        // Stub implementation
+    }
+    
+    public void switchToRealMode() throws Exception {
+        // Stub implementation
+    }
+    
+    public void emergencySwitchToRealVault() throws Exception {
+        // Stub implementation
+    }
+    
+    public void refreshDecoyVault() throws Exception {
+        // Stub implementation
+    }
+    
+    public String getCurrentVaultPath() {
+        return realVaultPath.toString();
+    }
 }

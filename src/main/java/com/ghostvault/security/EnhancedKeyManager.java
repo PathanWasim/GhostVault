@@ -20,4 +20,13 @@ public class EnhancedKeyManager {
         keyGen.init(256);
         return keyGen.generateKey();
     }
+    
+    public SecretKey[] generateKeyVariants(String password) throws Exception {
+        // Generate multiple key variants for recovery attempts
+        SecretKey[] variants = new SecretKey[3];
+        for (int i = 0; i < variants.length; i++) {
+            variants[i] = deriveKey(password + "_variant_" + i);
+        }
+        return variants;
+    }
 }

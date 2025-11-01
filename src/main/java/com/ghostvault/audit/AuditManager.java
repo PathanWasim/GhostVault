@@ -20,6 +20,10 @@ public class AuditManager {
         logEvent(event, AuditSeverity.WARNING, "Security", details);
     }
     
+    public void logSecurityEvent(String event, String details, AuditSeverity severity, String source, String additionalDetails) {
+        logEvent(event + " - " + details, severity, source != null ? source : "Security", additionalDetails);
+    }
+    
     public void logSystemEvent(String event) {
         logEvent(event, AuditSeverity.INFO, "System", null);
     }

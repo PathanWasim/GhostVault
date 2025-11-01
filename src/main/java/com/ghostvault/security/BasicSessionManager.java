@@ -472,7 +472,11 @@ public class BasicSessionManager {
             System.err.println("⚠️ Failed to deactivate decoy mode: " + e.getMessage());
             logSecurityEvent("DECOY MODE DEACTIVATION FAILED: " + e.getMessage());
             // Emergency fallback
-            decoyManager.emergencySwitchToRealVault();
+            try {
+                decoyManager.emergencySwitchToRealVault();
+            } catch (Exception ex) {
+                System.err.println("Emergency switch failed: " + ex.getMessage());
+            }
         }
     }
     
@@ -516,8 +520,12 @@ public class BasicSessionManager {
      */
     public void emergencyRealVaultAccess() {
         if (decoyManager != null) {
-            decoyManager.emergencySwitchToRealVault();
-            logSecurityEvent("EMERGENCY REAL VAULT ACCESS");
+            try {
+                decoyManager.emergencySwitchToRealVault();
+                logSecurityEvent("EMERGENCY REAL VAULT ACCESS");
+            } catch (Exception e) {
+                System.err.println("Emergency access failed: " + e.getMessage());
+            }
         }
     }
     

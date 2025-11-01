@@ -26,7 +26,17 @@ import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
+import javafx.stage.Modality;
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
 import java.util.Optional;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Arrays;
+import javafx.scene.media.Media;
+import javafx.scene.media.MediaPlayer;
+import javafx.scene.media.MediaView;
+import javafx.util.Duration;
 import com.ghostvault.ui.animations.AnimationManager;
 
 import javax.crypto.SecretKey;
@@ -901,7 +911,10 @@ public class VaultMainController implements Initializable {
     private boolean isPreviewableFileType(String extension) {
         return Arrays.asList("txt", "md", "pdf", "jpg", "jpeg", "png", "gif", "bmp", 
                            "mp4", "avi", "mov", "mkv", "webm", "flv",  // Video formats
-                           "mp3", "wav", "flac", "aac", "ogg", "m4a").contains(extension); // Audio formats
+                           "mp3", "wav", "flac", "aac", "ogg", "m4a", // Audio formats
+                           "java", "py", "js", "html", "css", "xml", "json", "cpp", "c", "h", 
+                           "php", "rb", "go", "rs", "kt", "swift", "sql", "yml", "yaml", 
+                           "properties", "ini", "cfg", "conf").contains(extension); // Code files
     }
     
     /**
@@ -911,16 +924,17 @@ public class VaultMainController implements Initializable {
         String extension = vaultFile.getExtension().toLowerCase();
         
         try {
-            if (Arrays.asList("txt", "md").contains(extension)) {
-                showTextPreview(vaultFile, fileData);
+            // Text and code files
+            if (Arrays.asList("txt", "md", "java", "py", "js", "html", "css", "xml", "json", "cpp", "c", "h", "php", "rb", "go", "rs", "kt", "swift", "sql", "yml", "yaml", "properties", "ini", "cfg", "conf").contains(extension)) {
+                showEnhancedTextPreview(vaultFile, fileData);
             } else if (extension.equals("pdf")) {
                 showPdfPreview(vaultFile, fileData);
             } else if (Arrays.asList("jpg", "jpeg", "png", "gif", "bmp").contains(extension)) {
                 showImagePreview(vaultFile, fileData);
             } else if (Arrays.asList("mp4", "avi", "mov", "mkv", "webm", "flv").contains(extension)) {
-                showVideoPreview(vaultFile, fileData);
+                showEnhancedVideoPreview(vaultFile, fileData);
             } else if (Arrays.asList("mp3", "wav", "flac", "aac", "ogg", "m4a").contains(extension)) {
-                showAudioPreview(vaultFile, fileData);
+                showEnhancedAudioPreview(vaultFile, fileData);
             } else {
                 showWarning("Preview Not Supported", "Preview not supported for file type: " + extension.toUpperCase());
             }
@@ -1514,6 +1528,535 @@ public class VaultMainController implements Initializable {
         return String.format("%02d:%02d", minutes, secs);
     }
     
+    /**
+     * Enhanced text preview with syntax highlighting for code files
+     */
+    private void showEnhancedTextPreview(VaultFile vaultFile, byte[] fileData) {
+        try {
+            String content = new String(fileData, "UTF-8");
+            String extension = vaultFile.getExtension().toLowerCase();
+            
+            // Create preview dialog
+            Dialog<Void> previewDialog = new Dialog<>();
+            previewDialog.setTitle("File Preview - " + vaultFile.getOriginalName());
+            previewDialog.setHeaderText(getFileTypeDescription(extension) + " File Preview");
+            
+            // Create text area for content
+            TextArea textArea = new TextArea(content);
+            textArea.setEditable(false);
+            textArea.setWrapText(false); // Don't wrap code
+            textArea.setPrefSize(800, 600);
+            
+            // Apply syntax-appropriate styling
+            if (isCodeFile(extension)) {
+                textArea.setStyle("-fx-font-family: 'Consolas', 'Monaco', 'Courier New', monospace; " +
+                                "-fx-font-size: 12px; " +
+                                "-fx-background-color: #1e1e1e; " +
+                                "-fx-text-fill: #d4d4d4; " +
+                                "-fx-control-inner-background: #1e1e1e;");
+            } else {
+                textArea.setStyle("-fx-font-family: 'Segoe UI', Arial, sans-serif; " +
+                                "-fx-font-size: 13px;");
+            }
+            
+            // Add file info
+            VBox container = new VBox(10);
+            
+            // File info header
+            HBox infoBox = new HBox(15);
+            infoBox.setStyle("-fx-padding: 10; -fx-background-color: #f0f0f0;");
+            
+            Label fileInfo = new Label("📄 " + vaultFile.getFileName() + " • " + 
+                                     formatFileSize(fileData.length) + " • " + 
+                                     content.split("\n").length + " lines");
+            fileInfo.setStyle("-fx-font-weight: bold;");
+            
+            Button copyBtn = new Button("📋 Copy");
+            copyBtn.setOnAction(e -> {
+                javafx.scene.input.Clipboard.getSystemClipboard().setContent(
+                    java.util.Map.of(javafx.scene.input.DataFormat.PLAIN_TEXT, content));
+                showInfo("Copied", "File content copied to clipboard");
+            });
+            
+            infoBox.getChildren().addAll(fileInfo, copyBtn);
+            
+            // Add scroll pane
+            ScrollPane scrollPane = new ScrollPane(textArea);
+            scrollPane.setFitToWidth(true);
+            scrollPane.setFitToHeight(true);
+            
+            container.getChildren().addAll(infoBox, scrollPane);
+            
+            previewDialog.getDialogPane().setContent(container);
+            previewDialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
+            previewDialog.getDialogPane().setPrefSize(850, 700);
+            
+            // Show dialog
+            previewDialog.showAndWait();
+            
+        } catch (Exception e) {
+            showError("Text Preview Error", "Failed to display text preview:\n\n" + e.getMessage());
+        }
+    }
+    
+    /**
+     * Enhanced video preview with better controls
+     */
+    private void showEnhancedVideoPreview(VaultFile vaultFile, byte[] fileData) {
+        try {
+            // Create temporary file for video playback
+            Path tempFile = Files.createTempFile("ghostvault_video_", "." + vaultFile.getExtension());
+            Files.write(tempFile, fileData);
+            
+            // Create video stage
+            Stage videoStage = new Stage();
+            videoStage.setTitle("🎬 Video Player - " + vaultFile.getOriginalName());
+            videoStage.initModality(Modality.APPLICATION_MODAL);
+            
+            VBox root = new VBox(15);
+            root.setPadding(new Insets(20));
+            root.setStyle("-fx-background-color: #000000;");
+            
+            // Video info header
+            HBox header = new HBox(10);
+            header.setAlignment(Pos.CENTER_LEFT);
+            Label info = new Label("🎬 " + vaultFile.getOriginalName());
+            info.setStyle("-fx-text-fill: white; -fx-font-size: 16px; -fx-font-weight: bold;");
+            header.getChildren().add(info);
+            
+            // Real JavaFX MediaPlayer
+            VBox videoContainer = new VBox(10);
+            videoContainer.setAlignment(Pos.CENTER);
+            videoContainer.setStyle("-fx-background-color: #000;");
+            
+            // Create MediaPlayer
+            javafx.scene.media.Media media = null;
+            javafx.scene.media.MediaPlayer mediaPlayer = null;
+            javafx.scene.media.MediaView mediaView = null;
+            
+            try {
+                // Create media from temp file
+                String mediaUrl = tempFile.toUri().toString();
+                media = new javafx.scene.media.Media(mediaUrl);
+                mediaPlayer = new javafx.scene.media.MediaPlayer(media);
+                mediaView = new javafx.scene.media.MediaView(mediaPlayer);
+                
+                // Configure media view
+                mediaView.setFitWidth(640);
+                mediaView.setFitHeight(360);
+                mediaView.setPreserveRatio(true);
+                mediaView.setStyle("-fx-background-color: black;");
+                
+                // Add error handling for media
+                final javafx.scene.media.MediaPlayer finalMediaPlayerForEvents = mediaPlayer;
+                finalMediaPlayerForEvents.setOnError(() -> {
+                    System.err.println("❌ MediaPlayer error: " + finalMediaPlayerForEvents.getError());
+                    
+                    // Show user-friendly error message
+                    Platform.runLater(() -> {
+                        Alert alert = new Alert(Alert.AlertType.WARNING);
+                        alert.setTitle("Video Codec Not Supported");
+                        alert.setHeaderText("Cannot play this video format");
+                        alert.setContentText("JavaFX MediaPlayer supports limited formats:\n\n" +
+                                           "✅ Supported: MP4 with H.264 video + AAC audio\n" +
+                                           "❌ Your file: " + vaultFile.getOriginalName() + "\n\n" +
+                                           "The video file may use an unsupported codec.\n" +
+                                           "Try converting to MP4 H.264 format for playback.");
+                        alert.showAndWait();
+                    });
+                });
+                
+                // Add status change listener
+                finalMediaPlayerForEvents.statusProperty().addListener((obs, oldStatus, newStatus) -> {
+                    System.out.println("🎬 MediaPlayer status changed: " + oldStatus + " -> " + newStatus);
+                });
+                
+                System.out.println("✅ MediaPlayer created successfully for: " + vaultFile.getOriginalName());
+                System.out.println("📹 Video dimensions will be: 640x360");
+                System.out.println("🎬 Media URL: " + mediaUrl);
+                System.out.println("📊 File size: " + formatFileSize(fileData.length));
+                System.out.println("🎞️ File extension: " + vaultFile.getExtension().toUpperCase());
+                
+            } catch (Exception e) {
+                System.err.println("❌ MediaPlayer creation failed: " + e.getMessage());
+                // Fallback to placeholder
+                mediaView = null;
+            }
+            
+            // Video display (either MediaView or fallback)
+            if (mediaView != null) {
+                // Create a container for the video with visible border
+                VBox mediaContainer = new VBox();
+                mediaContainer.setAlignment(Pos.CENTER);
+                mediaContainer.setStyle("-fx-background-color: #000; -fx-border-color: #00ff00; -fx-border-width: 2; -fx-padding: 5;");
+                mediaContainer.setPrefSize(650, 370);
+                
+                Label statusLabel = new Label("🎬 VIDEO PLAYER ACTIVE - " + vaultFile.getOriginalName());
+                statusLabel.setStyle("-fx-text-fill: #00ff00; -fx-font-size: 12px; -fx-font-weight: bold;");
+                
+                mediaContainer.getChildren().addAll(statusLabel, mediaView);
+                videoContainer.getChildren().add(mediaContainer);
+                
+                System.out.println("✅ MediaView added to container with green border for visibility");
+            } else {
+                VBox fallbackContainer = new VBox(15);
+                fallbackContainer.setAlignment(Pos.CENTER);
+                fallbackContainer.setStyle("-fx-background-color: #1a1a1a; -fx-border-color: #ff6b6b; -fx-border-width: 2; -fx-padding: 30;");
+                fallbackContainer.setPrefSize(640, 360);
+                
+                Label titleLabel = new Label("🎬 Video File Information");
+                titleLabel.setStyle("-fx-text-fill: #ff6b6b; -fx-font-size: 18px; -fx-font-weight: bold;");
+                
+                Label fileLabel = new Label("📁 " + vaultFile.getOriginalName());
+                fileLabel.setStyle("-fx-text-fill: white; -fx-font-size: 14px;");
+                
+                Label sizeLabel = new Label("📊 Size: " + formatFileSize(fileData.length));
+                sizeLabel.setStyle("-fx-text-fill: #ccc; -fx-font-size: 12px;");
+                
+                Label formatLabel = new Label("🎞️ Format: " + vaultFile.getExtension().toUpperCase());
+                formatLabel.setStyle("-fx-text-fill: #ccc; -fx-font-size: 12px;");
+                
+                Label errorLabel = new Label("❌ JavaFX MediaPlayer not available\n\nSupported formats: MP4 (H.264 + AAC)");
+                errorLabel.setStyle("-fx-text-fill: #ff6b6b; -fx-font-size: 12px; -fx-text-alignment: center;");
+                errorLabel.setAlignment(Pos.CENTER);
+                
+                fallbackContainer.getChildren().addAll(titleLabel, fileLabel, sizeLabel, formatLabel, errorLabel);
+                videoContainer.getChildren().add(fallbackContainer);
+            }
+            
+            // Video info
+            Label infoLabel = new Label("📹 " + formatFileSize(fileData.length) + " • " + 
+                                      vaultFile.getExtension().toUpperCase() + " Format");
+            infoLabel.setStyle("-fx-text-fill: #ccc; -fx-font-size: 12px;");
+            
+            // Video controls
+            HBox controls = new HBox(15);
+            controls.setAlignment(Pos.CENTER);
+            
+            Button playBtn = new Button("▶️ Play");
+            Button pauseBtn = new Button("⏸️ Pause");
+            Button stopBtn = new Button("⏹️ Stop");
+            
+            String btnStyle = "-fx-font-size: 14px; -fx-padding: 8 16; -fx-background-color: #3498db; " +
+                            "-fx-text-fill: white; -fx-background-radius: 5;";
+            playBtn.setStyle(btnStyle);
+            pauseBtn.setStyle(btnStyle);
+            stopBtn.setStyle(btnStyle);
+            
+            // Progress bar and time
+            ProgressBar progressBar = new ProgressBar(0);
+            progressBar.setPrefWidth(500);
+            progressBar.setStyle("-fx-accent: #3498db;");
+            
+            Label timeLabel = new Label("00:00 / 00:00");
+            timeLabel.setStyle("-fx-text-fill: #ccc; -fx-font-size: 12px;");
+            
+            // Wire up controls if MediaPlayer is available
+            final javafx.scene.media.MediaPlayer finalMediaPlayer = mediaPlayer;
+            final Button finalPlayBtn = playBtn;
+            final String finalBtnStyle = btnStyle;
+            
+            if (finalMediaPlayer != null) {
+                finalPlayBtn.setOnAction(e -> {
+                    finalMediaPlayer.play();
+                    finalPlayBtn.setText("🔄 Playing...");
+                    finalPlayBtn.setStyle(finalBtnStyle + "-fx-background-color: #27ae60;");
+                    System.out.println("▶️ Playing video: " + vaultFile.getOriginalName());
+                });
+                
+                pauseBtn.setOnAction(e -> {
+                    finalMediaPlayer.pause();
+                    finalPlayBtn.setText("▶️ Play");
+                    finalPlayBtn.setStyle(finalBtnStyle);
+                    System.out.println("⏸️ Paused video: " + vaultFile.getOriginalName());
+                });
+                
+                stopBtn.setOnAction(e -> {
+                    finalMediaPlayer.stop();
+                    finalPlayBtn.setText("▶️ Play");
+                    finalPlayBtn.setStyle(finalBtnStyle);
+                    System.out.println("⏹️ Stopped video: " + vaultFile.getOriginalName());
+                });
+                
+                // Update progress bar and time
+                finalMediaPlayer.currentTimeProperty().addListener((obs, oldTime, newTime) -> {
+                    if (finalMediaPlayer.getTotalDuration() != null) {
+                        double progress = newTime.toSeconds() / finalMediaPlayer.getTotalDuration().toSeconds();
+                        progressBar.setProgress(progress);
+                        
+                        String current = formatTime(newTime.toSeconds());
+                        String total = formatTime(finalMediaPlayer.getTotalDuration().toSeconds());
+                        timeLabel.setText(current + " / " + total);
+                    }
+                });
+                
+                // Auto-play when ready
+                finalMediaPlayer.setOnReady(() -> {
+                    System.out.println("🎬 Video ready to play: " + vaultFile.getOriginalName());
+                });
+                
+            } else {
+                // Disable controls if no MediaPlayer
+                playBtn.setDisable(true);
+                pauseBtn.setDisable(true);
+                stopBtn.setDisable(true);
+            }
+            
+            controls.getChildren().addAll(playBtn, pauseBtn, stopBtn);
+            
+            VBox playerControls = new VBox(10);
+            playerControls.setAlignment(Pos.CENTER);
+            playerControls.getChildren().addAll(infoLabel, controls, progressBar, timeLabel);
+            
+            videoContainer.getChildren().add(playerControls);
+            
+            // Action buttons
+            HBox actionButtons = new HBox(10);
+            actionButtons.setAlignment(Pos.CENTER);
+            
+            Button openExternalBtn = new Button("🚀 Open with System Player");
+            openExternalBtn.setStyle("-fx-font-size: 14px; -fx-padding: 10 20; -fx-background-color: #3498db; -fx-text-fill: white; -fx-background-radius: 5;");
+            openExternalBtn.setOnAction(e -> {
+                try {
+                    // Open with system default video player
+                    java.awt.Desktop.getDesktop().open(tempFile.toFile());
+                    System.out.println("🚀 Opened video with system player: " + vaultFile.getOriginalName());
+                } catch (Exception ex) {
+                    showError("External Player Error", "Could not open with system player:\n\n" + ex.getMessage());
+                }
+            });
+            
+            Button closeBtn = new Button("❌ Close");
+            closeBtn.setStyle("-fx-font-size: 14px; -fx-padding: 10 20; -fx-background-color: #e74c3c; -fx-text-fill: white; -fx-background-radius: 5;");
+            
+            actionButtons.getChildren().addAll(openExternalBtn, closeBtn);
+            
+            final javafx.scene.media.MediaPlayer finalMediaPlayerForCleanup = mediaPlayer;
+            closeBtn.setOnAction(e -> {
+                // Stop and dispose MediaPlayer
+                if (finalMediaPlayerForCleanup != null) {
+                    finalMediaPlayerForCleanup.stop();
+                    finalMediaPlayerForCleanup.dispose();
+                }
+                videoStage.close();
+                try {
+                    Files.deleteIfExists(tempFile);
+                } catch (Exception ex) {
+                    // Ignore cleanup errors
+                }
+            });
+            
+            root.getChildren().addAll(header, videoContainer, actionButtons);
+            
+            Scene scene = new Scene(root, 700, 500);
+            videoStage.setScene(scene);
+            videoStage.show();
+            
+            // Cleanup on close
+            videoStage.setOnCloseRequest(e -> {
+                // Stop and dispose MediaPlayer
+                if (finalMediaPlayerForCleanup != null) {
+                    finalMediaPlayerForCleanup.stop();
+                    finalMediaPlayerForCleanup.dispose();
+                }
+                try {
+                    Files.deleteIfExists(tempFile);
+                } catch (Exception ex) {
+                    // Ignore cleanup errors
+                }
+            });
+            
+        } catch (Exception e) {
+            showError("Video Preview Error", "Failed to open video:\n\n" + e.getMessage());
+        }
+    }
+    
+    /**
+     * Enhanced audio preview with better controls
+     */
+    private void showEnhancedAudioPreview(VaultFile vaultFile, byte[] fileData) {
+        try {
+            // Create temporary file for audio playback
+            Path tempFile = Files.createTempFile("ghostvault_audio_", "." + vaultFile.getExtension());
+            Files.write(tempFile, fileData);
+            
+            // Create audio stage
+            Stage audioStage = new Stage();
+            audioStage.setTitle("🎵 Audio Player - " + vaultFile.getOriginalName());
+            audioStage.initModality(Modality.APPLICATION_MODAL);
+            
+            VBox root = new VBox(20);
+            root.setPadding(new Insets(30));
+            root.setAlignment(Pos.CENTER);
+            root.setStyle("-fx-background-color: linear-gradient(to bottom, #2c3e50, #34495e);");
+            
+            // Audio info header
+            VBox header = new VBox(10);
+            header.setAlignment(Pos.CENTER);
+            
+            Label titleLabel = new Label("🎵 " + vaultFile.getOriginalName());
+            titleLabel.setStyle("-fx-text-fill: white; -fx-font-size: 18px; -fx-font-weight: bold;");
+            
+            Label infoLabel = new Label("Size: " + formatFileSize(fileData.length) + " • " +
+                                      "Format: " + vaultFile.getExtension().toUpperCase());
+            infoLabel.setStyle("-fx-text-fill: #bdc3c7; -fx-font-size: 12px;");
+            
+            header.getChildren().addAll(titleLabel, infoLabel);
+            
+            // Real JavaFX MediaPlayer for audio
+            VBox audioContainer = new VBox(15);
+            audioContainer.setAlignment(Pos.CENTER);
+            audioContainer.setStyle("-fx-background-color: rgba(0,0,0,0.3); -fx-background-radius: 10; -fx-padding: 30;");
+            
+            // Create MediaPlayer for audio
+            javafx.scene.media.Media audioMedia = null;
+            javafx.scene.media.MediaPlayer audioPlayer = null;
+            
+            try {
+                String mediaUrl = tempFile.toUri().toString();
+                audioMedia = new javafx.scene.media.Media(mediaUrl);
+                audioPlayer = new javafx.scene.media.MediaPlayer(audioMedia);
+                System.out.println("✅ Audio MediaPlayer created successfully for: " + vaultFile.getOriginalName());
+            } catch (Exception e) {
+                System.err.println("❌ Audio MediaPlayer creation failed: " + e.getMessage());
+            }
+            
+            // Audio visualization
+            Label audioIcon = new Label("🎵");
+            audioIcon.setStyle("-fx-font-size: 64px;");
+            
+            // Control buttons
+            HBox controls = new HBox(15);
+            controls.setAlignment(Pos.CENTER);
+            
+            Button playBtn = new Button("▶️ Play");
+            Button pauseBtn = new Button("⏸️ Pause");
+            Button stopBtn = new Button("⏹️ Stop");
+            
+            String buttonStyle = "-fx-font-size: 14px; -fx-padding: 8 16; -fx-background-color: #3498db; -fx-text-fill: white; -fx-background-radius: 5;";
+            playBtn.setStyle(buttonStyle);
+            pauseBtn.setStyle(buttonStyle);
+            stopBtn.setStyle(buttonStyle);
+            
+            // Wire up audio controls
+            final javafx.scene.media.MediaPlayer finalAudioPlayer = audioPlayer;
+            if (finalAudioPlayer != null) {
+                playBtn.setOnAction(e -> {
+                    finalAudioPlayer.play();
+                    System.out.println("▶️ Playing audio: " + vaultFile.getOriginalName());
+                });
+                
+                pauseBtn.setOnAction(e -> {
+                    finalAudioPlayer.pause();
+                    System.out.println("⏸️ Paused audio: " + vaultFile.getOriginalName());
+                });
+                
+                stopBtn.setOnAction(e -> {
+                    finalAudioPlayer.stop();
+                    System.out.println("⏹️ Stopped audio: " + vaultFile.getOriginalName());
+                });
+            } else {
+                playBtn.setDisable(true);
+                pauseBtn.setDisable(true);
+                stopBtn.setDisable(true);
+            }
+            
+            controls.getChildren().addAll(playBtn, pauseBtn, stopBtn);
+            
+            // Progress bar
+            ProgressBar progressBar = new ProgressBar(0);
+            progressBar.setPrefWidth(300);
+            progressBar.setStyle("-fx-accent: #3498db;");
+            
+            Label timeLabel = new Label("00:00 / 00:00");
+            timeLabel.setStyle("-fx-text-fill: #bdc3c7; -fx-font-size: 12px;");
+            
+            // Update progress if MediaPlayer is available
+            if (finalAudioPlayer != null) {
+                finalAudioPlayer.currentTimeProperty().addListener((obs, oldTime, newTime) -> {
+                    if (finalAudioPlayer.getTotalDuration() != null) {
+                        double progress = newTime.toSeconds() / finalAudioPlayer.getTotalDuration().toSeconds();
+                        progressBar.setProgress(progress);
+                        
+                        String current = formatTime(newTime.toSeconds());
+                        String total = formatTime(finalAudioPlayer.getTotalDuration().toSeconds());
+                        timeLabel.setText(current + " / " + total);
+                    }
+                });
+            }
+            
+            audioContainer.getChildren().addAll(audioIcon, controls, progressBar, timeLabel);
+            
+            Button closeBtn = new Button("Close");
+            closeBtn.setStyle("-fx-font-size: 14px; -fx-padding: 10 20; -fx-background-color: #e74c3c; -fx-text-fill: white; -fx-background-radius: 5;");
+            closeBtn.setOnAction(e -> {
+                // Stop and dispose MediaPlayer
+                if (finalAudioPlayer != null) {
+                    finalAudioPlayer.stop();
+                    finalAudioPlayer.dispose();
+                }
+                audioStage.close();
+                try {
+                    Files.deleteIfExists(tempFile);
+                } catch (Exception ex) {
+                    // Ignore cleanup errors
+                }
+            });
+            
+            root.getChildren().addAll(header, audioContainer, closeBtn);
+            
+            Scene scene = new Scene(root, 400, 350);
+            audioStage.setScene(scene);
+            audioStage.show();
+            
+            // Cleanup on close
+            audioStage.setOnCloseRequest(e -> {
+                try {
+                    Files.deleteIfExists(tempFile);
+                } catch (Exception ex) {
+                    // Ignore cleanup errors
+                }
+            });
+            
+        } catch (Exception e) {
+            showError("Audio Preview Error", "Failed to open audio:\n\n" + e.getMessage());
+        }
+    }
+    
+    /**
+     * Helper methods for enhanced previews
+     */
+    private boolean isCodeFile(String extension) {
+        return Arrays.asList("java", "py", "js", "html", "css", "xml", "json", "cpp", "c", "h", "php", "rb", "go", "rs", "kt", "swift", "sql").contains(extension);
+    }
+    
+    private String getFileTypeDescription(String extension) {
+        switch (extension) {
+            case "java": return "Java";
+            case "py": return "Python";
+            case "js": return "JavaScript";
+            case "html": return "HTML";
+            case "css": return "CSS";
+            case "xml": return "XML";
+            case "json": return "JSON";
+            case "cpp": return "C++";
+            case "c": return "C";
+            case "h": return "Header";
+            case "php": return "PHP";
+            case "rb": return "Ruby";
+            case "go": return "Go";
+            case "rs": return "Rust";
+            case "kt": return "Kotlin";
+            case "swift": return "Swift";
+            case "sql": return "SQL";
+            case "yml": case "yaml": return "YAML";
+            case "md": return "Markdown";
+            case "txt": return "Text";
+            default: return "Text";
+        }
+    }
+    
+
 
     
     /**
@@ -1592,12 +2135,17 @@ public class VaultMainController implements Initializable {
                 // Remove from metadata first
                 metadataManager.removeFile(targetFile.getFileId());
                 
-                // Secure delete the encrypted file
-                String encryptedFilePath = System.getProperty("user.home") + "/.ghostvault/files/" + targetFile.getEncryptedName();
-                File encryptedFile = new File(encryptedFilePath);
-                if (encryptedFile.exists()) {
+                // Secure delete the stored file
+                String storedFilePath = System.getProperty("user.home") + "/.ghostvault/files/" + targetFile.getFileId() + ".dat";
+                File storedFile = new File(storedFilePath);
+                if (storedFile.exists()) {
                     // Perform secure deletion (multiple overwrite passes)
-                    secureDeleteFile(encryptedFile);
+                    secureDeleteFile(storedFile);
+                }
+                
+                // Also remove from FileManager's memory cache
+                if (fileManager != null) {
+                    fileManager.deleteFile(targetFile);
                 }
                 
                 hideOperationProgress();
@@ -2014,16 +2562,27 @@ public class VaultMainController implements Initializable {
                 if (files != null && files.length > 0) {
                     List<File> orphanedFiles = new ArrayList<>();
                     
+                    // Get list of known file IDs from metadata
+                    List<String> knownFileIds = new ArrayList<>();
+                    for (VaultFile vaultFile : allVaultFiles) {
+                        knownFileIds.add(vaultFile.getFileId());
+                    }
+                    
                     for (File file : files) {
-                        if (file.isFile() && file.getName().endsWith(".enc")) {
-                            orphanedFiles.add(file);
-                            String displayName = "🔒 " + file.getName().replace(".enc", "") + " (orphaned)";
-                            fileList.add(displayName);
+                        if (file.isFile() && file.getName().endsWith(".dat")) {
+                            String fileId = file.getName().replace(".dat", "");
+                            
+                            // Only consider it orphaned if it's not in our metadata
+                            if (!knownFileIds.contains(fileId)) {
+                                orphanedFiles.add(file);
+                                String displayName = "🔒 " + fileId + " (orphaned)";
+                                fileList.add(displayName);
+                            }
                         }
                     }
                     
                     if (!orphanedFiles.isEmpty()) {
-                        logMessage("⚠ Found " + orphanedFiles.size() + " orphaned encrypted file(s) - preserving for safety");
+                        logMessage("⚠ Found " + orphanedFiles.size() + " orphaned file(s) - preserving for safety");
                         
                         // Preserve orphaned files and log them for manual recovery
                         for (File orphanedFile : orphanedFiles) {
@@ -2036,6 +2595,8 @@ public class VaultMainController implements Initializable {
                         Platform.runLater(() -> {
                             showOrphanedFileRecoveryDialog(orphanedFiles);
                         });
+                    } else {
+                        logMessage("✅ No orphaned files found - all files have proper metadata");
                     }
                 }
             }

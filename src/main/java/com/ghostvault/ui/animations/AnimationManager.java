@@ -22,6 +22,13 @@ public class AnimationManager {
         // Stub implementation
     }
     
+    public static void fadeIn(Node node, Duration duration, Runnable onFinished) {
+        // Stub implementation with callback
+        if (onFinished != null) {
+            onFinished.run();
+        }
+    }
+    
     public static void pulse(Node node, double scale, Duration duration) {
         // Stub implementation
     }

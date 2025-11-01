@@ -243,7 +243,7 @@ public class KDF {
             
             // Benchmark
             long startTime = System.currentTimeMillis();
-            argon2.hash(iterations, memory, parallelism, testPassword);
+            argon2.hash(iterations, memory, parallelism, new String(testPassword), java.nio.charset.StandardCharsets.UTF_8);
             long duration = System.currentTimeMillis() - startTime;
             
             // Adjust parameters if too fast (target ~500ms)
@@ -253,7 +253,7 @@ public class KDF {
                 
                 // Re-benchmark
                 startTime = System.currentTimeMillis();
-                argon2.hash(iterations, memory, parallelism, testPassword);
+                argon2.hash(iterations, memory, parallelism, new String(testPassword), java.nio.charset.StandardCharsets.UTF_8);
                 duration = System.currentTimeMillis() - startTime;
             }
             
