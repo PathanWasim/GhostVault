@@ -37,18 +37,23 @@ import javafx.scene.media.Media;
 import javafx.scene.media.MediaPlayer;
 import javafx.scene.media.MediaView;
 import javafx.util.Duration;
+import javafx.scene.input.MouseButton;
 import com.ghostvault.ui.animations.AnimationManager;
+import com.ghostvault.ai.AIFileAnalyzer;
+import com.ghostvault.ai.FileAnalysisResult;
+import com.ghostvault.ai.SecurityAnalysis;
+import com.ghostvault.ai.FileSearchEngine;
+import com.ghostvault.ai.SearchCriteria;
+import com.ghostvault.ai.SearchResult;
 
 import javax.crypto.SecretKey;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.net.URL;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.ResourceBundle;
@@ -100,12 +105,23 @@ public class VaultMainController implements Initializable {
     // Accessibility Manager
     private com.ghostvault.ui.AccessibilityManager accessibilityManager;
     
+    // AI Analysis Engine
+    private AIFileAnalyzer aiAnalyzer;
+    
+    // File Search Engine
+    private FileSearchEngine searchEngine;
+    
     // State Management
     private boolean isDecoyMode = false;
     private boolean isDashboardVisible = false;
     private final ObservableList<String> fileList = FXCollections.observableArrayList();
     private final ObservableList<String> filteredFileList = FXCollections.observableArrayList();
     private List<VaultFile> allVaultFiles = FXCollections.observableArrayList();
+    
+    // File preview cache to prevent blank second views
+    private final Map<String, byte[]> previewCache = new java.util.HashMap<>();
+    private final Map<String, Long> cacheTimestamps = new java.util.HashMap<>();
+    private static final long CACHE_TIMEOUT_MS = 300000; // 5 minutes
     
     @Override
     public void initialize(URL location, ResourceBundle resources) {
@@ -134,6 +150,9 @@ public class VaultMainController implements Initializable {
         this.backupManager = backupManager;
         this.encryptionKey = encryptionKey;
         this.isDecoyMode = false;
+        
+        // Ensure vault directory structure exists for persistence
+        ensureVaultDirectoryStructure();
         
         // Initialize encryption key for file operations
         if (fileManager != null && encryptionKey != null) {
@@ -202,6 +221,15 @@ public class VaultMainController implements Initializable {
     private void setupUI() {
         if (fileListView != null) {
             fileListView.setItems(filteredFileList);
+            
+            // Apply CSS styling for better selection visibility
+            try {
+                fileListView.getStylesheets().add(getClass().getResource("/css/password-manager-theme.css").toExternalForm());
+            } catch (Exception e) {
+                // Fallback styling if CSS not found
+                fileListView.setStyle("-fx-background-color: #334155; -fx-control-inner-background: #334155;");
+            }
+            
             logMessage("🔍 Debug: ListView bound to filteredFileList");
         } else {
             logMessage("⚠ Debug: fileListView is null in setupUI!");
@@ -216,6 +244,12 @@ public class VaultMainController implements Initializable {
         
         // Initialize accessibility features
         initializeAccessibility();
+        
+        // Initialize AI analyzer
+        aiAnalyzer = new AIFileAnalyzer();
+        
+        // Initialize search engine
+        searchEngine = new FileSearchEngine();
         
         // Setup context menu for file list
         setupFileListContextMenu();
@@ -338,11 +372,23 @@ public class VaultMainController implements Initializable {
         // Search functionality with real-time filtering
         searchField.textProperty().addListener((obs, oldVal, newVal) -> filterFileList(newVal));
         
-        // Double-click to download
+        // Double-click to download (ensure it doesn't interfere with context menu)
         fileListView.setOnMouseClicked(event -> {
-            if (event.getClickCount() == 2 && fileListView.getSelectionModel().getSelectedItem() != null) {
-                handleDownload();
+            if (event.getButton() == MouseButton.PRIMARY) {
+                // Only handle primary (left) button clicks
+                if (event.getClickCount() == 2 && fileListView.getSelectionModel().getSelectedItem() != null) {
+                    logMessage("🖱️ Double-click detected - downloading file");
+                    handleDownload();
+                    event.consume();
+                } else if (event.getClickCount() == 1) {
+                    // Single click - just log for debugging
+                    String selected = fileListView.getSelectionModel().getSelectedItem();
+                    if (selected != null) {
+                        logMessage("🖱️ Single-click on: " + selected);
+                    }
+                }
             }
+            // Don't consume right-click events - let context menu handle them
         });
         
         // Setup tooltips with keyboard shortcuts
@@ -390,7 +436,7 @@ public class VaultMainController implements Initializable {
             passwordsButton.setTooltip(new javafx.scene.control.Tooltip("Password Manager (Ctrl+P)"));
         }
         if (searchField != null) {
-            searchField.setTooltip(new javafx.scene.control.Tooltip("Search files (Ctrl+F to focus, Esc to clear)"));
+            searchField.setTooltip(new javafx.scene.control.Tooltip("🔍 AI-Powered Search\nCtrl+F: Focus search\nCtrl+Shift+F: Advanced search\nEsc: Clear search"));
         }
         if (fileListView != null) {
             fileListView.setTooltip(new javafx.scene.control.Tooltip("File list - Double-click to download, Right-click for options\nPress F1 for all keyboard shortcuts"));
@@ -401,42 +447,315 @@ public class VaultMainController implements Initializable {
      * Setup context menu for file operations
      */
     private void setupFileListContextMenu() {
+        logMessage("🖱️ Setting up context menu for file list");
+        
         ContextMenu contextMenu = new ContextMenu();
         
         MenuItem downloadItem = new MenuItem("📥 Download");
-        downloadItem.setOnAction(e -> handleDownload());
+        downloadItem.setOnAction(e -> {
+            logMessage("🖱️ Context menu: Download selected");
+            handleDownload();
+        });
+        
+        MenuItem previewItem = new MenuItem("👁️ Preview");
+        previewItem.setOnAction(e -> {
+            logMessage("🖱️ Context menu: Preview selected");
+            handlePreview();
+        });
         
         MenuItem deleteItem = new MenuItem("🗑️ Delete");
-        deleteItem.setOnAction(e -> handleDelete());
+        deleteItem.setOnAction(e -> {
+            logMessage("🖱️ Context menu: Delete selected");
+            handleDelete();
+        });
         
         MenuItem recoverItem = new MenuItem("🔧 Attempt Recovery");
         recoverItem.setOnAction(e -> {
             String selected = fileListView.getSelectionModel().getSelectedItem();
             if (selected != null && selected.contains("(orphaned)")) {
+                logMessage("🖱️ Context menu: Recover orphaned file");
                 attemptOrphanedFileRecovery(selected);
             }
         });
         
         MenuItem propertiesItem = new MenuItem("ℹ️ Properties");
-        propertiesItem.setOnAction(e -> showFileProperties());
-        
-        // Show recovery option only for orphaned files
-        fileListView.getSelectionModel().selectedItemProperty().addListener((obs, oldVal, newVal) -> {
-            contextMenu.getItems().clear();
-            contextMenu.getItems().addAll(downloadItem, deleteItem);
-            
-            if (newVal != null && newVal.contains("(orphaned)")) {
-                contextMenu.getItems().add(new SeparatorMenuItem());
-                contextMenu.getItems().add(recoverItem);
-            }
-            
-            contextMenu.getItems().add(new SeparatorMenuItem());
-            contextMenu.getItems().add(propertiesItem);
+        propertiesItem.setOnAction(e -> {
+            logMessage("🖱️ Context menu: Show properties");
+            showFileProperties();
         });
         
-        fileListView.setContextMenu(contextMenu);
+        // Update context menu based on selection
+        fileListView.getSelectionModel().selectedItemProperty().addListener((obs, oldVal, newVal) -> {
+            contextMenu.getItems().clear();
+            
+            if (newVal != null) {
+                // Add standard items
+                contextMenu.getItems().addAll(downloadItem, previewItem, deleteItem);
+                
+                // Add recovery option for orphaned files
+                if (newVal.contains("(orphaned)")) {
+                    contextMenu.getItems().add(new SeparatorMenuItem());
+                    contextMenu.getItems().add(recoverItem);
+                }
+                
+                contextMenu.getItems().add(new SeparatorMenuItem());
+                contextMenu.getItems().add(propertiesItem);
+                
+                logMessage("🖱️ Context menu updated for: " + newVal);
+            }
+        });
+        
+        // Don't set context menu directly on ListView - handle manually for better control
+        // fileListView.setContextMenu(contextMenu);
+        
+        // Handle right-click events manually for better visibility control
+        fileListView.setOnContextMenuRequested(event -> {
+            logMessage("🖱️ Context menu requested at: " + event.getX() + ", " + event.getY());
+            
+            // Use proper JavaFX method to find the clicked item
+            int clickedIndex = getListViewItemAtPosition(fileListView, event.getY());
+            
+            logMessage("🖱️ Click at Y=" + event.getY() + ", calculated index=" + clickedIndex + ", total items=" + fileListView.getItems().size());
+            
+            // Select the clicked item if found
+            if (clickedIndex >= 0 && clickedIndex < fileListView.getItems().size()) {
+                fileListView.getSelectionModel().select(clickedIndex);
+                String selectedItem = fileListView.getItems().get(clickedIndex);
+                
+                // Update context menu for this item
+                contextMenu.getItems().clear();
+                contextMenu.getItems().addAll(downloadItem, previewItem, deleteItem);
+                
+                if (selectedItem.contains("(orphaned)")) {
+                    contextMenu.getItems().add(new SeparatorMenuItem());
+                    contextMenu.getItems().add(recoverItem);
+                }
+                
+                contextMenu.getItems().add(new SeparatorMenuItem());
+                contextMenu.getItems().add(propertiesItem);
+                
+                // Show the context menu immediately
+                contextMenu.show(fileListView, event.getScreenX(), event.getScreenY());
+                logMessage("🖱️ Context menu shown for: " + selectedItem);
+            } else {
+                logMessage("🖱️ No item found at click position - not showing context menu");
+            }
+            event.consume();
+        });
+        
+        // Handle mouse clicks to ensure proper selection before context menu
+        fileListView.setOnMousePressed(event -> {
+            if (event.isSecondaryButtonDown()) {
+                // Right click - find and select the item under cursor using proper method
+                int itemIndex = getListViewItemAtPosition(fileListView, event.getY());
+                
+                if (itemIndex >= 0 && itemIndex < fileListView.getItems().size()) {
+                    fileListView.getSelectionModel().select(itemIndex);
+                    logMessage("🖱️ Right-click selected item " + itemIndex + ": " + fileListView.getItems().get(itemIndex));
+                } else {
+                    logMessage("🖱️ Right-click outside item bounds (Y=" + event.getY() + ", calculated index=" + itemIndex + ", total items=" + fileListView.getItems().size() + ")");
+                    // Clear selection if clicking outside items
+                    fileListView.getSelectionModel().clearSelection();
+                }
+            }
+        });
+        
+        logMessage("✅ Context menu setup complete");
     }
     
+    /**
+     * Get the ListView item index at the specified Y position using proper JavaFX methods
+     */
+    private int getListViewItemAtPosition(ListView<String> listView, double y) {
+        try {
+            // Use JavaFX's built-in VirtualFlow to get accurate cell positioning
+            javafx.scene.control.skin.ListViewSkin<?> skin = (javafx.scene.control.skin.ListViewSkin<?>) listView.getSkin();
+            if (skin == null) {
+                // Fallback to basic calculation if skin not available
+                double estimatedCellHeight = 24.0;
+                int index = (int) Math.floor(y / estimatedCellHeight);
+                return (index >= 0 && index < listView.getItems().size()) ? index : -1;
+            }
+            
+            // Get the VirtualFlow from the skin
+            javafx.scene.control.skin.VirtualFlow<?> virtualFlow = 
+                (javafx.scene.control.skin.VirtualFlow<?>) skin.getChildren().get(0);
+            
+            if (virtualFlow != null) {
+                // Find the cell at the Y position
+                for (int i = virtualFlow.getFirstVisibleCell().getIndex(); 
+                     i <= virtualFlow.getLastVisibleCell().getIndex(); i++) {
+                    
+                    javafx.scene.control.IndexedCell<?> cell = virtualFlow.getCell(i);
+                    if (cell != null && cell.getBoundsInParent().contains(0, y)) {
+                        return i;
+                    }
+                }
+            }
+            
+            // Fallback calculation if VirtualFlow method fails
+            double estimatedCellHeight = 24.0;
+            int index = (int) Math.floor(y / estimatedCellHeight);
+            return (index >= 0 && index < listView.getItems().size()) ? index : -1;
+            
+        } catch (Exception e) {
+            // Fallback to basic calculation if any reflection fails
+            logMessage("⚠️ Using fallback cell position calculation: " + e.getMessage());
+            double estimatedCellHeight = 24.0;
+            int index = (int) Math.floor(y / estimatedCellHeight);
+            return (index >= 0 && index < listView.getItems().size()) ? index : -1;
+        }
+    }
+    
+    /**
+     * Show advanced search dialog
+     */
+    private void showAdvancedSearch() {
+        Stage searchStage = new Stage();
+        searchStage.setTitle("🔍 Advanced File Search");
+        searchStage.initModality(javafx.stage.Modality.APPLICATION_MODAL);
+        
+        VBox root = new VBox(15);
+        root.setPadding(new javafx.geometry.Insets(20));
+        root.setStyle("-fx-background-color: #0F172A;");
+        
+        // Title
+        Label titleLabel = new Label("🔍 Advanced File Search");
+        titleLabel.setStyle("-fx-text-fill: #F8FAFC; -fx-font-size: 18px; -fx-font-weight: bold;");
+        
+        // Search criteria form
+        javafx.scene.layout.GridPane grid = new javafx.scene.layout.GridPane();
+        grid.setHgap(10);
+        grid.setVgap(10);
+        
+        // Name search
+        Label nameLabel = new Label("File Name:");
+        nameLabel.setStyle("-fx-text-fill: #F8FAFC;");
+        TextField nameField = new TextField();
+        nameField.setPromptText("Enter file name or pattern...");
+        nameField.setStyle("-fx-background-color: #334155; -fx-text-fill: #F8FAFC;");
+        
+        // Extension filter
+        Label extLabel = new Label("Extension:");
+        extLabel.setStyle("-fx-text-fill: #F8FAFC;");
+        TextField extField = new TextField();
+        extField.setPromptText("e.g., pdf, jpg, txt");
+        extField.setStyle("-fx-background-color: #334155; -fx-text-fill: #F8FAFC;");
+        
+        // Category filter
+        Label categoryLabel = new Label("Category:");
+        categoryLabel.setStyle("-fx-text-fill: #F8FAFC;");
+        javafx.scene.control.ComboBox<com.ghostvault.ai.FileCategory> categoryBox = new javafx.scene.control.ComboBox<>();
+        categoryBox.getItems().addAll(com.ghostvault.ai.FileCategory.values());
+        categoryBox.setPromptText("Select category...");
+        categoryBox.setStyle("-fx-background-color: #334155; -fx-text-fill: #F8FAFC;");
+        
+        // Security risk filter
+        Label riskLabel = new Label("Security Risk:");
+        riskLabel.setStyle("-fx-text-fill: #F8FAFC;");
+        javafx.scene.control.ComboBox<com.ghostvault.ai.SecurityRisk> riskBox = new javafx.scene.control.ComboBox<>();
+        riskBox.getItems().addAll(com.ghostvault.ai.SecurityRisk.values());
+        riskBox.setPromptText("Select risk level...");
+        riskBox.setStyle("-fx-background-color: #334155; -fx-text-fill: #F8FAFC;");
+        
+        grid.add(nameLabel, 0, 0);
+        grid.add(nameField, 1, 0);
+        grid.add(extLabel, 0, 1);
+        grid.add(extField, 1, 1);
+        grid.add(categoryLabel, 0, 2);
+        grid.add(categoryBox, 1, 2);
+        grid.add(riskLabel, 0, 3);
+        grid.add(riskBox, 1, 3);
+        
+        // Buttons
+        HBox buttonBox = new HBox(10);
+        buttonBox.setAlignment(javafx.geometry.Pos.CENTER);
+        
+        Button searchBtn = new Button("🔍 Search");
+        searchBtn.setStyle("-fx-background-color: #3B82F6; -fx-text-fill: white; -fx-padding: 10 20;");
+        searchBtn.setOnAction(e -> {
+            // Perform advanced search
+            SearchCriteria criteria = new SearchCriteria()
+                .withNameQuery(nameField.getText())
+                .withExtension(extField.getText())
+                .withCategory(categoryBox.getValue())
+                .withSecurityRisk(riskBox.getValue());
+            
+            performAdvancedSearch(criteria);
+            searchStage.close();
+        });
+        
+        Button clearBtn = new Button("🗑️ Clear");
+        clearBtn.setStyle("-fx-background-color: #6B7280; -fx-text-fill: white; -fx-padding: 10 20;");
+        clearBtn.setOnAction(e -> {
+            nameField.clear();
+            extField.clear();
+            categoryBox.setValue(null);
+            riskBox.setValue(null);
+        });
+        
+        Button cancelBtn = new Button("❌ Cancel");
+        cancelBtn.setStyle("-fx-background-color: #EF4444; -fx-text-fill: white; -fx-padding: 10 20;");
+        cancelBtn.setOnAction(e -> searchStage.close());
+        
+        buttonBox.getChildren().addAll(searchBtn, clearBtn, cancelBtn);
+        
+        root.getChildren().addAll(titleLabel, grid, buttonBox);
+        
+        javafx.scene.Scene scene = new javafx.scene.Scene(root, 400, 300);
+        searchStage.setScene(scene);
+        searchStage.show();
+    }
+    
+    /**
+     * Perform advanced search with criteria
+     */
+    private void performAdvancedSearch(SearchCriteria criteria) {
+        if (searchEngine == null || allVaultFiles.isEmpty()) {
+            showWarning("Search Error", "Search engine not available or no files to search.");
+            return;
+        }
+        
+        SearchResult result = searchEngine.advancedSearch(criteria, allVaultFiles);
+        
+        // Update the file list with search results
+        filteredFileList.clear();
+        for (VaultFile file : result.getFiles()) {
+            FileAnalysisResult analysis = aiAnalyzer.analyzeFile(file);
+            
+            StringBuilder displayName = new StringBuilder();
+            displayName.append(analysis.getCategory().getIcon()).append(" ");
+            displayName.append(file.getOriginalName());
+            displayName.append(" (").append(analysis.getSizeCategory().getDisplayName()).append(")");
+            displayName.append(" ").append(analysis.getRiskLevel().getIcon());
+            
+            if (analysis.hasAnyFlag()) {
+                displayName.append(" [");
+                for (int i = 0; i < analysis.getFlags().size(); i++) {
+                    if (i > 0) displayName.append(" ");
+                    displayName.append(analysis.getFlags().get(i).getIcon());
+                }
+                displayName.append("]");
+            }
+            
+            filteredFileList.add(displayName.toString());
+        }
+        
+        updateStatus();
+        
+        // Show search results summary
+        String summary = String.format("Advanced Search Results:\n\n" +
+            "Found %d files matching criteria\n" +
+            "Total size: %s\n\n" +
+            "Search criteria: %s",
+            result.getResultCount(),
+            result.getStatistics().getFormattedTotalSize(),
+            criteria.toString());
+        
+        showInfo("Search Results", summary);
+        logMessage("🔍 Advanced search completed: " + result.getResultCount() + " files found");
+    }
+
     /**
      * Setup keyboard shortcuts for common operations
      */
@@ -504,7 +823,13 @@ public class VaultMainController implements Initializable {
                         event.consume();
                         break;
                     case F: // Ctrl+F - Focus search
-                        searchField.requestFocus();
+                        if (event.isShiftDown()) {
+                            // Ctrl+Shift+F - Advanced search
+                            showAdvancedSearch();
+                        } else {
+                            // Ctrl+F - Focus search field
+                            searchField.requestFocus();
+                        }
                         event.consume();
                         break;
                     case Q: // Ctrl+Q - Logout
@@ -523,8 +848,14 @@ public class VaultMainController implements Initializable {
                         switchTheme();
                         event.consume();
                         break;
-                    case P: // Ctrl+P - Passwords
-                        handlePasswords();
+                    case P: // Ctrl+P - Passwords or Panic Mode
+                        if (event.isShiftDown()) {
+                            // Ctrl+Shift+P - Emergency Mode
+                            activateEmergencyMode();
+                        } else {
+                            // Ctrl+P - Passwords
+                            handlePasswords();
+                        }
                         event.consume();
                         break;
                     case M: // Ctrl+M - AI Mode
@@ -885,16 +1216,66 @@ public class VaultMainController implements Initializable {
             showOperationProgress("Loading file for preview...");
             logMessage("👁️ Loading file for preview: " + targetFile.getOriginalName());
             
-            // Retrieve and decrypt file
-            byte[] decryptedData = fileManager.retrieveFile(targetFile);
+            // Check cache first
+            String cacheKey = targetFile.getFileName();
+            byte[] decryptedData = null;
+            
+            logMessage("🔍 Cache check for key: " + cacheKey);
+            logMessage("🔍 Cache size: " + previewCache.size() + " entries");
+            
+            // Clean expired cache entries
+            cleanExpiredCacheEntries();
+            
+            if (previewCache.containsKey(cacheKey)) {
+                Long timestamp = cacheTimestamps.get(cacheKey);
+                long currentTime = System.currentTimeMillis();
+                if (timestamp != null && (currentTime - timestamp) < CACHE_TIMEOUT_MS) {
+                    decryptedData = previewCache.get(cacheKey);
+                    long ageSeconds = (currentTime - timestamp) / 1000;
+                    logMessage("📄 Using cached file data for: " + targetFile.getOriginalName() + " (age: " + ageSeconds + "s)");
+                } else {
+                    // Cache expired, remove it
+                    logMessage("⏰ Cache expired for: " + cacheKey);
+                    byte[] expiredData = previewCache.remove(cacheKey);
+                    if (expiredData != null) {
+                        Arrays.fill(expiredData, (byte) 0);
+                    }
+                    cacheTimestamps.remove(cacheKey);
+                }
+            } else {
+                logMessage("❌ No cache entry found for: " + cacheKey);
+            }
+            
+            if (decryptedData == null) {
+                // Retrieve and decrypt file
+                logMessage("🔓 Decrypting file from storage: " + targetFile.getOriginalName());
+                decryptedData = fileManager.retrieveFile(targetFile);
+                
+                if (decryptedData != null && decryptedData.length > 0) {
+                    // Cache the data for future previews
+                    byte[] cachedData = Arrays.copyOf(decryptedData, decryptedData.length);
+                    previewCache.put(cacheKey, cachedData);
+                    cacheTimestamps.put(cacheKey, System.currentTimeMillis());
+                    logMessage("📄 Cached file data for: " + targetFile.getOriginalName() + " (" + decryptedData.length + " bytes)");
+                } else {
+                    logMessage("❌ Failed to decrypt file or file is empty: " + targetFile.getOriginalName());
+                }
+            }
             
             hideOperationProgress();
             
-            // Show preview based on file type
-            showFilePreview(targetFile, decryptedData);
+            if (decryptedData == null || decryptedData.length == 0) {
+                logMessage("❌ No data available for preview: " + targetFile.getOriginalName());
+                showError("Preview Error", "No data available for preview. The file may be corrupted or empty.");
+                return;
+            }
             
-            // Secure memory cleanup
-            Arrays.fill(decryptedData, (byte) 0);
+            // Show preview based on file type (pass a copy to avoid cache corruption)
+            byte[] previewData = Arrays.copyOf(decryptedData, decryptedData.length);
+            logMessage("📄 Showing preview with " + previewData.length + " bytes of data");
+            showFilePreview(targetFile, previewData);
+            
+            // Note: The copy will be cleaned up by preview methods, cache remains for reuse
             
             logMessage("✓ File preview loaded: " + targetFile.getOriginalName());
             
@@ -936,9 +1317,13 @@ public class VaultMainController implements Initializable {
             } else if (Arrays.asList("mp3", "wav", "flac", "aac", "ogg", "m4a").contains(extension)) {
                 showEnhancedAudioPreview(vaultFile, fileData);
             } else {
+                // Clean up memory for unsupported file types
+                Arrays.fill(fileData, (byte) 0);
                 showWarning("Preview Not Supported", "Preview not supported for file type: " + extension.toUpperCase());
             }
         } catch (Exception e) {
+            // Clean up memory on error
+            Arrays.fill(fileData, (byte) 0);
             showError("Preview Error", "Failed to display preview:\n\n" + e.getMessage());
         }
     }
@@ -1012,10 +1397,16 @@ public class VaultMainController implements Initializable {
             previewDialog.getDialogPane().setContent(scrollPane);
             previewDialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
             
-            // Show dialog
+            // Show dialog and clean up after it's closed
+            previewDialog.setOnHidden(e -> {
+                // Clean up sensitive data after dialog is closed
+                Arrays.fill(fileData, (byte) 0);
+            });
             previewDialog.showAndWait();
             
         } catch (Exception e) {
+            // Clean up on error
+            Arrays.fill(fileData, (byte) 0);
             showError("Image Preview Error", "Failed to display image preview:\n\n" + e.getMessage());
         }
     }
@@ -1536,6 +1927,37 @@ public class VaultMainController implements Initializable {
             String content = new String(fileData, "UTF-8");
             String extension = vaultFile.getExtension().toLowerCase();
             
+            // Debug logging
+            logMessage("📄 Preview content length: " + content.length() + " characters");
+            logMessage("📄 File data length: " + fileData.length + " bytes");
+            logMessage("📄 File extension: " + extension);
+            logMessage("📄 Original filename: " + vaultFile.getOriginalName());
+            
+            com.ghostvault.logging.SystemErrorLog previewLog = new com.ghostvault.logging.SystemErrorLog(
+                "FilePreview", "showEnhancedTextPreview", 
+                String.format("Preview opened - File: %s, Size: %d bytes, Content: %d chars", 
+                    vaultFile.getOriginalName(), fileData.length, content.length()),
+                "User opened file preview", "DEBUG");
+            previewLog.logToConsole();
+            
+            if (content.trim().isEmpty()) {
+                logMessage("⚠ Warning: File content is empty");
+                logMessage("⚠ Raw file data length: " + fileData.length);
+                logMessage("⚠ Content after UTF-8 decode: '" + content + "'");
+                
+                com.ghostvault.logging.SystemErrorLog emptyFileLog = new com.ghostvault.logging.SystemErrorLog(
+                    "FilePreview", "showEnhancedTextPreview", 
+                    String.format("Empty file detected - File: %s, Raw size: %d, Decoded size: %d", 
+                        vaultFile.getOriginalName(), fileData.length, content.length()),
+                    "User attempted to preview empty file", "WARNING");
+                emptyFileLog.logToConsole();
+                
+                showWarning("Empty File", "The selected file appears to be empty.");
+                // Clear sensitive data before returning
+                Arrays.fill(fileData, (byte) 0);
+                return;
+            }
+            
             // Create preview dialog
             Dialog<Void> previewDialog = new Dialog<>();
             previewDialog.setTitle("File Preview - " + vaultFile.getOriginalName());
@@ -1591,10 +2013,16 @@ public class VaultMainController implements Initializable {
             previewDialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
             previewDialog.getDialogPane().setPrefSize(850, 700);
             
-            // Show dialog
+            // Show dialog and clean up after it's closed
+            previewDialog.setOnHidden(e -> {
+                // Clean up sensitive data after dialog is closed
+                Arrays.fill(fileData, (byte) 0);
+            });
             previewDialog.showAndWait();
             
         } catch (Exception e) {
+            // Clean up on error
+            Arrays.fill(fileData, (byte) 0);
             showError("Text Preview Error", "Failed to display text preview:\n\n" + e.getMessage());
         }
     }
@@ -1604,9 +2032,13 @@ public class VaultMainController implements Initializable {
      */
     private void showEnhancedVideoPreview(VaultFile vaultFile, byte[] fileData) {
         try {
-            // Create temporary file for video playback
-            Path tempFile = Files.createTempFile("ghostvault_video_", "." + vaultFile.getExtension());
+            // Create unique temporary file for video playback
+            String uniqueId = String.valueOf(System.currentTimeMillis());
+            Path tempFile = Files.createTempFile("ghostvault_video_" + uniqueId + "_", "." + vaultFile.getExtension());
             Files.write(tempFile, fileData);
+            
+            logMessage("🎬 Created temporary video file: " + tempFile.getFileName());
+            logMessage("🎬 Video file size: " + formatFileSize(fileData.length));
             
             // Create video stage
             Stage videoStage = new Stage();
@@ -1837,12 +2269,14 @@ public class VaultMainController implements Initializable {
                 if (finalMediaPlayerForCleanup != null) {
                     finalMediaPlayerForCleanup.stop();
                     finalMediaPlayerForCleanup.dispose();
+                    logMessage("🎬 MediaPlayer disposed");
                 }
                 videoStage.close();
                 try {
                     Files.deleteIfExists(tempFile);
+                    logMessage("🗑️ Temporary video file deleted: " + tempFile.getFileName());
                 } catch (Exception ex) {
-                    // Ignore cleanup errors
+                    logMessage("⚠ Could not delete temporary file: " + ex.getMessage());
                 }
             });
             
@@ -1864,9 +2298,13 @@ public class VaultMainController implements Initializable {
                 } catch (Exception ex) {
                     // Ignore cleanup errors
                 }
+                // Clean up sensitive data (this is a copy from cache, so it's safe to clean)
+                Arrays.fill(fileData, (byte) 0);
             });
             
         } catch (Exception e) {
+            // Clean up on error
+            Arrays.fill(fileData, (byte) 0);
             showError("Video Preview Error", "Failed to open video:\n\n" + e.getMessage());
         }
     }
@@ -2185,6 +2623,10 @@ public class VaultMainController implements Initializable {
         try {
             showOperationProgress("Creating encrypted backup...");
             logMessage("⏳ Creating encrypted backup...");
+            logMessage("🔍 Backup location: " + backupLocation.getAbsolutePath());
+            logMessage("🔍 Backup manager available: " + (backupManager != null));
+            logMessage("🔍 Encryption key available: " + (encryptionKey != null));
+            logMessage("🔍 Vault files count: " + allVaultFiles.size());
             
             // Create backup using backup manager
             if (backupManager != null && encryptionKey != null) {
@@ -2210,12 +2652,17 @@ public class VaultMainController implements Initializable {
                 
                 // Create the backup with enhanced error handling
                 try {
+                    logMessage("🔄 Calling backup manager to create backup...");
                     backupManager.createBackup(backupLocation, encryptionKey);
+                    logMessage("✅ Backup manager completed successfully");
                 } catch (Exception backupError) {
                     hideOperationProgress();
                     
                     // Check for specific error types
                     String errorMessage = backupError.getMessage();
+                    logMessage("❌ Backup creation failed: " + errorMessage);
+                    backupError.printStackTrace();
+                    
                     if (errorMessage != null && errorMessage.contains("Tag mismatch")) {
                         logMessage("✗ Backup failed: Encryption key mismatch or corrupted data");
                         showError("Backup Failed - Key Mismatch", 
@@ -2228,9 +2675,23 @@ public class VaultMainController implements Initializable {
                             "1. Restart the application\n" +
                             "2. Verify your password is correct\n" +
                             "3. Check if individual files can be downloaded");
+                    } else if (errorMessage != null && errorMessage.contains("not available")) {
+                        logMessage("✗ Backup failed: Required components not available");
+                        showError("Backup Failed - System Error", 
+                            "The backup failed because required components are not available.\n\n" +
+                            "Error: " + errorMessage + "\n\n" +
+                            "Please try:\n" +
+                            "1. Restart the application\n" +
+                            "2. Ensure the vault is properly loaded\n" +
+                            "3. Check that you have write permissions to the backup location");
                     } else {
                         logMessage("✗ Backup failed: " + errorMessage);
-                        showError("Backup Failed", "Failed to create backup:\n\n" + errorMessage);
+                        showError("Backup Failed", 
+                            "Failed to create backup:\n\n" + errorMessage + "\n\n" +
+                            "Please check:\n" +
+                            "• You have write permissions to the backup location\n" +
+                            "• There is sufficient disk space\n" +
+                            "• The vault directory is accessible");
                     }
                     return;
                 }
@@ -2239,11 +2700,14 @@ public class VaultMainController implements Initializable {
                 logMessage("✓ Backup created successfully: " + backupLocation.getName());
                 logMessage("  Location: " + backupLocation.getAbsolutePath());
                 logMessage("  Files backed up: " + allVaultFiles.size());
+                logMessage("  Backup size: " + formatFileSize(backupLocation.length()));
                 
                 showNotification("Backup Complete", 
                     "Encrypted backup created successfully!\n\n" +
-                    "Location: " + backupLocation.getAbsolutePath() + "\n" +
-                    "Files: " + allVaultFiles.size());
+                    "📁 Location: " + backupLocation.getAbsolutePath() + "\n" +
+                    "📄 Files: " + allVaultFiles.size() + "\n" +
+                    "📊 Size: " + formatFileSize(backupLocation.length()) + "\n\n" +
+                    "Your vault data is now safely backed up with AES-256 encryption.");
                 
             } else {
                 hideOperationProgress();
@@ -2321,11 +2785,23 @@ public class VaultMainController implements Initializable {
                     
                     // Perform the restore with enhanced error handling
                     try {
-                        backupManager.restoreBackup(backupFile, encryptionKey);
+                        logMessage("🔄 Starting restore process...");
+                        logMessage("📁 Backup file: " + backupFile.getAbsolutePath());
+                        logMessage("📊 Backup size: " + formatFileSize(backupFile.length()));
                         
-                        // Reload metadata from restored file
+                        backupManager.restoreBackup(backupFile, encryptionKey);
+                        logMessage("✅ Backup manager restore completed");
+                        
+                        // Clear existing metadata before reloading
                         if (metadataManager != null) {
                             try {
+                                // Clear current metadata first
+                                logMessage("🗑️ Clearing existing metadata before restore...");
+                                allVaultFiles.clear();
+                                fileList.clear();
+                                filteredFileList.clear();
+                                
+                                // Reload metadata from restored files
                                 metadataManager.loadMetadata();
                                 logMessage("📋 Metadata reloaded after restore");
                             } catch (Exception metaError) {
@@ -2333,15 +2809,65 @@ public class VaultMainController implements Initializable {
                             }
                         }
                         
+                        // Force refresh of all vault data
+                        logMessage("🔄 Refreshing vault data after restore...");
+                        
+                        // Clear preview cache since files may have changed
+                        clearPreviewCache();
+                        
+                        Platform.runLater(() -> {
+                            try {
+                                // Clear current file lists completely
+                                allVaultFiles.clear();
+                                fileList.clear();
+                                filteredFileList.clear();
+                                
+                                // Force reload metadata first
+                                if (metadataManager != null) {
+                                    try {
+                                        metadataManager.loadMetadata();
+                                        logMessage("📋 Metadata force reloaded");
+                                    } catch (Exception metaError) {
+                                        logMessage("⚠ Error reloading metadata: " + metaError.getMessage());
+                                    }
+                                }
+                                
+                                // Reload all files from file manager
+                                if (fileManager != null) {
+                                    try {
+                                        List<com.ghostvault.model.VaultFile> restoredFiles = fileManager.getAllFiles();
+                                        allVaultFiles.addAll(restoredFiles);
+                                        logMessage("📄 Reloaded " + allVaultFiles.size() + " files after restore");
+                                        
+                                        // Log each restored file for debugging
+                                        for (com.ghostvault.model.VaultFile file : restoredFiles) {
+                                            logMessage("📄 Restored file: " + file.getOriginalName());
+                                        }
+                                    } catch (Exception fileError) {
+                                        logMessage("⚠ Error reloading files: " + fileError.getMessage());
+                                    }
+                                }
+                                
+                                // Update UI
+                                refreshFileList();
+                                updateStatus();
+                                
+                                logMessage("✅ UI refreshed after restore - showing " + allVaultFiles.size() + " files");
+                            } catch (Exception refreshError) {
+                                logMessage("⚠ Error refreshing UI after restore: " + refreshError.getMessage());
+                                refreshError.printStackTrace();
+                            }
+                        });
+                        
                         hideOperationProgress();
-                        refreshFileList();
-                        updateStatus();
                         
                         logMessage("✓ Vault successfully restored from: " + backupFile.getName());
                         
                         showNotification("Restore Complete", 
                             "Vault successfully restored from backup!\n\n" +
-                            "Please verify your files are accessible.");
+                            "📁 Backup: " + backupFile.getName() + "\n" +
+                            "📄 Files restored: " + allVaultFiles.size() + "\n\n" +
+                            "Your vault has been restored. Please verify your files are accessible.");
                             
                     } catch (Exception restoreError) {
                         hideOperationProgress();
@@ -2380,16 +2906,54 @@ public class VaultMainController implements Initializable {
      */
     @FXML
     private void handleSettings() {
+        logMessage("⚙️ Opening Settings...");
         try {
-            // Simple settings dialog implementation
-            Alert settingsAlert = new Alert(Alert.AlertType.INFORMATION);
-            settingsAlert.setTitle("Settings");
-            settingsAlert.setHeaderText("GhostVault Settings");
-            settingsAlert.setContentText("Settings functionality will be implemented in a future version.");
-            settingsAlert.showAndWait();
-            logMessage("⚙️ Settings dialog opened");
+            // Create a more comprehensive settings dialog
+            Stage settingsStage = new Stage();
+            settingsStage.setTitle("⚙️ GhostVault Settings");
+            settingsStage.initModality(javafx.stage.Modality.APPLICATION_MODAL);
+            
+            VBox root = new VBox(20);
+            root.setPadding(new javafx.geometry.Insets(20));
+            root.setStyle("-fx-background-color: #0F172A;");
+            
+            Label titleLabel = new Label("⚙️ GhostVault Settings");
+            titleLabel.setStyle("-fx-text-fill: #F8FAFC; -fx-font-size: 18px; -fx-font-weight: bold;");
+            
+            // Settings content
+            VBox settingsContent = new VBox(15);
+            settingsContent.setStyle("-fx-background-color: #1E293B; -fx-padding: 20; -fx-background-radius: 8;");
+            
+            Label infoLabel = new Label("🔧 Application Settings");
+            infoLabel.setStyle("-fx-text-fill: #60A5FA; -fx-font-size: 14px; -fx-font-weight: bold;");
+            
+            Label vaultPathLabel = new Label("📁 Vault Location: " + com.ghostvault.config.AppConfig.getVaultDir());
+            vaultPathLabel.setStyle("-fx-text-fill: #94A3B8; -fx-font-size: 12px;");
+            vaultPathLabel.setWrapText(true);
+            
+            Label modeLabel = new Label("🔐 Current Mode: " + getCurrentVaultMode());
+            modeLabel.setStyle("-fx-text-fill: #94A3B8; -fx-font-size: 12px;");
+            
+            Label encryptionLabel = new Label("🔒 Encryption: AES-256-GCM");
+            encryptionLabel.setStyle("-fx-text-fill: #10B981; -fx-font-size: 12px;");
+            
+            settingsContent.getChildren().addAll(infoLabel, vaultPathLabel, modeLabel, encryptionLabel);
+            
+            // Close button
+            Button closeBtn = new Button("✅ Close");
+            closeBtn.setStyle("-fx-background-color: #3B82F6; -fx-text-fill: white; -fx-padding: 10 20; -fx-background-radius: 5;");
+            closeBtn.setOnAction(e -> settingsStage.close());
+            
+            root.getChildren().addAll(titleLabel, settingsContent, closeBtn);
+            
+            Scene scene = new Scene(root, 400, 300);
+            settingsStage.setScene(scene);
+            settingsStage.show();
+            
+            logMessage("⚙️ Settings dialog opened successfully");
         } catch (Exception e) {
             logMessage("⚠ Settings error: " + e.getMessage());
+            showError("Settings Error", "Could not open settings: " + e.getMessage());
         }
     }
     
@@ -2408,7 +2972,7 @@ public class VaultMainController implements Initializable {
     @FXML
     private void handleLogout() {
         boolean confirmed = showConfirmation("Logout", 
-            "Are you sure you want to logout?\n\nAll unsaved work will be lost.");
+            "Are you sure you want to logout?\n\nYou will be returned to the login screen.");
         
         if (confirmed) {
             logMessage("🚪 Logging out...");
@@ -2422,22 +2986,62 @@ public class VaultMainController implements Initializable {
                     sessionManager.endSession();
                 }
                 
-                // Close current window and return to login
+                // Return to login screen instead of closing app
                 Platform.runLater(() -> {
                     try {
-                        // Get the current stage and close it
+                        // Get the current stage
                         Stage currentStage = (Stage) logoutButton.getScene().getWindow();
-                        currentStage.close();
                         
-                        // Simple logout - application will be restarted externally
+                        // Load the login screen
+                        FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/login.fxml"));
+                        Parent loginRoot;
+                        
+                        try {
+                            loginRoot = loader.load();
+                        } catch (Exception e) {
+                            // Fallback: restart the main application but preserve existing setup
+                            logMessage("⚠ Login FXML not found, restarting application...");
+                            currentStage.close();
+                            
+                            // Start new instance of GhostVault
+                            Platform.runLater(() -> {
+                                try {
+                                    com.ghostvault.GhostVaultApp app = new com.ghostvault.GhostVaultApp();
+                                    Stage newStage = new Stage();
+                                    app.start(newStage);
+                                } catch (Exception ex) {
+                                    logMessage("✗ Failed to restart application: " + ex.getMessage());
+                                    Platform.exit();
+                                }
+                            });
+                            return;
+                        }
+                        
+                        // Set the login scene
+                        Scene loginScene = new Scene(loginRoot, 600, 500);
+                        currentStage.setScene(loginScene);
+                        currentStage.setTitle("GhostVault - Login");
+                        currentStage.centerOnScreen();
+                        
                         logMessage("🔓 User logged out successfully");
-                        
                         logMessage("✓ Returned to login screen");
                         
                     } catch (Exception e) {
                         logMessage("✗ Error returning to login: " + e.getMessage());
-                        // Fallback: close application
-                        Platform.exit();
+                        // Fallback: restart application
+                        try {
+                            Stage currentStage = (Stage) logoutButton.getScene().getWindow();
+                            currentStage.close();
+                            Platform.runLater(() -> {
+                                try {
+                                    new com.ghostvault.GhostVaultApp().start(new Stage());
+                                } catch (Exception ex) {
+                                    Platform.exit();
+                                }
+                            });
+                        } catch (Exception ex) {
+                            Platform.exit();
+                        }
                     }
                 });
                 
@@ -2451,26 +3055,84 @@ public class VaultMainController implements Initializable {
     // =========================== SEARCH AND FILTERING ===========================
     
     /**
-     * Filter file list based on search term
+     * Enhanced filter file list using AI-powered search
      */
     private void filterFileList(String searchTerm) {
         filteredFileList.clear();
         
-        logMessage("🔍 Debug: Filtering files - fileList size: " + fileList.size() + ", searchTerm: '" + searchTerm + "'");
+        logMessage("🔍 AI Search: Filtering " + fileList.size() + " files with query: '" + searchTerm + "'");
         
         if (searchTerm == null || searchTerm.trim().isEmpty()) {
             filteredFileList.addAll(fileList);
         } else {
-            String lowerSearchTerm = searchTerm.toLowerCase();
-            List<String> filtered = fileList.stream()
-                .filter(displayName -> displayName.toLowerCase().contains(lowerSearchTerm))
-                .collect(Collectors.toList());
-            filteredFileList.addAll(filtered);
+            // Use AI-powered search on actual VaultFile objects
+            if (!allVaultFiles.isEmpty() && searchEngine != null) {
+                List<VaultFile> searchResults = searchEngine.searchFiles(searchTerm, allVaultFiles);
+                
+                // Convert search results back to display names
+                for (VaultFile file : searchResults) {
+                    FileAnalysisResult analysis = aiAnalyzer.analyzeFile(file);
+                    
+                    StringBuilder displayName = new StringBuilder();
+                    displayName.append(analysis.getCategory().getIcon()).append(" ");
+                    displayName.append(file.getOriginalName());
+                    displayName.append(" (").append(analysis.getSizeCategory().getDisplayName()).append(")");
+                    displayName.append(" ").append(analysis.getRiskLevel().getIcon());
+                    
+                    if (analysis.hasAnyFlag()) {
+                        displayName.append(" [");
+                        for (int i = 0; i < analysis.getFlags().size(); i++) {
+                            if (i > 0) displayName.append(" ");
+                            displayName.append(analysis.getFlags().get(i).getIcon());
+                        }
+                        displayName.append("]");
+                    }
+                    
+                    filteredFileList.add(displayName.toString());
+                }
+                
+                logMessage("🤖 AI Search: Found " + searchResults.size() + " matching files");
+            } else {
+                // Fallback to simple text search for display names
+                String lowerSearchTerm = searchTerm.toLowerCase();
+                List<String> filtered = fileList.stream()
+                    .filter(displayName -> displayName.toLowerCase().contains(lowerSearchTerm))
+                    .collect(Collectors.toList());
+                filteredFileList.addAll(filtered);
+                
+                logMessage("📝 Text Search: Found " + filtered.size() + " matching files");
+            }
         }
         
-        logMessage("🔍 Debug: After filtering - filteredFileList size: " + filteredFileList.size());
+        // Highlight search results in UI
+        if (searchTerm != null && !searchTerm.trim().isEmpty()) {
+            highlightSearchResults(searchTerm);
+        }
         
         updateStatus();
+    }
+    
+    /**
+     * Highlight search results in the file list
+     */
+    private void highlightSearchResults(String searchTerm) {
+        // Add visual feedback for search results
+        if (fileListView != null && !filteredFileList.isEmpty()) {
+            Platform.runLater(() -> {
+                // Add a subtle highlight effect to the list view
+                fileListView.setStyle("-fx-background-color: #1E293B; -fx-border-color: #3B82F6; -fx-border-width: 1px;");
+                
+                // Remove highlight after a short delay
+                javafx.animation.Timeline timeline = new javafx.animation.Timeline(
+                    new javafx.animation.KeyFrame(javafx.util.Duration.seconds(2), e -> {
+                        if (fileListView != null) {
+                            fileListView.setStyle("-fx-background-color: #1E293B;");
+                        }
+                    })
+                );
+                timeline.play();
+            });
+        }
     }
     
     // =========================== FILE LIST MANAGEMENT ===========================
@@ -2502,9 +3164,32 @@ public class VaultMainController implements Initializable {
                 allVaultFiles.addAll(vaultFiles);
                 
                 for (VaultFile vaultFile : vaultFiles) {
-                    String displayName = vaultFile.getIcon() + " " + vaultFile.getDisplayName();
-                    fileList.add(displayName);
-                    logMessage("� eDebug: Added file to list: " + displayName);
+                    // Perform AI analysis on the file
+                    FileAnalysisResult analysis = aiAnalyzer.analyzeFile(vaultFile);
+                    
+                    // Create enhanced display name with AI indicators
+                    StringBuilder displayName = new StringBuilder();
+                    displayName.append(analysis.getCategory().getIcon()).append(" ");
+                    displayName.append(vaultFile.getOriginalName());
+                    
+                    // Add size indicator
+                    displayName.append(" (").append(analysis.getSizeCategory().getDisplayName()).append(")");
+                    
+                    // Add security risk indicator
+                    displayName.append(" ").append(analysis.getRiskLevel().getIcon());
+                    
+                    // Add flags if any
+                    if (analysis.hasAnyFlag()) {
+                        displayName.append(" [");
+                        for (int i = 0; i < analysis.getFlags().size(); i++) {
+                            if (i > 0) displayName.append(" ");
+                            displayName.append(analysis.getFlags().get(i).getIcon());
+                        }
+                        displayName.append("]");
+                    }
+                    
+                    fileList.add(displayName.toString());
+                    logMessage("🤖 AI-Enhanced file: " + displayName.toString());
                 }
                 
                 logMessage("📁 Loaded " + fileList.size() + " file(s) from vault");
@@ -2841,12 +3526,12 @@ public class VaultMainController implements Initializable {
     // =========================== UTILITY METHODS ===========================
     
     /**
-     * Find VaultFile by display name
+     * Find VaultFile by display name (enhanced for AI analysis)
      */
     private VaultFile findVaultFileByDisplayName(String displayName) {
         for (VaultFile vaultFile : allVaultFiles) {
-            String fileDisplayName = vaultFile.getIcon() + " " + vaultFile.getDisplayName();
-            if (fileDisplayName.equals(displayName)) {
+            // Check if the display name contains the original file name
+            if (displayName.contains(vaultFile.getOriginalName())) {
                 return vaultFile;
             }
         }
@@ -3080,7 +3765,7 @@ public class VaultMainController implements Initializable {
         try {
             // Create professional dashboard window
             Stage dashboardStage = new Stage();
-            dashboardStage.setTitle("📊 GhostVault Security Dashboard - " + getCurrentVaultMode());
+            dashboardStage.setTitle("📊 GhostVault Security Dashboard");
             dashboardStage.initModality(javafx.stage.Modality.NONE);
             dashboardStage.setResizable(true);
             
@@ -3133,9 +3818,9 @@ public class VaultMainController implements Initializable {
      */
     private String getCurrentVaultMode() {
         if (isDecoyMode) {
-            return "DECOY";
+            return "SECURE";
         } else {
-            return "MASTER";
+            return "SECURE";
         }
     }
     
@@ -3155,12 +3840,8 @@ public class VaultMainController implements Initializable {
         HBox.setHgrow(spacer, javafx.scene.layout.Priority.ALWAYS);
         
         // Vault mode indicator
-        Label modeLabel = new Label(getCurrentVaultMode() + " MODE");
-        if (isDecoyMode) {
-            modeLabel.setStyle("-fx-background-color: #F59E0B; -fx-text-fill: #000000; -fx-padding: 8px 16px; -fx-background-radius: 20px; -fx-font-weight: bold; -fx-font-size: 12px;");
-        } else {
-            modeLabel.setStyle("-fx-background-color: #10B981; -fx-text-fill: #FFFFFF; -fx-padding: 8px 16px; -fx-background-radius: 20px; -fx-font-weight: bold; -fx-font-size: 12px;");
-        }
+        Label modeLabel = new Label("SECURE VAULT");
+        modeLabel.setStyle("-fx-background-color: #10B981; -fx-text-fill: #FFFFFF; -fx-padding: 8px 16px; -fx-background-radius: 20px; -fx-font-weight: bold; -fx-font-size: 12px;");
         
         // Security status indicator
         Label securityStatus = new Label("🔒 SECURE");
@@ -3340,13 +4021,8 @@ public class VaultMainController implements Initializable {
         activities.add("🔒 Session security validated");
         
         // Add vault mode specific activities
-        if (isDecoyMode) {
-            activities.add("⚠️ Operating in DECOY mode");
-            activities.add("🎭 Decoy data layer active");
-        } else {
-            activities.add("✅ Operating in MASTER mode");
-            activities.add("🔐 Full vault access enabled");
-        }
+        activities.add("✅ Operating in secure mode");
+        activities.add("🔐 Vault access enabled");
         
         activityList.getItems().addAll(activities);
         
@@ -3399,7 +4075,7 @@ public class VaultMainController implements Initializable {
             createHealthItem("Disk Space", diskStatus + " (" + formatFileSize(freeSpace) + " free)", diskColor),
             createHealthItem("Encryption", encryptionStatus, encryptionColor),
             createHealthItem("File Integrity", integrityStatus, integrityColor),
-            createHealthItem("Vault Mode", getCurrentVaultMode() + " Mode Active", isDecoyMode ? "#F59E0B" : "#10B981"),
+            createHealthItem("Vault Mode", "Secure Mode Active", "#10B981"),
             createHealthItem("Session", "Authenticated & Secure", "#175DDC")
         );
         
@@ -3518,7 +4194,7 @@ public class VaultMainController implements Initializable {
             "🛡️ Mode: %s",
             allVaultFiles.size(),
             calculateTotalVaultSize(),
-            isDecoyMode ? "Decoy Mode" : "Master Mode"
+            "Secure Mode"
         );
         
         showNotification("Security Dashboard", info);
@@ -3574,45 +4250,302 @@ public class VaultMainController implements Initializable {
     }
     
     /**
-     * Show advanced file manager options
+     * Show advanced file manager with AI enhancement
      */
     private void showAdvancedFileManager() {
-        // Create a dialog with advanced file management options
-        Alert dialog = new Alert(Alert.AlertType.INFORMATION);
-        dialog.setTitle("Advanced File Manager");
-        dialog.setHeaderText("Enhanced File Operations");
+        Stage fileManagerStage = new Stage();
+        fileManagerStage.setTitle("🤖 AI-Enhanced File Manager");
+        fileManagerStage.initModality(Modality.NONE);
         
-        String content = String.format(
-            "📁 Current Vault Status:\n" +
-            "• Files: %d\n" +
-            "• Total Size: %s\n" +
-            "• Mode: %s\n\n" +
-            "🔧 Available Operations:\n" +
-            "• Bulk file operations (Select multiple files)\n" +
-            "• File search and filtering (Use search box)\n" +
-            "• Drag & drop upload support\n" +
-            "• Secure file deletion with overwrite\n" +
-            "• Encrypted backup and restore\n" +
-            "• File integrity verification\n\n" +
-            "⌨️ Keyboard Shortcuts:\n" +
-            "• Ctrl+O: Upload files\n" +
-            "• Ctrl+S: Download selected\n" +
-            "• Delete: Secure delete\n" +
-            "• F5: Refresh file list\n" +
-            "• Ctrl+F: Focus search",
-            allVaultFiles.size(),
-            calculateTotalVaultSize(),
-            isDecoyMode ? "Decoy Mode" : "Master Mode"
-        );
+        VBox root = new VBox(15);
+        root.setPadding(new Insets(20));
+        root.setStyle("-fx-background-color: #0F172A;");
         
-        dialog.setContentText(content);
+        // Header
+        Label headerLabel = new Label("🤖 AI-Enhanced File Manager");
+        headerLabel.setStyle("-fx-text-fill: #F8FAFC; -fx-font-size: 20px; -fx-font-weight: bold;");
         
-        // Apply password manager theme
-        dialog.getDialogPane().getStylesheets().add(
-            getClass().getResource("/css/password-manager-theme.css").toExternalForm());
-        dialog.getDialogPane().getStyleClass().add("dialog-pane");
+        // AI Analysis Section
+        VBox aiSection = new VBox(10);
+        aiSection.setStyle("-fx-background-color: #1E293B; -fx-padding: 15; -fx-background-radius: 8;");
         
-        dialog.showAndWait();
+        Label aiLabel = new Label("🧠 AI File Analysis");
+        aiLabel.setStyle("-fx-text-fill: #60A5FA; -fx-font-size: 16px; -fx-font-weight: bold;");
+        
+        // File categorization
+        ListView<String> aiFileList = new ListView<>();
+        aiFileList.setPrefHeight(300);
+        aiFileList.setStyle("-fx-background-color: #334155; -fx-control-inner-background: #334155;");
+        
+        // Populate with AI-enhanced file information
+        ObservableList<String> aiEnhancedFiles = FXCollections.observableArrayList();
+        
+        if (allVaultFiles.isEmpty()) {
+            aiEnhancedFiles.add("📁 No files found in vault");
+            aiEnhancedFiles.add("💡 Upload some files to see AI analysis");
+        } else {
+            for (VaultFile file : allVaultFiles) {
+                String aiInfo = generateAIFileInfo(file);
+                aiEnhancedFiles.add(aiInfo);
+            }
+        }
+        
+        aiFileList.setItems(aiEnhancedFiles);
+        
+        // Custom cell factory for better text visibility
+        aiFileList.setCellFactory(listView -> new ListCell<String>() {
+            @Override
+            protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setText(null);
+                    setStyle("");
+                } else {
+                    setText(item);
+                    setStyle("-fx-text-fill: #F8FAFC; -fx-background-color: #334155; -fx-padding: 8px;");
+                }
+            }
+        });
+        
+        // Search box for AI file manager
+        TextField aiSearchField = new TextField();
+        aiSearchField.setPromptText("🔍 Search files by name, type, or AI tags...");
+        aiSearchField.setStyle("-fx-background-color: #334155; -fx-text-fill: #F8FAFC; -fx-prompt-text-fill: #94A3B8;");
+        
+        // Filter files based on search
+        aiSearchField.textProperty().addListener((obs, oldText, newText) -> {
+            if (newText == null || newText.isEmpty()) {
+                aiFileList.setItems(aiEnhancedFiles);
+            } else {
+                ObservableList<String> filteredAI = FXCollections.observableArrayList();
+                String searchLower = newText.toLowerCase();
+                for (String fileInfo : aiEnhancedFiles) {
+                    if (fileInfo.toLowerCase().contains(searchLower)) {
+                        filteredAI.add(fileInfo);
+                    }
+                }
+                aiFileList.setItems(filteredAI);
+            }
+        });
+        
+        // AI Statistics
+        TextArea aiStats = new TextArea();
+        aiStats.setPrefRowCount(6);
+        aiStats.setEditable(false);
+        aiStats.setStyle("-fx-background-color: #334155; -fx-control-inner-background: #334155; -fx-text-fill: #F8FAFC; -fx-highlight-fill: #475569; -fx-highlight-text-fill: #F8FAFC;");
+        
+        String statsText = generateAIStatistics();
+        if (statsText == null || statsText.trim().isEmpty()) {
+            statsText = "📊 AI Analysis Summary:\n\n" +
+                       "• Total Files: " + allVaultFiles.size() + "\n" +
+                       "• Analysis Status: " + (allVaultFiles.isEmpty() ? "No files to analyze" : "Ready") + "\n" +
+                       "• AI Engine: Active\n" +
+                       "• Security Scanning: Enabled";
+        }
+        aiStats.setText(statsText);
+        
+        aiSection.getChildren().addAll(aiLabel, aiSearchField, aiFileList, 
+                                      new Label("📊 AI Analysis Summary:") {{
+                                          setStyle("-fx-text-fill: #94A3B8; -fx-font-size: 14px;");
+                                      }}, aiStats);
+        
+        // Action buttons
+        HBox buttonBox = new HBox(10);
+        buttonBox.setAlignment(Pos.CENTER);
+        
+        Button refreshBtn = new Button("🔄 Refresh Analysis");
+        refreshBtn.setStyle("-fx-background-color: #3B82F6; -fx-text-fill: white; -fx-padding: 10 20; -fx-background-radius: 5;");
+        refreshBtn.setOnAction(e -> {
+            // Refresh AI analysis
+            aiEnhancedFiles.clear();
+            for (VaultFile file : allVaultFiles) {
+                aiEnhancedFiles.add(generateAIFileInfo(file));
+            }
+            aiStats.setText(generateAIStatistics());
+            showNotification("AI Analysis", "File analysis refreshed successfully");
+        });
+        
+        Button exportBtn = new Button("📄 Export Analysis");
+        exportBtn.setStyle("-fx-background-color: #10B981; -fx-text-fill: white; -fx-padding: 10 20; -fx-background-radius: 5;");
+        exportBtn.setOnAction(e -> {
+            // Export AI analysis to text file
+            try {
+                FileChooser fileChooser = new FileChooser();
+                fileChooser.setTitle("Export AI Analysis");
+                fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Text Files", "*.txt"));
+                fileChooser.setInitialFileName("vault_ai_analysis.txt");
+                
+                File exportFile = fileChooser.showSaveDialog(fileManagerStage);
+                if (exportFile != null) {
+                    StringBuilder export = new StringBuilder();
+                    export.append("GhostVault AI Analysis Report\n");
+                    export.append("Generated: ").append(LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))).append("\n\n");
+                    export.append(generateAIStatistics()).append("\n\n");
+                    export.append("Detailed File Analysis:\n");
+                    for (String fileInfo : aiEnhancedFiles) {
+                        export.append(fileInfo).append("\n");
+                    }
+                    
+                    Files.write(exportFile.toPath(), export.toString().getBytes());
+                    showNotification("Export Complete", "AI analysis exported to " + exportFile.getName());
+                }
+            } catch (Exception ex) {
+                showError("Export Error", "Failed to export analysis: " + ex.getMessage());
+            }
+        });
+        
+        Button closeBtn = new Button("❌ Close");
+        closeBtn.setStyle("-fx-background-color: #EF4444; -fx-text-fill: white; -fx-padding: 10 20; -fx-background-radius: 5;");
+        closeBtn.setOnAction(e -> fileManagerStage.close());
+        
+        buttonBox.getChildren().addAll(refreshBtn, exportBtn, closeBtn);
+        
+        root.getChildren().addAll(headerLabel, aiSection, buttonBox);
+        
+        Scene scene = new Scene(root, 800, 600);
+        fileManagerStage.setScene(scene);
+        fileManagerStage.show();
+    }
+    
+    /**
+     * Generate AI-enhanced file information
+     */
+    private String generateAIFileInfo(VaultFile file) {
+        StringBuilder info = new StringBuilder();
+        
+        // Basic file info
+        info.append("📄 ").append(file.getOriginalName());
+        
+        // AI-generated tags based on extension and size
+        String extension = file.getExtension().toLowerCase();
+        long size = file.getSize();
+        
+        // File type classification
+        String category = classifyFileType(extension);
+        info.append(" | 🏷️ ").append(category);
+        
+        // Size classification
+        String sizeCategory = classifyFileSize(size);
+        info.append(" | 📏 ").append(sizeCategory);
+        
+        // Security level based on file type
+        String securityLevel = assessSecurityLevel(extension);
+        info.append(" | 🔒 ").append(securityLevel);
+        
+        // File age (simulated)
+        info.append(" | 📅 ").append(file.getCreatedDate().format(DateTimeFormatter.ofPattern("MMM dd, yyyy")));
+        
+        return info.toString();
+    }
+    
+    /**
+     * Classify file type based on extension
+     */
+    private String classifyFileType(String extension) {
+        switch (extension) {
+            case "pdf": case "doc": case "docx": case "txt": case "rtf":
+                return "Document";
+            case "jpg": case "jpeg": case "png": case "gif": case "bmp": case "svg":
+                return "Image";
+            case "mp4": case "avi": case "mkv": case "mov": case "wmv":
+                return "Video";
+            case "mp3": case "wav": case "flac": case "aac": case "ogg":
+                return "Audio";
+            case "zip": case "rar": case "7z": case "tar": case "gz":
+                return "Archive";
+            case "exe": case "msi": case "dmg": case "deb": case "rpm":
+                return "Executable";
+            case "java": case "py": case "js": case "html": case "css": case "cpp": case "c":
+                return "Code";
+            case "xlsx": case "xls": case "csv": case "ods":
+                return "Spreadsheet";
+            case "pptx": case "ppt": case "odp":
+                return "Presentation";
+            default:
+                return "Other";
+        }
+    }
+    
+    /**
+     * Classify file size
+     */
+    private String classifyFileSize(long size) {
+        if (size < 1024) return "Tiny (<1KB)";
+        else if (size < 1024 * 1024) return "Small (<1MB)";
+        else if (size < 10 * 1024 * 1024) return "Medium (<10MB)";
+        else if (size < 100 * 1024 * 1024) return "Large (<100MB)";
+        else return "Very Large (>100MB)";
+    }
+    
+    /**
+     * Assess security level based on file type
+     */
+    private String assessSecurityLevel(String extension) {
+        switch (extension) {
+            case "exe": case "msi": case "bat": case "cmd": case "scr":
+                return "High Risk";
+            case "zip": case "rar": case "7z":
+                return "Medium Risk";
+            case "pdf": case "doc": case "docx":
+                return "Low Risk";
+            case "txt": case "jpg": case "png": case "mp3": case "mp4":
+                return "Safe";
+            default:
+                return "Unknown";
+        }
+    }
+    
+    /**
+     * Generate AI statistics summary
+     */
+    private String generateAIStatistics() {
+        if (allVaultFiles.isEmpty()) {
+            return "No files to analyze.";
+        }
+        
+        StringBuilder stats = new StringBuilder();
+        
+        // File type distribution
+        Map<String, Long> typeCount = allVaultFiles.stream()
+            .collect(Collectors.groupingBy(
+                f -> classifyFileType(f.getExtension().toLowerCase()),
+                Collectors.counting()
+            ));
+        
+        stats.append("📊 File Type Distribution:\n");
+        typeCount.forEach((type, count) -> 
+            stats.append("  • ").append(type).append(": ").append(count).append(" files\n"));
+        
+        // Size distribution
+        Map<String, Long> sizeCount = allVaultFiles.stream()
+            .collect(Collectors.groupingBy(
+                f -> classifyFileSize(f.getSize()),
+                Collectors.counting()
+            ));
+        
+        stats.append("\n📏 Size Distribution:\n");
+        sizeCount.forEach((size, count) -> 
+            stats.append("  • ").append(size).append(": ").append(count).append(" files\n"));
+        
+        // Security assessment
+        Map<String, Long> securityCount = allVaultFiles.stream()
+            .collect(Collectors.groupingBy(
+                f -> assessSecurityLevel(f.getExtension().toLowerCase()),
+                Collectors.counting()
+            ));
+        
+        stats.append("\n🔒 Security Assessment:\n");
+        securityCount.forEach((level, count) -> 
+            stats.append("  • ").append(level).append(": ").append(count).append(" files\n"));
+        
+        // Total statistics
+        long totalSize = allVaultFiles.stream().mapToLong(VaultFile::getSize).sum();
+        stats.append("\n📈 Summary:\n");
+        stats.append("  • Total Files: ").append(allVaultFiles.size()).append("\n");
+        stats.append("  • Total Size: ").append(formatFileSize(totalSize)).append("\n");
+        stats.append("  • Average Size: ").append(formatFileSize(totalSize / allVaultFiles.size())).append("\n");
+        
+        return stats.toString();
     }
     
     /**
@@ -3643,15 +4576,32 @@ public class VaultMainController implements Initializable {
     @FXML
     private void handleNotes() {
         try {
+            logMessage("📝 Opening Secure Notes Manager...");
+            
+            // Check encryption key
+            if (encryptionKey == null) {
+                showError("Notes Manager Error", "Encryption key not available. Please ensure you are logged in properly.");
+                return;
+            }
+            
             // Initialize secure notes manager
             String vaultPath = com.ghostvault.config.AppConfig.getVaultDir();
+            logMessage("📁 Vault path: " + vaultPath);
+            
             SecureNotesManager notesManager = new SecureNotesManager(vaultPath);
             notesManager.setEncryptionKey(encryptionKey);
-            notesManager.loadNotes();
+            
+            try {
+                notesManager.loadNotes();
+                logMessage("✅ Notes data loaded successfully");
+            } catch (Exception loadEx) {
+                logMessage("⚠ Could not load existing notes: " + loadEx.getMessage());
+                // Continue anyway - might be first time use
+            }
             
             // Create professional notes manager window
             Stage notesStage = new Stage();
-            notesStage.setTitle("📝 Secure Notes - " + getCurrentVaultMode() + " Mode");
+            notesStage.setTitle("📝 Secure Notes");
             notesStage.initModality(javafx.stage.Modality.NONE);
             notesStage.setResizable(true);
             
@@ -3678,7 +4628,15 @@ public class VaultMainController implements Initializable {
             root.getChildren().addAll(header, mainContent);
             
             Scene scene = new Scene(root, 900, 600);
-            scene.getStylesheets().add(getClass().getResource("/css/password-manager-theme.css").toExternalForm());
+            
+            // Try to load CSS, but don't fail if it doesn't exist
+            try {
+                scene.getStylesheets().add(getClass().getResource("/css/password-manager-theme.css").toExternalForm());
+            } catch (Exception cssEx) {
+                logMessage("⚠ Could not load notes manager CSS: " + cssEx.getMessage());
+                // Apply basic styling directly
+                root.setStyle("-fx-background-color: #0F172A; -fx-text-fill: #F8FAFC;");
+            }
             
             notesStage.setScene(scene);
             notesStage.show();
@@ -3726,12 +4684,8 @@ public class VaultMainController implements Initializable {
         closeBtn.setOnAction(e -> stage.close());
         
         // Vault mode indicator
-        Label modeLabel = new Label(getCurrentVaultMode() + " NOTES");
-        if (isDecoyMode) {
-            modeLabel.setStyle("-fx-background-color: #F59E0B; -fx-text-fill: #000000; -fx-padding: 8px 16px; -fx-background-radius: 20px; -fx-font-weight: bold; -fx-font-size: 12px;");
-        } else {
-            modeLabel.setStyle("-fx-background-color: #10B981; -fx-text-fill: #FFFFFF; -fx-padding: 8px 16px; -fx-background-radius: 20px; -fx-font-weight: bold; -fx-font-size: 12px;");
-        }
+        Label modeLabel = new Label("SECURE NOTES");
+        modeLabel.setStyle("-fx-background-color: #10B981; -fx-text-fill: #FFFFFF; -fx-padding: 8px 16px; -fx-background-radius: 20px; -fx-font-weight: bold; -fx-font-size: 12px;");
         
         header.getChildren().addAll(titleLabel, spacer, newNoteBtn, saveBtn, closeBtn, modeLabel);
         return header;
@@ -3931,11 +4885,43 @@ public class VaultMainController implements Initializable {
             notesList.getSelectionModel().selectedItemProperty().addListener((obs, oldNote, newNote) -> {
                 if (newNote != null) {
                     currentNote[0] = newNote;
-                    titleField.setText(newNote.getTitle());
-                    contentArea.setText(newNote.getContent());
-                    categoryBox.setValue(newNote.getCategory() != null ? newNote.getCategory() : "General");
+                    logMessage("📝 Loading note in editor: " + newNote.getTitle());
+                    logMessage("📄 Note content length: " + (newNote.getContent() != null ? newNote.getContent().length() : 0));
+                    logMessage("📂 Note category: " + (newNote.getCategory() != null ? newNote.getCategory() : "None"));
+                    
+                    Platform.runLater(() -> {
+                        try {
+                            titleField.setText(newNote.getTitle() != null ? newNote.getTitle() : "");
+                            contentArea.setText(newNote.getContent() != null ? newNote.getContent() : "");
+                            categoryBox.setValue(newNote.getCategory() != null ? newNote.getCategory() : "General");
+                            
+                            // Ensure fields are editable and focused
+                            titleField.setEditable(true);
+                            contentArea.setEditable(true);
+                            
+                            logMessage("✅ Note loaded in editor successfully");
+                        } catch (Exception e) {
+                            logMessage("❌ Error loading note in editor: " + e.getMessage());
+                            
+                            com.ghostvault.logging.SystemErrorLog editorLog = new com.ghostvault.logging.SystemErrorLog(
+                                "NoteEditor", "loadNoteInEditor", e, "Failed to load note in editor");
+                            editorLog.logToConsole();
+                            
+                            showError("Editor Error", "Failed to load note in editor: " + e.getMessage());
+                        }
+                    });
+                } else {
+                    currentNote[0] = null;
+                    Platform.runLater(() -> {
+                        titleField.clear();
+                        contentArea.clear();
+                        categoryBox.setValue("General");
+                    });
+                    logMessage("🗑️ Editor cleared");
                 }
             });
+        } else {
+            logMessage("❌ Notes list not found - editor integration disabled");
         }
         
         // Save button functionality
@@ -3945,37 +4931,60 @@ public class VaultMainController implements Initializable {
                 String content = contentArea.getText();
                 String category = categoryBox.getValue();
                 
+                logMessage("💾 Attempting to save note: " + title);
+                logMessage("💾 Content length: " + content.length() + " characters");
+                logMessage("💾 Category: " + category);
+                
                 if (title.isEmpty()) {
+                    logMessage("❌ Save failed: Empty title");
                     showWarning("Invalid Title", "Please enter a title for the note.");
                     return;
                 }
                 
                 if (currentNote[0] != null) {
                     // Update existing note
+                    logMessage("📝 Updating existing note: " + currentNote[0].getId());
                     currentNote[0].setTitle(title);
                     currentNote[0].setContent(content);
                     currentNote[0].setCategory(category);
                     currentNote[0].setLastModified(java.time.LocalDateTime.now());
                     notesManager.updateNote(currentNote[0]);
+                    logMessage("✅ Note updated successfully");
                     showNotification("Note Updated", "Your note has been updated and encrypted.");
                 } else {
                     // Create new note
+                    logMessage("📝 Creating new note");
                     SecureNote note = new SecureNote(title, content);
                     note.setCategory(category);
                     notesManager.addNote(note);
                     currentNote[0] = note;
+                    logMessage("✅ New note created successfully: " + note.getId());
                     showNotification("Note Saved", "Your note has been encrypted and saved securely.");
                 }
                 
                 // Refresh the notes list
                 if (notesList != null) {
+                    List<SecureNote> allNotes = notesManager.getAllNotes();
+                    logMessage("🔄 Refreshing notes list: " + allNotes.size() + " notes found");
+                    
                     notesList.getItems().clear();
-                    notesList.getItems().addAll(notesManager.getAllNotes());
+                    notesList.getItems().addAll(allNotes);
+                    
+                    // Force UI refresh
+                    Platform.runLater(() -> {
+                        notesList.refresh();
+                    });
                 }
                 
                 logMessage("📝 Note saved: " + title);
             } catch (Exception ex) {
-                showError("Save Error", "Failed to save note: " + ex.getMessage());
+                logMessage("❌ Failed to save note: " + ex.getMessage());
+                ex.printStackTrace();
+                showError("Save Error", "Failed to save note: " + ex.getMessage() + 
+                         "\n\nPlease check that:\n" +
+                         "• The vault is properly unlocked\n" +
+                         "• You have write permissions\n" +
+                         "• There is sufficient disk space");
             }
         });
         
@@ -4014,15 +5023,32 @@ public class VaultMainController implements Initializable {
     @FXML
     private void handlePasswords() {
         try {
+            logMessage("🔑 Opening Password Manager...");
+            
+            // Check encryption key
+            if (encryptionKey == null) {
+                showError("Password Manager Error", "Encryption key not available. Please ensure you are logged in properly.");
+                return;
+            }
+            
             // Initialize password vault manager
             String vaultPath = com.ghostvault.config.AppConfig.getVaultDir();
+            logMessage("📁 Vault path: " + vaultPath);
+            
             PasswordVaultManager passwordManager = new PasswordVaultManager(vaultPath);
             passwordManager.setEncryptionKey(encryptionKey);
-            passwordManager.loadPasswords();
+            
+            try {
+                passwordManager.loadPasswords();
+                logMessage("✅ Password data loaded successfully");
+            } catch (Exception loadEx) {
+                logMessage("⚠ Could not load existing passwords: " + loadEx.getMessage());
+                // Continue anyway - might be first time use
+            }
             
             // Create professional password manager window
             Stage passwordStage = new Stage();
-            passwordStage.setTitle("🔑 Password Vault - " + getCurrentVaultMode() + " Mode");
+            passwordStage.setTitle("🔑 Password Vault");
             passwordStage.initModality(javafx.stage.Modality.NONE);
             passwordStage.setResizable(true);
             
@@ -4177,10 +5203,20 @@ public class VaultMainController implements Initializable {
             root.getChildren().addAll(header, scrollPane);
             
             Scene scene = new Scene(root, 800, 700);
-            scene.getStylesheets().add(getClass().getResource("/css/password-manager-theme.css").toExternalForm());
+            
+            // Try to load CSS, but don't fail if it doesn't exist
+            try {
+                scene.getStylesheets().add(getClass().getResource("/css/password-manager-theme.css").toExternalForm());
+            } catch (Exception cssEx) {
+                logMessage("⚠ Could not load password manager CSS: " + cssEx.getMessage());
+                // Apply basic styling directly
+                root.setStyle("-fx-background-color: #0F172A; -fx-text-fill: #F8FAFC;");
+            }
             
             passwordStage.setScene(scene);
             passwordStage.show();
+            
+            logMessage("🔑 Password Manager window opened successfully");
             
             logMessage("🔑 Professional Password Vault opened - " + getCurrentVaultMode() + " Mode");
         } catch (Exception e) {
@@ -4205,12 +5241,8 @@ public class VaultMainController implements Initializable {
         HBox.setHgrow(spacer, javafx.scene.layout.Priority.ALWAYS);
         
         // Vault mode indicator
-        Label modeLabel = new Label(getCurrentVaultMode() + " VAULT");
-        if (isDecoyMode) {
-            modeLabel.setStyle("-fx-background-color: #F59E0B; -fx-text-fill: #000000; -fx-padding: 8px 16px; -fx-background-radius: 20px; -fx-font-weight: bold; -fx-font-size: 12px;");
-        } else {
-            modeLabel.setStyle("-fx-background-color: #10B981; -fx-text-fill: #FFFFFF; -fx-padding: 8px 16px; -fx-background-radius: 20px; -fx-font-weight: bold; -fx-font-size: 12px;");
-        }
+        Label modeLabel = new Label("SECURE VAULT");
+        modeLabel.setStyle("-fx-background-color: #10B981; -fx-text-fill: #FFFFFF; -fx-padding: 8px 16px; -fx-background-radius: 20px; -fx-font-weight: bold; -fx-font-size: 12px;");
         
         header.getChildren().addAll(titleLabel, spacer, modeLabel);
         return header;
@@ -4353,14 +5385,26 @@ public class VaultMainController implements Initializable {
         Map<String, Object> stats = passwordManager.getPasswordStatistics();
         
         VBox statusItems = new VBox(5);
+        
+        // Safely get statistics with defaults
+        int total = (Integer) stats.getOrDefault("total", 0);
+        int weak = (Integer) stats.getOrDefault("weak", 0);
+        int strong = (Integer) stats.getOrDefault("strong", 0);
+        int excellent = (Integer) stats.getOrDefault("excellent", 0);
+        long expiring = (Long) stats.getOrDefault("expiring", 0L);
+        
+        // Calculate average strength
+        int avgStrength = total > 0 ? 
+            ((weak * 10) + (strong * 70) + (excellent * 90)) / total : 0;
+        
         statusItems.getChildren().addAll(
-            createSecurityStatusItem("Total Passwords", stats.get("totalPasswords").toString(), "#175DDC"),
-            createSecurityStatusItem("Favorites", stats.get("favoritePasswords").toString(), "#10B981"),
-            createSecurityStatusItem("Weak Passwords", stats.get("weakPasswords").toString(), 
-                (Integer) stats.get("weakPasswords") > 0 ? "#EF4444" : "#10B981"),
-            createSecurityStatusItem("Categories", stats.get("categories").toString(), "#8B5CF6"),
-            createSecurityStatusItem("Avg Strength", stats.get("averageStrength") + "%", "#F59E0B"),
-            createSecurityStatusItem("Vault Mode", getCurrentVaultMode(), isDecoyMode ? "#F59E0B" : "#10B981")
+            createSecurityStatusItem("Total Passwords", String.valueOf(total), "#175DDC"),
+            createSecurityStatusItem("Strong Passwords", String.valueOf(strong + excellent), "#10B981"),
+            createSecurityStatusItem("Weak Passwords", String.valueOf(weak), 
+                weak > 0 ? "#EF4444" : "#10B981"),
+            createSecurityStatusItem("Expiring Soon", String.valueOf(expiring), "#F59E0B"),
+            createSecurityStatusItem("Avg Strength", avgStrength + "%", "#8B5CF6"),
+            createSecurityStatusItem("Vault Mode", "Secure", "#10B981")
         );
         
         securityInfo.getChildren().addAll(securityTitle, statusItems);
@@ -4637,16 +5681,6 @@ public class VaultMainController implements Initializable {
     }
     
 
-    
-
-    
-
-
-    
-
-    
-
-    
     /**
      * Show AI analysis of current vault files
      */
@@ -4702,19 +5736,13 @@ public class VaultMainController implements Initializable {
             long totalSize = allVaultFiles.stream().mapToLong(VaultFile::getSize).sum();
             vaultSizeLabel.setText("💾 " + formatFileSize(totalSize));
             
-            if (isDecoyMode) {
-                encryptionLabel.setText("🎭 Decoy Mode Active");
-                sessionLabel.setText("🟡 DECOY MODE");
-                sessionLabel.setStyle("-fx-background-color: #F59E0B; -fx-text-fill: #000000; -fx-padding: 6px 12px; -fx-background-radius: 15px; -fx-font-weight: bold; -fx-font-size: 12px;");
+            if (totalCount > 0) {
+                encryptionLabel.setText("🔐 " + totalCount + " files encrypted with AES-256");
             } else {
-                if (totalCount > 0) {
-                    encryptionLabel.setText("🔐 " + totalCount + " files encrypted with AES-256");
-                } else {
-                    encryptionLabel.setText("🔐 Vault ready - Drop files to encrypt");
-                }
-                sessionLabel.setText("🟢 MASTER MODE");
-                sessionLabel.setStyle("-fx-background-color: #10B981; -fx-text-fill: #FFFFFF; -fx-padding: 6px 12px; -fx-background-radius: 15px; -fx-font-weight: bold; -fx-font-size: 12px;");
+                encryptionLabel.setText("🔐 Vault ready - Drop files to encrypt");
             }
+            sessionLabel.setText("🟢 SECURE");
+            sessionLabel.setStyle("-fx-background-color: #10B981; -fx-text-fill: #FFFFFF; -fx-padding: 6px 12px; -fx-background-radius: 15px; -fx-font-weight: bold; -fx-font-size: 12px;");
             
             // Status updated successfully
         });
@@ -5107,6 +6135,207 @@ public class VaultMainController implements Initializable {
                 showNotification("Note Updated", "Note updated successfully");
             } catch (Exception e) {
                 showError("Update Error", "Failed to update note: " + e.getMessage());
+            }
+        });
+    }
+    
+    // =========================== EMERGENCY MODE ===========================
+    
+    /**
+     * Activate emergency mode - shows hidden emergency button
+     */
+    private void activateEmergencyMode() {
+        Alert emergencyAlert = new Alert(Alert.AlertType.CONFIRMATION);
+        emergencyAlert.setTitle("⚠️ EMERGENCY RESET");
+        emergencyAlert.setHeaderText("SYSTEM RESET");
+        emergencyAlert.setContentText("This will permanently delete ALL data and cannot be undone!\n\nAre you absolutely sure?");
+        
+        Optional<ButtonType> result = emergencyAlert.showAndWait();
+        if (result.isPresent() && result.get() == ButtonType.OK) {
+            // Execute emergency mode
+            executePanicMode();
+        }
+    }
+    
+    /**
+     * Execute panic mode - completely wipe all data and reset system
+     */
+    private void executePanicMode() {
+        com.ghostvault.logging.SystemErrorLog debugLog = new com.ghostvault.logging.SystemErrorLog(
+            "PanicMode", "executePanicMode", "Emergency mode activated", "User triggered Ctrl+Shift+P", "INFO");
+        debugLog.logToConsole();
+        
+        try {
+            logMessage("🚨 EMERGENCY MODE ACTIVATED - WIPING ALL DATA");
+            
+            // 1. Delete all vault files
+            String vaultDir = com.ghostvault.config.AppConfig.getVaultDir();
+            java.io.File vaultFolder = new java.io.File(vaultDir);
+            if (vaultFolder.exists()) {
+                deleteDirectoryRecursively(vaultFolder);
+            }
+            
+            // 2. Delete user data directory
+            String userHome = System.getProperty("user.home");
+            java.io.File ghostVaultDir = new java.io.File(userHome, ".ghostvault");
+            if (ghostVaultDir.exists()) {
+                deleteDirectoryRecursively(ghostVaultDir);
+            }
+            
+            // 3. Clear all memory
+            encryptionKey = null;
+            fileList.clear();
+            allVaultFiles.clear();
+            filteredFileList.clear();
+            clearPreviewCache();
+            
+            // 4. Clear UI
+            if (fileListView != null) {
+                fileListView.getItems().clear();
+            }
+            
+            logMessage("🗑️ All vault data permanently deleted");
+            logMessage("🔄 System will restart to registration");
+            
+            // 5. Show brief completion message (no details for security)
+            Platform.runLater(() -> {
+                Alert completionAlert = new Alert(Alert.AlertType.INFORMATION);
+                completionAlert.setTitle("System Reset");
+                completionAlert.setHeaderText(null);
+                completionAlert.setContentText("System has been reset.");
+                completionAlert.setOnHidden(e -> {
+                    // 6. Restart application to registration page
+                    restartToRegistration();
+                });
+                completionAlert.show();
+                
+                // Auto-close after 2 seconds
+                javafx.animation.Timeline timeline = new javafx.animation.Timeline(
+                    new javafx.animation.KeyFrame(javafx.util.Duration.seconds(2), 
+                        event -> completionAlert.hide())
+                );
+                timeline.play();
+            });
+            
+        } catch (Exception e) {
+            logMessage("⚠ Emergency mode error: " + e.getMessage());
+            
+            com.ghostvault.logging.SystemErrorLog errorLog = new com.ghostvault.logging.SystemErrorLog(
+                "PanicMode", "executePanicMode", e, "Emergency wipe failed");
+            errorLog.logToConsole();
+            
+            // Even if there's an error, still restart
+            restartToRegistration();
+        }
+    }
+    
+    /**
+     * Recursively delete directory and all contents
+     */
+    private void deleteDirectoryRecursively(java.io.File directory) {
+        if (directory.exists()) {
+            java.io.File[] files = directory.listFiles();
+            if (files != null) {
+                for (java.io.File file : files) {
+                    if (file.isDirectory()) {
+                        deleteDirectoryRecursively(file);
+                    } else {
+                        file.delete();
+                    }
+                }
+            }
+            directory.delete();
+        }
+    }
+    
+    /**
+     * Clean expired cache entries
+     */
+    private void cleanExpiredCacheEntries() {
+        long currentTime = System.currentTimeMillis();
+        List<String> expiredKeys = new ArrayList<>();
+        
+        for (Map.Entry<String, Long> entry : cacheTimestamps.entrySet()) {
+            if ((currentTime - entry.getValue()) >= CACHE_TIMEOUT_MS) {
+                expiredKeys.add(entry.getKey());
+            }
+        }
+        
+        for (String key : expiredKeys) {
+            byte[] expiredData = previewCache.remove(key);
+            if (expiredData != null) {
+                Arrays.fill(expiredData, (byte) 0);
+            }
+            cacheTimestamps.remove(key);
+            logMessage("🗑️ Cleaned expired cache entry: " + key);
+        }
+    }
+    
+    /**
+     * Clear all preview cache (for security)
+     */
+    private void clearPreviewCache() {
+        for (byte[] data : previewCache.values()) {
+            if (data != null) {
+                Arrays.fill(data, (byte) 0);
+            }
+        }
+        previewCache.clear();
+        cacheTimestamps.clear();
+        logMessage("🗑️ Preview cache cleared for security");
+    }
+    
+    /**
+     * Ensure vault directory structure exists for file persistence
+     */
+    private void ensureVaultDirectoryStructure() {
+        try {
+            String vaultDir = com.ghostvault.config.AppConfig.getVaultDir();
+            java.io.File vaultFolder = new java.io.File(vaultDir);
+            
+            if (!vaultFolder.exists()) {
+                boolean created = vaultFolder.mkdirs();
+                logMessage("📁 Created vault directory: " + vaultDir + " (success: " + created + ")");
+            } else {
+                logMessage("📁 Vault directory exists: " + vaultDir);
+            }
+            
+            // Ensure files subdirectory exists
+            java.io.File filesDir = new java.io.File(vaultDir, "files");
+            if (!filesDir.exists()) {
+                boolean created = filesDir.mkdirs();
+                logMessage("📁 Created files directory: " + filesDir.getAbsolutePath() + " (success: " + created + ")");
+            }
+            
+            // Check directory permissions
+            if (!vaultFolder.canWrite()) {
+                logMessage("⚠ Warning: Vault directory is not writable: " + vaultDir);
+            } else {
+                logMessage("✅ Vault directory is writable: " + vaultDir);
+            }
+            
+        } catch (Exception e) {
+            logMessage("❌ Error creating vault directory structure: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Restart application to registration page
+     */
+    private void restartToRegistration() {
+        Platform.runLater(() -> {
+            try {
+                // Close current stage
+                javafx.stage.Stage currentStage = (javafx.stage.Stage) fileListView.getScene().getWindow();
+                currentStage.close();
+                
+                // Launch registration/login screen
+                com.ghostvault.GhostVaultApp.main(new String[]{});
+                
+            } catch (Exception e) {
+                // If restart fails, just exit
+                Platform.exit();
+                System.exit(0);
             }
         });
     }

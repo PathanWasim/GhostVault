@@ -13,13 +13,48 @@ public class MetadataManager {
     private List<VaultFile> files = new ArrayList<>();
     private boolean initialized = false;
     private String metadataPath;
+    private PersistentStorageManager storageManager;
     
     public MetadataManager() {
-        this.metadataPath = System.getProperty("user.home") + "/.ghostvault/metadata.json";
+        String vaultPath = System.getProperty("user.home") + "/.ghostvault";
+        this.metadataPath = vaultPath + "/metadata/metadata.json";
+        this.storageManager = new PersistentStorageManager(vaultPath);
+        initializeMetadata();
     }
     
     public MetadataManager(String metadataPath) {
         this.metadataPath = metadataPath;
+        // Extract vault path from metadata path
+        String vaultPath = metadataPath.substring(0, metadataPath.lastIndexOf("/"));
+        this.storageManager = new PersistentStorageManager(vaultPath);
+        initializeMetadata();
+    }
+    
+    /**
+     * Initialize metadata storage
+     */
+    private void initializeMetadata() {
+        System.out.println("📋 Initializing MetadataManager...");
+        
+        // Ensure vault structure exists
+        if (!storageManager.initializeVaultStructure()) {
+            System.err.println("❌ Failed to initialize vault structure for metadata");
+            return;
+        }
+        
+        // Load existing metadata
+        try {
+            loadMetadata();
+        } catch (Exception e) {
+            System.err.println("⚠️ Failed to load existing metadata: " + e.getMessage());
+        }
+        
+        System.out.println("✅ MetadataManager initialized with " + files.size() + " files");
+        
+        // Debug: List all loaded files
+        for (VaultFile file : files) {
+            System.out.println("📋 Loaded metadata for: " + file.getFileName() + " (ID: " + file.getFileId() + ")");
+        }
     }
     
     public void setEncryptionKey(SecretKey key) {
@@ -69,14 +104,26 @@ public class MetadataManager {
             }
             json.append("]");
             
-            // Save to disk
+            // Save to disk with verification
             java.nio.file.Path metaPath = java.nio.file.Paths.get(metadataPath);
             java.nio.file.Files.createDirectories(metaPath.getParent());
             java.nio.file.Files.write(metaPath, json.toString().getBytes());
             
-            System.out.println("💾 Metadata saved: " + files.size() + " files");
+            // Verify save was successful
+            if (!java.nio.file.Files.exists(metaPath)) {
+                throw new Exception("Metadata save verification failed - file does not exist");
+            }
+            
+            long savedSize = java.nio.file.Files.size(metaPath);
+            if (savedSize == 0) {
+                throw new Exception("Metadata save verification failed - file is empty");
+            }
+            
+            System.out.println("💾 Metadata saved and verified: " + files.size() + " files (" + savedSize + " bytes)");
+            
         } catch (Exception e) {
             System.err.println("❌ Failed to save metadata: " + e.getMessage());
+            throw e; // Re-throw to notify caller of failure
         }
     }
     
@@ -114,7 +161,9 @@ public class MetadataManager {
                 // End of object, create VaultFile
                 if (fileName != null && fileId != null && mimeType != null) {
                     VaultFile vaultFile = new VaultFile(fileName, size, mimeType);
+                    vaultFile.setFileId(fileId); // Use the stored fileId
                     files.add(vaultFile);
+                    System.out.println("📋 Loaded file: " + fileName + " (ID: " + fileId + ")");
                 }
             }
         }

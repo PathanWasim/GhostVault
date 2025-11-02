@@ -20,6 +20,7 @@ public class PasswordEntry implements Serializable {
     private LocalDateTime createdDate;
     private LocalDateTime modifiedDate;
     private LocalDateTime lastUsed;
+    private LocalDateTime expirationDate;
     private boolean isFavorite;
     private int strength;
     
@@ -49,6 +50,10 @@ public class PasswordEntry implements Serializable {
         this.title = title;
         updateModifiedDate();
     }
+    
+    // Alias for compatibility with PasswordVaultManager
+    public String getServiceName() { return title; }
+    public void setServiceName(String serviceName) { setTitle(serviceName); }
     
     public String getUsername() { return username; }
     public void setUsername(String username) { 
@@ -87,8 +92,18 @@ public class PasswordEntry implements Serializable {
     public LocalDateTime getModifiedDate() { return modifiedDate; }
     public void setModifiedDate(LocalDateTime modifiedDate) { this.modifiedDate = modifiedDate; }
     
+    // Alias for compatibility with PasswordVaultManager
+    public LocalDateTime getLastModified() { return modifiedDate; }
+    public void setLastModified(LocalDateTime lastModified) { setModifiedDate(lastModified); }
+    
     public LocalDateTime getLastUsed() { return lastUsed; }
     public void setLastUsed(LocalDateTime lastUsed) { this.lastUsed = lastUsed; }
+    
+    public LocalDateTime getExpirationDate() { return expirationDate; }
+    public void setExpirationDate(LocalDateTime expirationDate) { 
+        this.expirationDate = expirationDate;
+        updateModifiedDate();
+    }
     
     public boolean isFavorite() { return isFavorite; }
     public void setFavorite(boolean favorite) { 

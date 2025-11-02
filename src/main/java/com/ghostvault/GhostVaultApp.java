@@ -49,18 +49,22 @@ public class GhostVaultApp extends Application {
         // Initialize notification system
         com.ghostvault.ui.components.NotificationSystem.initialize(primaryStage);
         
-        // Check if setup is needed by checking saved configuration
+        // Check if setup is needed by checking if user has set custom passwords
         try {
-            com.ghostvault.security.PasswordManager passwordManager = new com.ghostvault.security.PasswordManager();
-            isSetupComplete = passwordManager.isSetupComplete();
+            com.ghostvault.security.SecureAuthenticationManager authManager = 
+                new com.ghostvault.security.SecureAuthenticationManager();
+            isSetupComplete = authManager.isSetupComplete();
+            System.out.println("🔍 Setup status check: isSetupComplete = " + isSetupComplete);
         } catch (Exception e) {
             System.err.println("Error checking setup status: " + e.getMessage());
             isSetupComplete = false;
         }
         
         if (!isSetupComplete) {
-            showModernSetupWizard();
+            System.out.println("🔧 Setup required - showing setup wizard");
+            showFallbackSetupWizard();
         } else {
+            System.out.println("✅ Setup complete - showing login screen");
             showLoginScreen();
         }
     }
@@ -94,6 +98,14 @@ public class GhostVaultApp extends Application {
             showFallbackSetupWizard();
         }
     }
+    
+    // Store password fields for extraction
+    private javafx.scene.control.PasswordField masterPasswordField;
+    private javafx.scene.control.PasswordField masterConfirmField;
+    private javafx.scene.control.PasswordField panicPasswordField;
+    private javafx.scene.control.PasswordField panicConfirmField;
+    private javafx.scene.control.PasswordField decoyPasswordField;
+    private javafx.scene.control.PasswordField decoyConfirmField;
     
     /**
      * Fallback setup wizard if modern one fails
@@ -129,21 +141,24 @@ public class GhostVaultApp extends Application {
         VBox masterSection = createPasswordSection(
             "Master Password", 
             "Access to your real secure vault", 
-            "#4CAF50"
+            "#4CAF50",
+            0
         );
         
         // Panic Password  
         VBox panicSection = createPasswordSection(
             "Panic Password", 
             "Emergency wipe - destroys all data permanently", 
-            "#f44336"
+            "#f44336",
+            1
         );
         
         // Decoy Password
         VBox decoySection = createPasswordSection(
             "Decoy Password", 
             "Shows fake vault to protect under duress", 
-            "#ff9800"
+            "#ff9800",
+            2
         );
         
         passwordSections.getChildren().addAll(masterSection, panicSection, decoySection);
@@ -179,7 +194,7 @@ public class GhostVaultApp extends Application {
     /**
      * Create a password input section
      */
-    private VBox createPasswordSection(String title, String description, String borderColor) {
+    private VBox createPasswordSection(String title, String description, String borderColor, int sectionIndex) {
         VBox section = new VBox(12);
         section.setPadding(new Insets(20));
         section.setStyle("-fx-background-color: #2b2b2b; -fx-background-radius: 10; -fx-border-color: " + borderColor + "; -fx-border-width: 2; -fx-border-radius: 10;");
@@ -205,6 +220,22 @@ public class GhostVaultApp extends Application {
         confirmField.setPromptText("Confirm password");
         confirmField.setPrefHeight(40);
         confirmField.setStyle("-fx-font-size: 14px; -fx-background-color: #3a3a3a; -fx-text-fill: white; -fx-prompt-text-fill: #888888;");
+        
+        // Store references to password fields for later extraction
+        switch (sectionIndex) {
+            case 0: // Master
+                masterPasswordField = passwordField;
+                masterConfirmField = confirmField;
+                break;
+            case 1: // Panic
+                panicPasswordField = passwordField;
+                panicConfirmField = confirmField;
+                break;
+            case 2: // Decoy
+                decoyPasswordField = passwordField;
+                decoyConfirmField = confirmField;
+                break;
+        }
         
         // Strength indicator
         ProgressBar strengthBar = new ProgressBar(0);
@@ -263,16 +294,142 @@ public class GhostVaultApp extends Application {
      */
     private void completeSetup() {
         System.out.println("✅ Setup completed");
+        
+        // For testing - use simple passwords if UI extraction fails
+        String masterPassword = extractPasswordFromSection(0);
+        String panicPassword = extractPasswordFromSection(1);
+        String decoyPassword = extractPasswordFromSection(2);
+        
+        // If UI extraction failed, show error and don't proceed
+        if (masterPassword.isEmpty() || panicPassword.isEmpty() || decoyPassword.isEmpty()) {
+            showError("Setup Error", "Please fill in all password fields and ensure passwords match their confirmations.");
+            return;
+        }
+        
+        System.out.println("🔍 Extracted passwords - Master: " + (masterPassword.isEmpty() ? "empty" : "set") + 
+                          ", Panic: " + (panicPassword.isEmpty() ? "empty" : "set") + 
+                          ", Decoy: " + (decoyPassword.isEmpty() ? "empty" : "set"));
+        
+        // Validate passwords
+        if (masterPassword.isEmpty()) {
+            showError("Setup Error", "Master password must be set and confirmed.");
+            return;
+        }
+        if (panicPassword.isEmpty()) {
+            showError("Setup Error", "Panic password must be set and confirmed.");
+            return;
+        }
+        if (decoyPassword.isEmpty()) {
+            showError("Setup Error", "Decoy password must be set and confirmed.");
+            return;
+        }
+        
+        if (masterPassword.equals(panicPassword) || masterPassword.equals(decoyPassword) || panicPassword.equals(decoyPassword)) {
+            showError("Setup Error", "All three passwords must be different from each other.");
+            return;
+        }
+        
         try {
-            // Save setup completion status
-            com.ghostvault.security.PasswordManager passwordManager = new com.ghostvault.security.PasswordManager();
-            passwordManager.markSetupComplete();
+            System.out.println("🔐 About to save passwords: master=" + masterPassword + ", decoy=" + decoyPassword + ", panic=" + panicPassword);
+            
+            // Save user passwords using SecureAuthenticationManager
+            com.ghostvault.security.SecureAuthenticationManager authManager = 
+                new com.ghostvault.security.SecureAuthenticationManager();
+            authManager.setUserPasswords(masterPassword, decoyPassword, panicPassword);
+            
+            // Verify passwords were saved by creating a new instance
+            com.ghostvault.security.SecureAuthenticationManager testManager = 
+                new com.ghostvault.security.SecureAuthenticationManager();
+            boolean setupComplete = testManager.isSetupComplete();
+            System.out.println("🔍 Verification: setup complete = " + setupComplete);
+            
             isSetupComplete = true;
+            showInfo("Setup Complete", 
+                "Your vault has been configured successfully!\n\n" +
+                "Remember your passwords:\n" +
+                "• Master Password: Access your real vault\n" +
+                "• Decoy Password: Shows fake vault under duress\n" +
+                "• Panic Password: Wipes all data permanently\n\n" +
+                "⚠️ These passwords cannot be recovered if forgotten!");
+            
             showLoginScreen();
         } catch (Exception e) {
-            System.err.println("Error saving setup completion: " + e.getMessage());
-            showLoginScreen(); // Continue anyway
+            System.err.println("Error saving setup: " + e.getMessage());
+            showError("Setup Error", "Failed to save setup: " + e.getMessage());
         }
+    }
+    
+    /**
+     * Extract password from setup section
+     */
+    private String extractPasswordFromSection(int sectionIndex) {
+        String sectionName = (sectionIndex == 0) ? "Master" : (sectionIndex == 1) ? "Panic" : "Decoy";
+        
+        switch (sectionIndex) {
+            case 0: // Master
+                if (masterPasswordField != null && masterConfirmField != null) {
+                    String password = masterPasswordField.getText();
+                    String confirm = masterConfirmField.getText();
+                    System.out.println("🔍 " + sectionName + " password check: " + 
+                                     (password.isEmpty() ? "empty" : "set") + 
+                                     ", confirm: " + (confirm.isEmpty() ? "empty" : "set") + 
+                                     ", match: " + password.equals(confirm));
+                    if (!password.isEmpty() && password.equals(confirm)) {
+                        return password;
+                    }
+                }
+                break;
+            case 1: // Panic
+                if (panicPasswordField != null && panicConfirmField != null) {
+                    String password = panicPasswordField.getText();
+                    String confirm = panicConfirmField.getText();
+                    System.out.println("🔍 " + sectionName + " password check: " + 
+                                     (password.isEmpty() ? "empty" : "set") + 
+                                     ", confirm: " + (confirm.isEmpty() ? "empty" : "set") + 
+                                     ", match: " + password.equals(confirm));
+                    if (!password.isEmpty() && password.equals(confirm)) {
+                        return password;
+                    }
+                }
+                break;
+            case 2: // Decoy
+                if (decoyPasswordField != null && decoyConfirmField != null) {
+                    String password = decoyPasswordField.getText();
+                    String confirm = decoyConfirmField.getText();
+                    System.out.println("🔍 " + sectionName + " password check: " + 
+                                     (password.isEmpty() ? "empty" : "set") + 
+                                     ", confirm: " + (confirm.isEmpty() ? "empty" : "set") + 
+                                     ", match: " + password.equals(confirm));
+                    if (!password.isEmpty() && password.equals(confirm)) {
+                        return password;
+                    }
+                }
+                break;
+        }
+        System.out.println("⚠️ " + sectionName + " password extraction failed");
+        return "";
+    }
+    
+    /**
+     * Show error dialog
+     */
+    private void showError(String title, String message) {
+        javafx.scene.control.Alert alert = new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.ERROR);
+        alert.setTitle(title);
+        alert.setHeaderText(null);
+        alert.setContentText(message);
+        alert.showAndWait();
+    }
+    
+    /**
+     * Show info dialog
+     */
+    private void showInfo(String title, String message) {
+        javafx.scene.control.Alert alert = new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.INFORMATION);
+        alert.setTitle(title);
+        alert.setHeaderText(null);
+        alert.setContentText(message);
+        alert.showAndWait();
     }
     
     /**
@@ -345,31 +502,111 @@ public class GhostVaultApp extends Application {
     }
     
     /**
-     * Authenticate user and determine mode
+     * Authenticate user and determine mode using SecureAuthenticationManager
      */
     private void authenticateUser(String password) {
         System.out.println("🔐 Authenticating user with password: [" + password.length() + " chars]");
         
         if (password.isEmpty()) {
             System.out.println("❌ Empty password");
+            showAuthenticationError("Password cannot be empty");
             return;
         }
         
-        // Simulate authentication
-        String mode = determineMode(password);
-        System.out.println("✅ Authentication successful - Mode: " + mode);
+        // Use secure authentication manager
+        com.ghostvault.security.SecureAuthenticationManager authManager = 
+            new com.ghostvault.security.SecureAuthenticationManager();
         
-        showMainApplication(mode, password);
+        com.ghostvault.security.AuthenticationResult result = authManager.authenticate(password);
+        
+        if (!result.isSuccess()) {
+            System.out.println("❌ Authentication failed: " + result.getErrorMessage());
+            showAuthenticationError(result.getErrorMessage());
+            return;
+        }
+        
+        // Handle panic mode specially - wipe system and exit
+        if (result.isPanicMode()) {
+            System.out.println("🚨 PANIC MODE ACTIVATED - Wiping system");
+            executePanicMode();
+            return;
+        }
+        
+        System.out.println("✅ Authentication successful - Mode: " + result.getMode());
+        showMainApplication(result.getMode().toString(), password);
     }
     
     /**
-     * Determine vault mode based on password
+     * Show authentication error message
      */
-    private String determineMode(String password) {
-        // Simple mode detection for demo
-        if (password.toLowerCase().contains("master")) return "MASTER";
-        if (password.toLowerCase().contains("panic")) return "PANIC";
-        return "DECOY";
+    private void showAuthenticationError(String message) {
+        // Find the status label in the current scene and update it
+        javafx.scene.Scene currentScene = primaryStage.getScene();
+        if (currentScene != null && currentScene.getRoot() instanceof javafx.scene.layout.VBox) {
+            javafx.scene.layout.VBox root = (javafx.scene.layout.VBox) currentScene.getRoot();
+            
+            // Find the status label (should be the last child)
+            if (!root.getChildren().isEmpty()) {
+                javafx.scene.Node lastChild = root.getChildren().get(root.getChildren().size() - 1);
+                if (lastChild instanceof javafx.scene.control.Label) {
+                    javafx.scene.control.Label statusLabel = (javafx.scene.control.Label) lastChild;
+                    statusLabel.setText(message);
+                    statusLabel.setStyle("-fx-font-size: 13px; -fx-text-fill: #f44336;");
+                }
+            }
+        }
+    }
+    
+    /**
+     * Execute panic mode - wipe all data and exit application
+     */
+    private void executePanicMode() {
+        System.out.println("🚨 Executing panic mode - wiping all vault data");
+        
+        try {
+            // Delete vault directories
+            java.nio.file.Path vaultPath = java.nio.file.Paths.get(System.getProperty("user.home"), ".ghostvault");
+            if (java.nio.file.Files.exists(vaultPath)) {
+                deleteDirectoryRecursively(vaultPath.toFile());
+                System.out.println("✅ Vault directory deleted");
+            }
+            
+            // Delete any other application data
+            java.nio.file.Path configPath = java.nio.file.Paths.get(System.getProperty("user.home"), ".ghostvault-config");
+            if (java.nio.file.Files.exists(configPath)) {
+                deleteDirectoryRecursively(configPath.toFile());
+                System.out.println("✅ Configuration directory deleted");
+            }
+            
+            System.out.println("🚨 PANIC MODE COMPLETE - All data wiped");
+            
+        } catch (Exception e) {
+            System.err.println("⚠️ Error during panic mode wipe: " + e.getMessage());
+            // Continue with exit even if wipe fails partially
+        }
+        
+        // Exit application immediately
+        Platform.exit();
+        System.exit(0);
+    }
+    
+    /**
+     * Recursively delete directory and all contents
+     */
+    private void deleteDirectoryRecursively(java.io.File directory) {
+        if (directory.exists()) {
+            java.io.File[] files = directory.listFiles();
+            if (files != null) {
+                for (java.io.File file : files) {
+                    if (file.isDirectory()) {
+                        deleteDirectoryRecursively(file);
+                    } else {
+                        file.delete();
+                    }
+                }
+            }
+            directory.delete();
+        }
     }
     
     /**
@@ -403,9 +640,16 @@ public class GhostVaultApp extends Application {
                 
                 try {
                     fileManager = new com.ghostvault.core.FileManager(vaultPath);
-                    metadataManager = new com.ghostvault.core.MetadataManager(vaultPath + "/metadata.enc");
+                    metadataManager = new com.ghostvault.core.MetadataManager(vaultPath + "/metadata/metadata.json");
+                    
+                    // Load existing metadata to restore file list
+                    System.out.println("📋 Loading existing metadata...");
+                    metadataManager.loadMetadata();
+                    System.out.println("✅ Metadata loaded successfully");
+                    
                 } catch (Exception e) {
                     System.err.println("❌ Failed to initialize vault: " + e.getMessage());
+                    e.printStackTrace();
                     showFallbackMainApplication("ERROR - " + e.getMessage());
                     return;
                 }
@@ -429,7 +673,7 @@ public class GhostVaultApp extends Application {
             com.ghostvault.ui.theme.PasswordManagerTheme.applyPasswordManagerTheme(scene);
             
             primaryStage.setScene(scene);
-            primaryStage.setTitle("GhostVault - Secure File Management (" + mode + " Mode)");
+            primaryStage.setTitle("GhostVault - Secure File Management");
             primaryStage.setMinWidth(1000);
             primaryStage.setMinHeight(700);
             

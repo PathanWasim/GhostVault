@@ -32,7 +32,10 @@ public class VaultFile {
     public String getOriginalName() { return fileName; }
     public String getDisplayName() { return fileName; }
     public String getIcon() { return "📄"; }
-    public String getFileId() { return fileName + "_" + size; }
+    public String getFileId() { 
+        // Use custom fileId if set, otherwise generate default
+        return fileId != null ? fileId : (fileName + "_" + size); 
+    }
     public String getEncryptedName() { return fileName + ".enc"; }
     public String getHash() { return "hash_" + fileName.hashCode(); }
     public long getUploadTime() { return System.currentTimeMillis(); }
@@ -48,6 +51,13 @@ public class VaultFile {
     public void setMimeType(String mimeType) { this.mimeType = mimeType; }
     public void setCreatedDate(LocalDateTime createdDate) { this.createdDate = createdDate; }
     public void setModifiedDate(LocalDateTime modifiedDate) { this.modifiedDate = modifiedDate; }
+    
+    // Add field and setter for fileId to support persistence
+    private String fileId;
+    
+    public void setFileId(String fileId) { 
+        this.fileId = fileId; 
+    }
     public void setExtension(String extension) { this.extension = extension; }
     
     public void setTags(String tags) {
