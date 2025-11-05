@@ -1,32 +1,40 @@
 package com.ghostvault.core;
 
 import com.ghostvault.model.VaultFile;
+import com.ghostvault.security.SecureMemoryManager;
 import javax.crypto.SecretKey;
 import java.util.List;
 import java.util.ArrayList;
+import java.util.Map;
+import java.util.HashMap;
 
 /**
- * Simple MetadataManager stub for compilation
+ * Enhanced MetadataManager with encrypted storage support
+ * Uses EncryptedMetadataManager for secure metadata operations
  */
 public class MetadataManager {
-    private SecretKey encryptionKey;
+    private final EncryptedMetadataManager encryptedMetadataManager;
     private List<VaultFile> files = new ArrayList<>();
     private boolean initialized = false;
     private String metadataPath;
+    private String vaultPath;
     private PersistentStorageManager storageManager;
+    private boolean encryptionEnabled = true;
     
     public MetadataManager() {
-        String vaultPath = System.getProperty("user.home") + "/.ghostvault";
+        this.vaultPath = System.getProperty("user.home") + "/.ghostvault";
         this.metadataPath = vaultPath + "/metadata/metadata.json";
         this.storageManager = new PersistentStorageManager(vaultPath);
+        this.encryptedMetadataManager = new EncryptedMetadataManager(vaultPath);
         initializeMetadata();
     }
     
     public MetadataManager(String metadataPath) {
         this.metadataPath = metadataPath;
         // Extract vault path from metadata path
-        String vaultPath = metadataPath.substring(0, metadataPath.lastIndexOf("/"));
+        this.vaultPath = metadataPath.substring(0, metadataPath.lastIndexOf("/"));
         this.storageManager = new PersistentStorageManager(vaultPath);
+        this.encryptedMetadataManager = new EncryptedMetadataManager(vaultPath);
         initializeMetadata();
     }
     
@@ -57,8 +65,56 @@ public class MetadataManager {
         }
     }
     
+    private String currentPassword; // For encryption/decryption
+    
+    /**
+     * Set the password for metadata encryption/decryption
+     * @param password The user's password
+     */
+    public void setPassword(String password) {
+        this.currentPassword = password;
+        System.out.println("🔐 MetadataManager: Password set successfully (length: " + (password != null ? password.length() : "null") + ")");
+    }
+    
+    /**
+     * Legacy method for backward compatibility
+     * @key The encryption key (not used in new implementation)
+     */
+    @Deprecated
     public void setEncryptionKey(SecretKey key) {
-        this.encryptionKey = key;
+        // Legacy method - encryption now uses password-derived keys
+        System.out.println("⚠️ setEncryptionKey is deprecated - use setPassword instead");
+        
+        // WORKAROUND: For legacy compatibility, we'll try to use a default password
+        // This is not ideal for security but maintains functionality during transition
+        if (key != null && currentPassword == null) {
+            // Use a derived password based on the key for backward compatibility
+            // This is a temporary solution until proper password passing is implemented
+            String derivedPassword = "legacy_key_" + key.hashCode();
+            this.currentPassword = derivedPassword;
+            System.out.println("⚠️ Using derived password for legacy encryption key compatibility: " + derivedPassword);
+        } else if (currentPassword != null) {
+            System.out.println("🔐 MetadataManager: Password already set, not overriding with derived password");
+        } else {
+            System.out.println("⚠️ MetadataManager: No encryption key provided for legacy compatibility");
+        }
+    }
+    
+    /**
+     * Enable or disable encryption for metadata operations
+     * @param enabled true to enable encryption
+     */
+    public void setEncryptionEnabled(boolean enabled) {
+        this.encryptionEnabled = enabled;
+        System.out.println("🔐 Metadata encryption " + (enabled ? "enabled" : "disabled"));
+    }
+    
+    /**
+     * Check if encryption is enabled
+     * @return true if encryption is enabled
+     */
+    public boolean isEncryptionEnabled() {
+        return encryptionEnabled;
     }
     
     public List<VaultFile> getAllFiles() {
@@ -81,50 +137,99 @@ public class MetadataManager {
     }
     
     public void loadMetadata() throws Exception {
-        // Load metadata from disk if it exists
-        loadMetadataFromDisk();
+        // Check for and perform migration if needed
+        checkAndPerformMigration();
+        
+        // Load metadata from appropriate storage
+        if (encryptionEnabled && encryptedMetadataManager.hasEncryptedMetadata()) {
+            loadEncryptedMetadata();
+        } else {
+            loadMetadataFromDisk();
+        }
         initialized = true;
     }
     
     private void saveMetadata() throws Exception {
         try {
-            // Create a simple JSON-like format for metadata
-            StringBuilder json = new StringBuilder();
-            json.append("[\n");
-            for (int i = 0; i < files.size(); i++) {
-                VaultFile file = files.get(i);
-                json.append("  {\n");
-                json.append("    \"fileName\": \"").append(file.getFileName()).append("\",\n");
-                json.append("    \"fileId\": \"").append(file.getFileId()).append("\",\n");
-                json.append("    \"size\": ").append(file.getSize()).append(",\n");
-                json.append("    \"mimeType\": \"").append(file.getMimeType()).append("\"\n");
-                json.append("  }");
-                if (i < files.size() - 1) json.append(",");
-                json.append("\n");
+            if (encryptionEnabled) {
+                saveEncryptedMetadata();
+            } else {
+                savePlainTextMetadata();
             }
-            json.append("]");
-            
-            // Save to disk with verification
-            java.nio.file.Path metaPath = java.nio.file.Paths.get(metadataPath);
-            java.nio.file.Files.createDirectories(metaPath.getParent());
-            java.nio.file.Files.write(metaPath, json.toString().getBytes());
-            
-            // Verify save was successful
-            if (!java.nio.file.Files.exists(metaPath)) {
-                throw new Exception("Metadata save verification failed - file does not exist");
-            }
-            
-            long savedSize = java.nio.file.Files.size(metaPath);
-            if (savedSize == 0) {
-                throw new Exception("Metadata save verification failed - file is empty");
-            }
-            
-            System.out.println("💾 Metadata saved and verified: " + files.size() + " files (" + savedSize + " bytes)");
-            
         } catch (Exception e) {
             System.err.println("❌ Failed to save metadata: " + e.getMessage());
-            throw e; // Re-throw to notify caller of failure
+            throw e;
         }
+    }
+    
+    /**
+     * Save metadata using encryption
+     */
+    private void saveEncryptedMetadata() throws Exception {
+        // Convert files to metadata map
+        Map<String, Object> metadata = new HashMap<>();
+        List<Map<String, Object>> filesList = new ArrayList<>();
+        
+        for (VaultFile file : files) {
+            Map<String, Object> fileData = new HashMap<>();
+            fileData.put("fileName", file.getFileName());
+            fileData.put("fileId", file.getFileId());
+            fileData.put("size", file.getSize());
+            fileData.put("mimeType", file.getMimeType());
+            filesList.add(fileData);
+        }
+        
+        metadata.put("files", filesList);
+        metadata.put("version", "1.0");
+        metadata.put("encrypted", true);
+        
+        // Convert to JSON string
+        com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+        String jsonString = mapper.writeValueAsString(metadata);
+        
+        // Save using encrypted metadata manager
+        System.out.println("🔍 Debug: About to save encrypted metadata with password: " + (currentPassword != null ? "SET (length=" + currentPassword.length() + ")" : "NULL"));
+        encryptedMetadataManager.saveEncryptedMetadata(jsonString, currentPassword);
+        
+        System.out.println("🔐 Encrypted metadata saved: " + files.size() + " files");
+    }
+    
+    /**
+     * Save metadata in plain text format (legacy)
+     */
+    private void savePlainTextMetadata() throws Exception {
+        // Create a simple JSON-like format for metadata
+        StringBuilder json = new StringBuilder();
+        json.append("[\n");
+        for (int i = 0; i < files.size(); i++) {
+            VaultFile file = files.get(i);
+            json.append("  {\n");
+            json.append("    \"fileName\": \"").append(file.getFileName()).append("\",\n");
+            json.append("    \"fileId\": \"").append(file.getFileId()).append("\",\n");
+            json.append("    \"size\": ").append(file.getSize()).append(",\n");
+            json.append("    \"mimeType\": \"").append(file.getMimeType()).append("\"\n");
+            json.append("  }");
+            if (i < files.size() - 1) json.append(",");
+            json.append("\n");
+        }
+        json.append("]");
+        
+        // Save to disk with verification
+        java.nio.file.Path metaPath = java.nio.file.Paths.get(metadataPath);
+        java.nio.file.Files.createDirectories(metaPath.getParent());
+        java.nio.file.Files.write(metaPath, json.toString().getBytes());
+        
+        // Verify save was successful
+        if (!java.nio.file.Files.exists(metaPath)) {
+            throw new Exception("Metadata save verification failed - file does not exist");
+        }
+        
+        long savedSize = java.nio.file.Files.size(metaPath);
+        if (savedSize == 0) {
+            throw new Exception("Metadata save verification failed - file is empty");
+        }
+        
+        System.out.println("💾 Plain text metadata saved: " + files.size() + " files (" + savedSize + " bytes)");
     }
     
     private void loadMetadataFromDisk() throws Exception {
@@ -194,5 +299,86 @@ public class MetadataManager {
     public void removeFile(String fileId) throws Exception {
         files.removeIf(f -> f.getFileId().equals(fileId));
         saveMetadata(); // Persist changes to disk
+    }
+    
+    /**
+     * Load metadata from encrypted storage
+     */
+    private void loadEncryptedMetadata() throws Exception {
+        try {
+            String jsonString = encryptedMetadataManager.loadEncryptedMetadata(currentPassword);
+            if (jsonString == null) {
+                return;
+            }
+            
+            // Parse JSON
+            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            com.fasterxml.jackson.databind.JsonNode rootNode = mapper.readTree(jsonString);
+            
+            files.clear();
+            
+            if (rootNode.has("files")) {
+                com.fasterxml.jackson.databind.JsonNode filesNode = rootNode.get("files");
+                
+                for (com.fasterxml.jackson.databind.JsonNode fileNode : filesNode) {
+                    String fileName = fileNode.get("fileName").asText();
+                    String fileId = fileNode.get("fileId").asText();
+                    long size = fileNode.get("size").asLong();
+                    String mimeType = fileNode.get("mimeType").asText();
+                    
+                    if (fileName != null && fileId != null && mimeType != null) {
+                        VaultFile vaultFile = new VaultFile(fileName, size, mimeType);
+                        vaultFile.setFileId(fileId);
+                        files.add(vaultFile);
+                        System.out.println("🔓 Loaded encrypted file: " + fileName + " (ID: " + fileId + ")");
+                    }
+                }
+            }
+            
+            System.out.println("🔓 Encrypted metadata loaded: " + files.size() + " files");
+            
+        } catch (Exception e) {
+            System.err.println("❌ Failed to load encrypted metadata: " + e.getMessage());
+            throw e;
+        }
+    }
+    
+    /**
+     * Check for and perform migration from plain text metadata if needed
+     */
+    private void checkAndPerformMigration() {
+        if (encryptionEnabled && encryptedMetadataManager.needsMigration()) {
+            System.out.println("🔄 Plain text metadata detected - performing automatic migration...");
+            
+            if (encryptedMetadataManager.migrateFromPlainText(currentPassword)) {
+                System.out.println("✅ Metadata migration completed successfully");
+            } else {
+                System.err.println("❌ Metadata migration failed");
+                System.err.println("⚠️ WARNING: Metadata is still stored in plain text!");
+            }
+        }
+    }
+    
+    /**
+     * Check if using encrypted metadata storage
+     * @return true if metadata is stored securely
+     */
+    public boolean isUsingEncryptedStorage() {
+        return encryptedMetadataManager.hasEncryptedMetadata();
+    }
+    
+    /**
+     * Clear sensitive data from memory using SecureMemoryManager
+     */
+    public void clearSensitiveData() {
+        if (currentPassword != null) {
+            SecureMemoryManager.getInstance().secureWipe(currentPassword);
+            currentPassword = null;
+        }
+        
+        // Trigger secure memory cleanup
+        SecureMemoryManager.getInstance().cleanupAllTrackedData();
+        
+        System.out.println("🧹 Cleared sensitive metadata from memory");
     }
 }

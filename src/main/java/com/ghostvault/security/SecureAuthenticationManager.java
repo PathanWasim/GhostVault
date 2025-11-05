@@ -8,17 +8,17 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * Secure authentication manager that properly validates passwords and determines vault modes
+ * Secure authentication manager with encrypted password storage
+ * Uses PBKDF2 hashing instead of plain text password storage
  */
 public class SecureAuthenticationManager {
     
-    // Password storage file
-    private static final String PASSWORDS_FILE = System.getProperty("user.home") + "/.ghostvault/passwords.dat";
+    // Secure password storage
+    private final SecurePasswordStorage passwordStorage;
+    private final PasswordMigrationUtility migrationUtility;
     
-    // User-defined passwords (loaded from secure storage)
-    private String masterPassword = null;
-    private String decoyPassword = null;
-    private String panicPassword = null;
+    // Migration flag
+    private boolean migrationChecked = false;
     
     // Security settings
     private static final int MAX_FAILED_ATTEMPTS = 5;
@@ -30,15 +30,15 @@ public class SecureAuthenticationManager {
     private static final String ATTEMPTS_FILE = System.getProperty("user.home") + "/.ghostvault/auth_attempts.dat";
     
     /**
-     * Constructor - load persistent attempt data and user passwords
+     * Constructor - initialize secure password storage and load attempt data
      */
     public SecureAuthenticationManager() {
-        System.out.println("🔐 Initializing SecureAuthenticationManager...");
+        System.out.println("🔐 Initializing SecureAuthenticationManager with encrypted storage...");
+        this.passwordStorage = new SecurePasswordStorage();
+        this.migrationUtility = new PasswordMigrationUtility();
         loadAttemptData();
-        loadUserPasswords();
-        System.out.println("🔍 Password status: master=" + (masterPassword != null) + 
-                          ", decoy=" + (decoyPassword != null) + 
-                          ", panic=" + (panicPassword != null));
+        checkAndPerformMigration();
+        System.out.println("🔍 Password storage status: secure=" + passwordStorage.isUsingSecureStorage());
     }
     
     /**
@@ -117,51 +117,77 @@ public class SecureAuthenticationManager {
     }
     
     /**
-     * Check if password is valid master password
+     * Check if password is valid master password using secure hash verification
      */
     public boolean isValidMasterPassword(String password) {
-        boolean isValid = masterPassword != null && masterPassword.equals(password);
-        System.out.println("🔍 Master password check: input='" + password + "' stored='" + masterPassword + "' valid=" + isValid);
-        return isValid;
+        try {
+            boolean isValid = passwordStorage.verifyPassword(password, SecurePasswordStorage.PasswordType.MASTER);
+            System.out.println("🔍 Master password check: valid=" + isValid);
+            return isValid;
+        } catch (Exception e) {
+            System.err.println("❌ Master password verification failed: " + e.getMessage());
+            return false;
+        }
     }
     
     /**
-     * Check if password is valid decoy password
+     * Check if password is valid decoy password using secure hash verification
      */
     public boolean isValidDecoyPassword(String password) {
-        boolean isValid = decoyPassword != null && decoyPassword.equals(password);
-        System.out.println("🔍 Decoy password check: input='" + password + "' stored='" + decoyPassword + "' valid=" + isValid);
-        return isValid;
+        try {
+            boolean isValid = passwordStorage.verifyPassword(password, SecurePasswordStorage.PasswordType.DECOY);
+            System.out.println("🔍 Decoy password check: valid=" + isValid);
+            return isValid;
+        } catch (Exception e) {
+            System.err.println("❌ Decoy password verification failed: " + e.getMessage());
+            return false;
+        }
     }
     
     /**
-     * Check if password is panic password
+     * Check if password is panic password using secure hash verification
      */
     public boolean isPanicPassword(String password) {
-        boolean isValid = panicPassword != null && panicPassword.equals(password);
-        System.out.println("🔍 Panic password check: input='" + password + "' stored='" + panicPassword + "' valid=" + isValid);
-        return isValid;
+        try {
+            boolean isValid = passwordStorage.verifyPassword(password, SecurePasswordStorage.PasswordType.PANIC);
+            System.out.println("🔍 Panic password check: valid=" + isValid);
+            return isValid;
+        } catch (Exception e) {
+            System.err.println("❌ Panic password verification failed: " + e.getMessage());
+            return false;
+        }
     }
     
     /**
      * Check if setup is complete (user has set custom passwords)
      */
     public boolean isSetupComplete() {
-        return masterPassword != null && decoyPassword != null && panicPassword != null;
+        try {
+            SecurePasswordStorage.PasswordData passwordData = passwordStorage.loadPasswordData();
+            boolean complete = passwordData != null && 
+                             passwordData.getMasterHash() != null && 
+                             passwordData.getDecoyHash() != null && 
+                             passwordData.getPanicHash() != null;
+            System.out.println("🔍 Setup complete check: " + complete);
+            return complete;
+        } catch (Exception e) {
+            System.err.println("❌ Setup check failed: " + e.getMessage());
+            return false;
+        }
     }
     
     /**
-     * Set user passwords during setup
+     * Set user passwords during setup using secure hash storage
      */
     public void setUserPasswords(String master, String decoy, String panic) {
-        System.out.println("🔐 Setting user passwords: master=" + (master != null && !master.isEmpty()) + 
-                          ", decoy=" + (decoy != null && !decoy.isEmpty()) + 
-                          ", panic=" + (panic != null && !panic.isEmpty()));
-        this.masterPassword = master;
-        this.decoyPassword = decoy;
-        this.panicPassword = panic;
-        saveUserPasswords();
-        System.out.println("✅ User passwords set and saved securely");
+        System.out.println("🔐 Setting user passwords with secure hashing...");
+        try {
+            passwordStorage.storePasswordHashes(master, decoy, panic);
+            System.out.println("✅ User passwords hashed and saved securely");
+        } catch (Exception e) {
+            System.err.println("❌ Failed to save user passwords: " + e.getMessage());
+            throw new RuntimeException("Failed to save passwords securely", e);
+        }
     }
     
     /**
@@ -253,53 +279,48 @@ public class SecureAuthenticationManager {
     }
     
     /**
-     * Load user passwords from secure storage
+     * Check for and perform migration from plain text passwords if needed
      */
-    private void loadUserPasswords() {
-        try {
-            java.nio.file.Path passwordsPath = java.nio.file.Paths.get(PASSWORDS_FILE);
-            if (java.nio.file.Files.exists(passwordsPath)) {
-                String data = new String(java.nio.file.Files.readAllBytes(passwordsPath));
-                String[] parts = data.split("\n");
-                if (parts.length == 3) {
-                    masterPassword = parts[0].trim();
-                    decoyPassword = parts[1].trim();
-                    panicPassword = parts[2].trim();
-                    System.out.println("🔐 Loaded user passwords from secure storage");
-                    System.out.println("🔍 Debug - Master: '" + masterPassword + "' (length: " + masterPassword.length() + ")");
-                    System.out.println("🔍 Debug - Decoy: '" + decoyPassword + "' (length: " + decoyPassword.length() + ")");
-                    System.out.println("🔍 Debug - Panic: '" + panicPassword + "' (length: " + panicPassword.length() + ")");
-                }
+    private void checkAndPerformMigration() {
+        if (migrationChecked) {
+            return;
+        }
+        
+        migrationChecked = true;
+        
+        if (migrationUtility.isMigrationNeeded()) {
+            System.out.println("🔄 Plain text passwords detected - performing automatic migration...");
+            PasswordMigrationUtility.MigrationResult result = migrationUtility.performMigration();
+            
+            if (result.isSuccess()) {
+                System.out.println("✅ Password migration completed successfully");
             } else {
-                System.out.println("📋 No user passwords found - setup required");
+                System.err.println("❌ Password migration failed: " + result.getMessage());
+                // Continue with plain text for now, but warn user
+                System.err.println("⚠️ WARNING: Passwords are still stored in plain text!");
             }
-        } catch (Exception e) {
-            System.err.println("⚠️ Failed to load user passwords: " + e.getMessage());
         }
     }
     
     /**
-     * Save user passwords to secure storage
+     * Get salt for key derivation (used by file encryption)
+     * @param type The password type
+     * @return The salt for key derivation
      */
-    private void saveUserPasswords() {
+    public byte[] getSaltForKeyDerivation(SecurePasswordStorage.PasswordType type) {
         try {
-            java.nio.file.Path passwordsPath = java.nio.file.Paths.get(PASSWORDS_FILE);
-            System.out.println("💾 Saving passwords to: " + passwordsPath.toString());
-            java.nio.file.Files.createDirectories(passwordsPath.getParent());
-            
-            String data = masterPassword + "\n" + decoyPassword + "\n" + panicPassword;
-            java.nio.file.Files.write(passwordsPath, data.getBytes());
-            
-            // Verify the file was created
-            if (java.nio.file.Files.exists(passwordsPath)) {
-                long fileSize = java.nio.file.Files.size(passwordsPath);
-                System.out.println("💾 User passwords saved to secure storage (" + fileSize + " bytes)");
-            } else {
-                System.err.println("❌ Password file was not created!");
-            }
+            return passwordStorage.getSaltForKeyDerivation(type);
         } catch (Exception e) {
-            System.err.println("⚠️ Failed to save user passwords: " + e.getMessage());
-            e.printStackTrace();
+            System.err.println("❌ Failed to get salt for key derivation: " + e.getMessage());
+            return null;
         }
+    }
+    
+    /**
+     * Check if using secure password storage
+     * @return true if passwords are stored securely
+     */
+    public boolean isUsingSecureStorage() {
+        return passwordStorage.isUsingSecureStorage();
     }
 }

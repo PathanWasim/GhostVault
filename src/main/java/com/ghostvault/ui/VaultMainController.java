@@ -29,6 +29,8 @@ import javafx.stage.Stage;
 import javafx.stage.Modality;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.control.Alert;
+import javafx.scene.control.ButtonType;
 import java.util.Optional;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -140,6 +142,9 @@ public class VaultMainController implements Initializable {
         logMessage("🔧 FXML components initialized");
     }
     
+    // Store the session password for encryption operations
+    private String sessionPassword;
+    
     /**
      * Initialize for master vault mode with all components
      */
@@ -154,37 +159,83 @@ public class VaultMainController implements Initializable {
         // Ensure vault directory structure exists for persistence
         ensureVaultDirectoryStructure();
         
-        // Initialize encryption key for file operations
-        if (fileManager != null && encryptionKey != null) {
-            fileManager.setEncryptionKey(encryptionKey);
-            logMessage("🔐 Encryption key initialized for file operations");
-        }
-        
-        // Initialize encryption key for metadata operations with session validation
-        if (metadataManager != null && encryptionKey != null) {
-            // Validate key consistency before setting
-            if (validateSessionKey(encryptionKey)) {
-                metadataManager.setEncryptionKey(encryptionKey);
-                logMessage("🔐 Encryption key validated and initialized for metadata operations");
-                
-                // Load existing metadata with enhanced recovery
+        // Initialize encryption for file operations with password-based methods preferred
+        if (fileManager != null) {
+            // Try password-based initialization first
+            String sessionPassword = getSessionPassword();
+            if (sessionPassword != null && !sessionPassword.isEmpty()) {
                 try {
-                    metadataManager.loadMetadata();
-                    logMessage("📋 Metadata loaded successfully");
+                    fileManager.setPassword(sessionPassword);
+                    fileManager.setEncryptionEnabled(true);
+                    logMessage("🔐 Password-based encryption initialized for file operations");
                 } catch (Exception e) {
-                    logMessage("⚠ Metadata loading failed, attempting recovery...");
-                    
-                    // Enhanced error handling with recovery attempt
-                    boolean recovered = attemptSessionRecovery(e);
-                    if (!recovered) {
-                        String userFriendlyError = "Metadata loading failed: " + e.getMessage();
-                        logMessage("⚠ " + userFriendlyError);
-                        System.err.println("Technical error in metadata loading: " + e.getMessage());
+                    logMessage("⚠ Password-based initialization failed, using legacy method: " + e.getMessage());
+                    if (encryptionKey != null) {
+                        fileManager.setEncryptionKey(encryptionKey);
+                        logMessage("🔐 Legacy encryption key initialized for file operations");
                     }
                 }
-            } else {
-                logMessage("⚠ Session key validation failed - using fallback initialization");
-                metadataManager.setEncryptionKey(encryptionKey);
+            } else if (encryptionKey != null) {
+                fileManager.setEncryptionKey(encryptionKey);
+                logMessage("🔐 Legacy encryption key initialized for file operations");
+            }
+        }
+        
+        // Initialize encryption for metadata operations with password-based methods preferred
+        if (metadataManager != null) {
+            // Try password-based initialization first
+            String sessionPassword = getSessionPassword();
+            if (sessionPassword != null && !sessionPassword.isEmpty()) {
+                try {
+                    metadataManager.setPassword(sessionPassword);
+                    metadataManager.setEncryptionEnabled(true);
+                    logMessage("🔐 Password-based encryption initialized for metadata operations");
+                    
+                    // Load existing metadata
+                    try {
+                        metadataManager.loadMetadata();
+                        logMessage("📋 Metadata loaded successfully with password-based encryption");
+                    } catch (Exception e) {
+                        logMessage("⚠ Metadata loading failed with password-based method: " + e.getMessage());
+                    }
+                } catch (Exception e) {
+                    logMessage("⚠ Password-based metadata initialization failed, using legacy method: " + e.getMessage());
+                    // Fall back to legacy method
+                    if (encryptionKey != null) {
+                        if (validateSessionKey(encryptionKey)) {
+                            metadataManager.setEncryptionKey(encryptionKey);
+                            logMessage("🔐 Legacy encryption key validated and initialized for metadata operations");
+                        } else {
+                            logMessage("⚠ Session key validation failed - using fallback initialization");
+                            metadataManager.setEncryptionKey(encryptionKey);
+                        }
+                        
+                        // Load metadata with legacy method
+                        try {
+                            metadataManager.loadMetadata();
+                            logMessage("📋 Metadata loaded successfully with legacy method");
+                        } catch (Exception loadException) {
+                            logMessage("⚠ Metadata loading failed: " + loadException.getMessage());
+                        }
+                    }
+                }
+            } else if (encryptionKey != null) {
+                // Use legacy method if password not available
+                if (validateSessionKey(encryptionKey)) {
+                    metadataManager.setEncryptionKey(encryptionKey);
+                    logMessage("🔐 Legacy encryption key validated and initialized for metadata operations");
+                } else {
+                    logMessage("⚠ Session key validation failed - using fallback initialization");
+                    metadataManager.setEncryptionKey(encryptionKey);
+                }
+                
+                // Load metadata with legacy method
+                try {
+                    metadataManager.loadMetadata();
+                    logMessage("📋 Metadata loaded successfully with legacy method");
+                } catch (Exception e) {
+                    logMessage("⚠ Metadata loading failed: " + e.getMessage());
+                }
             }
         }
         
@@ -6329,7 +6380,10 @@ public class VaultMainController implements Initializable {
                 javafx.stage.Stage currentStage = (javafx.stage.Stage) fileListView.getScene().getWindow();
                 currentStage.close();
                 
-                // Launch registration/login screen
+                // Force the app to show login by setting a property
+                System.setProperty("ghostvault.force.login", "true");
+                
+                // Launch new instance which will go to login
                 com.ghostvault.GhostVaultApp.main(new String[]{});
                 
             } catch (Exception e) {
@@ -6338,5 +6392,34 @@ public class VaultMainController implements Initializable {
                 System.exit(0);
             }
         });
+    }
+    
+    /**
+     * Set the session password for encryption operations
+     * @param password The user's password from authentication
+     */
+    public void setSessionPassword(String password) {
+        this.sessionPassword = password;
+        
+        // Update FileManager and MetadataManager with the password
+        if (fileManager != null) {
+            fileManager.setPassword(password);
+            fileManager.setEncryptionEnabled(true);
+            logMessage("🔐 FileManager password updated");
+        }
+        
+        if (metadataManager != null) {
+            metadataManager.setPassword(password);
+            metadataManager.setEncryptionEnabled(true);
+            logMessage("🔐 MetadataManager password updated");
+        }
+    }
+    
+    /**
+     * Get the current session password for encryption operations
+     * @return The session password or null if not available
+     */
+    private String getSessionPassword() {
+        return sessionPassword;
     }
 }

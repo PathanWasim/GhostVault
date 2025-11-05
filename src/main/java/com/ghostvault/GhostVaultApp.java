@@ -49,6 +49,15 @@ public class GhostVaultApp extends Application {
         // Initialize notification system
         com.ghostvault.ui.components.NotificationSystem.initialize(primaryStage);
         
+        // Check if we're being forced to show login (e.g., after logout)
+        boolean forceLogin = "true".equals(System.getProperty("ghostvault.force.login"));
+        if (forceLogin) {
+            System.out.println("🔓 Forced login mode - showing login screen");
+            System.clearProperty("ghostvault.force.login"); // Clear the property
+            showLoginScreen();
+            return;
+        }
+        
         // Check if setup is needed by checking if user has set custom passwords
         try {
             com.ghostvault.security.SecureAuthenticationManager authManager = 
@@ -663,7 +672,11 @@ public class GhostVaultApp extends Application {
                 // Create encryption key from user password using deterministic key derivation
                 javax.crypto.SecretKey encryptionKey = createEncryptionKeyFromPassword(password);
                 
+                // Initialize the controller
                 vaultController.initialize(fileManager, metadataManager, backupManager, encryptionKey);
+                
+                // Set the session password for proper encryption
+                vaultController.setSessionPassword(password);
             }
             
             // Create and show scene with proper styling

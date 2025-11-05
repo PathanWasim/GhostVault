@@ -2,28 +2,36 @@ package com.ghostvault.core;
 
 import com.ghostvault.model.VaultFile;
 import com.ghostvault.logging.PersistenceLogger;
+import com.ghostvault.security.CryptoManager;
+import com.ghostvault.security.SecurityConfiguration;
+import com.ghostvault.security.SecureMemoryManager;
 import javax.crypto.SecretKey;
 import java.io.File;
 import java.util.List;
 import java.util.ArrayList;
 
 /**
- * Simple FileManager stub for compilation
+ * Enhanced FileManager with AES-256-GCM encryption
+ * Provides secure file storage with password-derived encryption
  */
 public class FileManager {
-    private SecretKey encryptionKey;
+    private final CryptoManager cryptoManager;
+    private String currentPassword; // For encryption/decryption
     private java.util.Map<String, byte[]> fileStorage = new java.util.HashMap<>();
     private String vaultPath;
     private PersistentStorageManager storageManager;
+    private boolean encryptionEnabled = true;
     
     public FileManager() {
         this.vaultPath = System.getProperty("user.home") + "/.ghostvault";
+        this.cryptoManager = new CryptoManager();
         this.storageManager = new PersistentStorageManager(vaultPath);
         initializeStorage();
     }
     
     public FileManager(String vaultPath) {
         this.vaultPath = vaultPath;
+        this.cryptoManager = new CryptoManager();
         this.storageManager = new PersistentStorageManager(vaultPath);
         initializeStorage();
     }
@@ -61,8 +69,66 @@ public class FileManager {
         }
     }
     
+    /**
+     * Set the password for encryption/decryption operations
+     * @param password The user's password
+     */
+    public void setPassword(String password) {
+        if (password == null) {
+            System.err.println("⚠️ FileManager: Password is null - encryption/decryption will not work");
+        } else if (password.isEmpty()) {
+            System.err.println("⚠️ FileManager: Password is empty - encryption/decryption may fail");
+        } else {
+            System.out.println("🔐 FileManager: Password set successfully for encryption operations");
+        }
+        this.currentPassword = password;
+    }
+    
+    /**
+     * Legacy method for backward compatibility
+     * @param key The encryption key (not used in new implementation)
+     */
+    @Deprecated
     public void setEncryptionKey(SecretKey key) {
-        this.encryptionKey = key;
+        // Legacy method - encryption now uses password-derived keys
+        System.out.println("⚠️ setEncryptionKey is deprecated - use setPassword instead");
+    }
+    
+    /**
+     * Enable or disable encryption for file operations
+     * @param enabled true to enable encryption
+     */
+    public void setEncryptionEnabled(boolean enabled) {
+        this.encryptionEnabled = enabled;
+        System.out.println("🔐 File encryption " + (enabled ? "enabled" : "disabled"));
+    }
+    
+    /**
+     * Check if encryption is enabled
+     * @return true if encryption is enabled
+     */
+    public boolean isEncryptionEnabled() {
+        return encryptionEnabled;
+    }
+    
+    /**
+     * Check if password is properly set for encryption operations
+     * @return true if password is available and not empty
+     */
+    public boolean isPasswordAvailable() {
+        return currentPassword != null && !currentPassword.isEmpty();
+    }
+    
+    /**
+     * Validate that FileManager is ready for encrypted operations
+     * @return true if both encryption is enabled and password is available
+     */
+    public boolean isReadyForEncryptedOperations() {
+        boolean ready = encryptionEnabled && isPasswordAvailable();
+        if (!ready) {
+            System.err.println("⚠️ FileManager not ready for encrypted operations: encryption=" + encryptionEnabled + ", password=" + isPasswordAvailable());
+        }
+        return ready;
     }
     
     public VaultFile storeFile(File file) throws Exception {
@@ -74,12 +140,20 @@ public class FileManager {
         
         VaultFile vaultFile = new VaultFile(file.getName(), file.length(), mimeType);
         
-        // Store file content both in memory AND on disk for persistence
+        // Store file content in memory (unencrypted for fast access)
         fileStorage.put(vaultFile.getFileId(), fileContent);
         
-        // Also save to disk for persistence across sessions
+        // Save to disk with encryption if enabled
         try {
-            saveFileToDisk(vaultFile.getFileId(), fileContent);
+            if (encryptionEnabled && currentPassword != null) {
+                saveEncryptedFileToDisk(vaultFile.getFileId(), fileContent);
+                System.out.println("🔐 File encrypted and saved: " + file.getName());
+            } else {
+                saveFileToDisk(vaultFile.getFileId(), fileContent);
+                if (!encryptionEnabled) {
+                    System.out.println("⚠️ File saved without encryption: " + file.getName());
+                }
+            }
             PersistenceLogger.logFileSave(file.getName(), vaultFile.getFileId(), fileContent.length, true, null);
         } catch (Exception e) {
             PersistenceLogger.logFileSave(file.getName(), vaultFile.getFileId(), fileContent.length, false, e.getMessage());
@@ -90,6 +164,50 @@ public class FileManager {
         return vaultFile;
     }
     
+    /**
+     * Save encrypted file to disk using AES-256-GCM
+     */
+    private void saveEncryptedFileToDisk(String fileId, byte[] content) throws Exception {
+        if (currentPassword == null) {
+            throw new IllegalStateException("Password not set for encryption");
+        }
+        
+        // Use files subdirectory for better organization
+        java.nio.file.Path filesDir = java.nio.file.Paths.get(vaultPath, "files");
+        java.nio.file.Files.createDirectories(filesDir);
+        
+        java.nio.file.Path filePath = filesDir.resolve(fileId + ".dat");
+        
+        // Encrypt the file content
+        CryptoManager.EncryptedData cryptoData = cryptoManager.encryptWithPassword(content, currentPassword);
+        
+        // Create properly formatted encrypted file data
+        EncryptedFileData encryptedFileData = new EncryptedFileData(
+            cryptoData.getSalt(),
+            cryptoData.getIv(),
+            cryptoData.getCiphertext()
+        );
+        
+        if (!encryptedFileData.isValid()) {
+            throw new Exception("Invalid encrypted file data format");
+        }
+        
+        // Save encrypted data with proper format
+        byte[] serializedData = encryptedFileData.toByteArray();
+        java.nio.file.Files.write(filePath, serializedData);
+        
+        // Verify file was saved successfully
+        if (!java.nio.file.Files.exists(filePath)) {
+            throw new Exception("Encrypted file save verification failed: " + fileId);
+        }
+        
+        long savedSize = java.nio.file.Files.size(filePath);
+        System.out.println("🔐 Encrypted file saved to disk: " + fileId + " (" + savedSize + " bytes encrypted)");
+    }
+    
+    /**
+     * Legacy method for saving unencrypted files
+     */
     private void saveFileToDisk(String fileId, byte[] content) throws Exception {
         // Use files subdirectory for better organization
         java.nio.file.Path filesDir = java.nio.file.Paths.get(vaultPath, "files");
@@ -108,18 +226,70 @@ public class FileManager {
             throw new Exception("File size mismatch after save: expected " + content.length + ", got " + savedSize);
         }
         
-        System.out.println("💾 File saved to disk: " + fileId + " (" + savedSize + " bytes)");
+        System.out.println("💾 File saved to disk (unencrypted): " + fileId + " (" + savedSize + " bytes)");
     }
     
+    /**
+     * Load and decrypt file from disk
+     */
     private byte[] loadFileFromDisk(String fileId) throws Exception {
-        // Load from files subdirectory
         java.nio.file.Path filePath = java.nio.file.Paths.get(vaultPath, "files", fileId + ".dat");
-        if (java.nio.file.Files.exists(filePath)) {
-            byte[] content = java.nio.file.Files.readAllBytes(filePath);
-            System.out.println("📁 Loaded file from disk: " + fileId + " (" + content.length + " bytes)");
-            return content;
+        if (!java.nio.file.Files.exists(filePath)) {
+            return null;
         }
-        return null;
+        
+        byte[] fileData = java.nio.file.Files.readAllBytes(filePath);
+        
+        // Try to detect if file is encrypted by checking if it has the expected format
+        if (isEncryptedFile(fileData)) {
+            return loadEncryptedFileFromDisk(fileId, fileData);
+        } else {
+            // Legacy unencrypted file
+            System.out.println("📁 Loaded unencrypted file from disk: " + fileId + " (" + fileData.length + " bytes)");
+            return fileData;
+        }
+    }
+    
+    /**
+     * Load and decrypt an encrypted file
+     */
+    private byte[] loadEncryptedFileFromDisk(String fileId, byte[] encryptedData) throws Exception {
+        if (currentPassword == null) {
+            throw new IllegalStateException("Password not set for decryption");
+        }
+        
+        try {
+            // Deserialize encrypted file data with format validation
+            EncryptedFileData encryptedFileData = EncryptedFileData.fromByteArray(encryptedData);
+            
+            if (!encryptedFileData.isValid()) {
+                throw new Exception("Invalid encrypted file format");
+            }
+            
+            // Convert to CryptoManager format for decryption
+            CryptoManager.EncryptedData cryptoData = new CryptoManager.EncryptedData(
+                encryptedFileData.getSalt(),
+                encryptedFileData.getIv(),
+                encryptedFileData.getCiphertext()
+            );
+            
+            // Decrypt the content
+            byte[] decryptedContent = cryptoManager.decryptWithPassword(cryptoData, currentPassword);
+            
+            System.out.println("🔓 Decrypted file from disk: " + fileId + " (" + decryptedContent.length + " bytes)");
+            return decryptedContent;
+            
+        } catch (Exception e) {
+            System.err.println("❌ Failed to decrypt file " + fileId + ": " + e.getMessage());
+            throw new Exception("Failed to decrypt file - incorrect password or corrupted data", e);
+        }
+    }
+    
+    /**
+     * Check if file data appears to be encrypted using proper format validation
+     */
+    private boolean isEncryptedFile(byte[] data) {
+        return EncryptedFileData.isEncryptedFileFormat(data);
     }
     
     public byte[] retrieveFile(VaultFile vaultFile) throws Exception {
@@ -131,7 +301,7 @@ public class FileManager {
             return content;
         }
         
-        // Then try disk storage (for persistence across sessions)
+        // Then try disk storage (with decryption if needed)
         content = loadFileFromDisk(vaultFile.getFileId());
         if (content != null) {
             // Cache in memory for faster access
@@ -198,5 +368,69 @@ public class FileManager {
     
     public List<VaultFile> getAllFiles() {
         return new ArrayList<>();
+    }
+    
+    /**
+     * Check if a specific file is encrypted on disk
+     * @param fileId The file ID to check
+     * @return true if file is encrypted
+     */
+    public boolean isFileEncrypted(String fileId) {
+        try {
+            java.nio.file.Path filePath = java.nio.file.Paths.get(vaultPath, "files", fileId + ".dat");
+            if (!java.nio.file.Files.exists(filePath)) {
+                return false;
+            }
+            
+            byte[] fileData = java.nio.file.Files.readAllBytes(filePath);
+            return isEncryptedFile(fileData);
+            
+        } catch (Exception e) {
+            System.err.println("❌ Error checking encryption status for " + fileId + ": " + e.getMessage());
+            return false;
+        }
+    }
+    
+    /**
+     * Get encryption status for all files
+     * @return map of file ID to encryption status
+     */
+    public java.util.Map<String, Boolean> getEncryptionStatus() {
+        java.util.Map<String, Boolean> status = new java.util.HashMap<>();
+        
+        try {
+            java.nio.file.Path filesDir = java.nio.file.Paths.get(vaultPath, "files");
+            if (java.nio.file.Files.exists(filesDir)) {
+                java.nio.file.Files.list(filesDir)
+                    .filter(path -> path.toString().endsWith(".dat"))
+                    .forEach(path -> {
+                        String fileName = path.getFileName().toString();
+                        String fileId = fileName.substring(0, fileName.length() - 4); // Remove .dat
+                        status.put(fileId, isFileEncrypted(fileId));
+                    });
+            }
+        } catch (Exception e) {
+            System.err.println("❌ Error getting encryption status: " + e.getMessage());
+        }
+        
+        return status;
+    }
+    
+    /**
+     * Clear sensitive data from memory using SecureMemoryManager
+     */
+    public void clearSensitiveData() {
+        if (currentPassword != null) {
+            // Clear password from memory (best effort)
+            currentPassword = null;
+        }
+        
+        // Clear file cache
+        fileStorage.clear();
+        
+        // Trigger secure memory cleanup
+        SecureMemoryManager.getInstance().cleanupAllTrackedData();
+        
+        System.out.println("🧹 Cleared sensitive data from memory");
     }
 }
