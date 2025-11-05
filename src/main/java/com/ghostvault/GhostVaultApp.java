@@ -672,11 +672,11 @@ public class GhostVaultApp extends Application {
                 // Create encryption key from user password using deterministic key derivation
                 javax.crypto.SecretKey encryptionKey = createEncryptionKeyFromPassword(password);
                 
-                // Initialize the controller
-                vaultController.initialize(fileManager, metadataManager, backupManager, encryptionKey);
-                
-                // Set the session password for proper encryption
+                // CRITICAL FIX: Set the session password BEFORE initialization
                 vaultController.setSessionPassword(password);
+                
+                // Initialize the controller (now with password available)
+                vaultController.initialize(fileManager, metadataManager, backupManager, encryptionKey);
             }
             
             // Create and show scene with proper styling

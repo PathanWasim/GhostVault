@@ -3037,62 +3037,15 @@ public class VaultMainController implements Initializable {
                     sessionManager.endSession();
                 }
                 
-                // Return to login screen instead of closing app
+                // FIXED: Always use simple login screen to avoid double login issue
                 Platform.runLater(() -> {
                     try {
-                        // Get the current stage
                         Stage currentStage = (Stage) logoutButton.getScene().getWindow();
-                        
-                        // Load the login screen
-                        FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/login.fxml"));
-                        Parent loginRoot;
-                        
-                        try {
-                            loginRoot = loader.load();
-                        } catch (Exception e) {
-                            // Fallback: restart the main application but preserve existing setup
-                            logMessage("⚠ Login FXML not found, restarting application...");
-                            currentStage.close();
-                            
-                            // Start new instance of GhostVault
-                            Platform.runLater(() -> {
-                                try {
-                                    com.ghostvault.GhostVaultApp app = new com.ghostvault.GhostVaultApp();
-                                    Stage newStage = new Stage();
-                                    app.start(newStage);
-                                } catch (Exception ex) {
-                                    logMessage("✗ Failed to restart application: " + ex.getMessage());
-                                    Platform.exit();
-                                }
-                            });
-                            return;
-                        }
-                        
-                        // Set the login scene
-                        Scene loginScene = new Scene(loginRoot, 600, 500);
-                        currentStage.setScene(loginScene);
-                        currentStage.setTitle("GhostVault - Login");
-                        currentStage.centerOnScreen();
-                        
-                        logMessage("🔓 User logged out successfully");
-                        logMessage("✓ Returned to login screen");
-                        
+                        createSimpleLoginScreen(currentStage);
+                        logMessage("✅ Returned to login screen (simple login)");
                     } catch (Exception e) {
-                        logMessage("✗ Error returning to login: " + e.getMessage());
-                        // Fallback: restart application
-                        try {
-                            Stage currentStage = (Stage) logoutButton.getScene().getWindow();
-                            currentStage.close();
-                            Platform.runLater(() -> {
-                                try {
-                                    new com.ghostvault.GhostVaultApp().start(new Stage());
-                                } catch (Exception ex) {
-                                    Platform.exit();
-                                }
-                            });
-                        } catch (Exception ex) {
-                            Platform.exit();
-                        }
+                        logMessage("❌ Error returning to login: " + e.getMessage());
+                        Platform.exit();
                     }
                 });
                 
@@ -6413,6 +6366,84 @@ public class VaultMainController implements Initializable {
             metadataManager.setEncryptionEnabled(true);
             logMessage("🔐 MetadataManager password updated");
         }
+    }
+    
+    /**
+     * Create simple login screen without restarting app
+     */
+    private void createSimpleLoginScreen(Stage stage) {
+        VBox root = new VBox(20);
+        root.setAlignment(javafx.geometry.Pos.CENTER);
+        root.setPadding(new javafx.geometry.Insets(50));
+        root.setStyle("-fx-background-color: #0F172A;");
+        
+        Label titleLabel = new Label("🔒 GhostVault");
+        titleLabel.setStyle("-fx-text-fill: #F8FAFC; -fx-font-size: 28px; -fx-font-weight: bold;");
+        
+        Label subtitleLabel = new Label("Enter your vault password");
+        subtitleLabel.setStyle("-fx-text-fill: #94A3B8; -fx-font-size: 16px;");
+        
+        PasswordField passwordField = new PasswordField();
+        passwordField.setPromptText("Enter your password");
+        passwordField.setMaxWidth(350);
+        passwordField.setPrefHeight(45);
+        passwordField.setStyle("-fx-background-color: #334155; -fx-text-fill: #F8FAFC; -fx-prompt-text-fill: #94A3B8; -fx-font-size: 16px; -fx-background-radius: 8;");
+        
+        Button loginButton = new Button("🔓 Unlock Vault");
+        loginButton.setPrefWidth(200);
+        loginButton.setPrefHeight(45);
+        loginButton.setStyle("-fx-background-color: #3B82F6; -fx-text-fill: white; -fx-font-size: 16px; -fx-font-weight: bold; -fx-background-radius: 8;");
+        
+        Label statusLabel = new Label("");
+        statusLabel.setStyle("-fx-text-fill: #EF4444; -fx-font-size: 14px;");
+        
+        loginButton.setOnAction(e -> {
+            String password = passwordField.getText();
+            if (!password.isEmpty()) {
+                try {
+                    com.ghostvault.security.SecureAuthenticationManager authManager = 
+                        new com.ghostvault.security.SecureAuthenticationManager();
+                    
+                    com.ghostvault.security.AuthenticationResult result = authManager.authenticate(password);
+                    
+                    if (result.isSuccess()) {
+                        // Success - restart app to main screen (this is safe because it goes to login first)
+                        stage.close();
+                        Platform.runLater(() -> {
+                            try {
+                                new com.ghostvault.GhostVaultApp().start(new Stage());
+                            } catch (Exception ex) {
+                                Platform.exit();
+                            }
+                        });
+                    } else {
+                        statusLabel.setText("❌ Invalid password. Please try again.");
+                        passwordField.clear();
+                        passwordField.requestFocus();
+                    }
+                } catch (Exception ex) {
+                    statusLabel.setText("❌ Authentication error: " + ex.getMessage());
+                    passwordField.clear();
+                    passwordField.requestFocus();
+                }
+            } else {
+                statusLabel.setText("❌ Please enter your password.");
+                passwordField.requestFocus();
+            }
+        });
+        
+        passwordField.setOnAction(e -> loginButton.fire());
+        
+        root.getChildren().addAll(titleLabel, subtitleLabel, passwordField, loginButton, statusLabel);
+        
+        Scene loginScene = new Scene(root, 600, 500);
+        stage.setScene(loginScene);
+        stage.setTitle("GhostVault - Login");
+        stage.centerOnScreen();
+        
+        Platform.runLater(() -> passwordField.requestFocus());
+        
+        logMessage("✅ Simple login screen created (no app restart)");
     }
     
     /**
