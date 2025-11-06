@@ -1,471 +1,224 @@
 package com.ghostvault.security;
 
-import com.ghostvault.model.SecureNote;
-import com.ghostvault.model.StoredPassword;
-import javafx.collections.FXCollections;
-import javafx.collections.ObservableList;
-
 import javax.crypto.SecretKey;
-import java.io.*;
+import javax.crypto.Cipher;
+import javax.crypto.spec.GCMParameterSpec;
+import java.util.List;
+import java.util.ArrayList;
+import java.io.File;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.SecureRandom;
-import java.time.LocalDateTime;
-import java.util.*;
-import java.util.stream.Collectors;
 
 /**
- * Secure Notes and Password Manager for GhostVault
- * Provides encrypted storage for notes, passwords, and sensitive information
+ * Enhanced secure notes manager with encryption and persistence
  */
 public class SecureNotesManager {
-    
-    private final String notesFilePath;
-    private final String passwordsFilePath;
-    private final CryptoManager cryptoManager;
     private SecretKey encryptionKey;
+    private List<SecureNote> notes = new ArrayList<>();
+    private final String vaultPath;
+    private final String notesFile;
+    private final SecureRandom secureRandom = new SecureRandom();
     
-    private final ObservableList<SecureNote> notes = FXCollections.observableArrayList();
-    private final ObservableList<StoredPassword> passwords = FXCollections.observableArrayList();
-    
-    public SecureNotesManager(String vaultPath) throws Exception {
-        this.notesFilePath = vaultPath + "/secure_notes.enc";
-        this.passwordsFilePath = vaultPath + "/stored_passwords.enc";
-        this.cryptoManager = new CryptoManager();
+    public SecureNotesManager(String vaultPath) {
+        this.vaultPath = vaultPath;
+        this.notesFile = vaultPath + File.separator + "notes.enc";
+        
+        // Ensure vault directory exists
+        try {
+            Files.createDirectories(Paths.get(vaultPath));
+        } catch (Exception e) {
+            System.err.println("Failed to create vault directory: " + e.getMessage());
+        }
     }
     
-    /**
-     * Set encryption key
-     */
     public void setEncryptionKey(SecretKey key) {
         this.encryptionKey = key;
     }
     
-    /**
-     * Load encrypted notes and passwords
-     */
+    public void loadNotes() throws Exception {
+        loadData();
+    }
+    
     public void loadData() throws Exception {
-        loadNotes();
-        loadPasswords();
-    }
-    
-    /**
-     * Save encrypted notes and passwords
-     */
-    public void saveData() throws Exception {
-        saveNotes();
-        savePasswords();
-    }
-    
-    // ==================== SECURE NOTES ====================
-    
-    /**
-     * Add a new secure note
-     */
-    public SecureNote addNote(String title, String content, String category, List<String> tags) {
-        SecureNote note = new SecureNote(
-            UUID.randomUUID().toString(),
-            title,
-            content,
-            category,
-            tags,
-            LocalDateTime.now(),
-            LocalDateTime.now()
-        );
-        
-        notes.add(note);
-        
-        try {
-            saveNotes();
-        } catch (Exception e) {
-            System.err.println("Failed to save notes: " + e.getMessage());
-        }
-        
-        return note;
-    }
-    
-    /**
-     * Update an existing note
-     */
-    public void updateNote(String noteId, String title, String content, String category, List<String> tags) {
-        notes.stream()
-            .filter(note -> note.getId().equals(noteId))
-            .findFirst()
-            .ifPresent(note -> {
-                note.setTitle(title);
-                note.setContent(content);
-                note.setCategory(category);
-                note.setTags(tags);
-                note.setModifiedDate(LocalDateTime.now());
-                
-                try {
-                    saveNotes();
-                } catch (Exception e) {
-                    System.err.println("Failed to save notes: " + e.getMessage());
-                }
-            });
-    }
-    
-    /**
-     * Delete a note
-     */
-    public void deleteNote(String noteId) {
-        notes.removeIf(note -> note.getId().equals(noteId));
-        
-        try {
-            saveNotes();
-        } catch (Exception e) {
-            System.err.println("Failed to save notes: " + e.getMessage());
-        }
-    }
-    
-    /**
-     * Search notes
-     */
-    public List<SecureNote> searchNotes(String query) {
-        if (query == null || query.trim().isEmpty()) {
-            return new ArrayList<>(notes);
-        }
-        
-        String lowerQuery = query.toLowerCase();
-        return notes.stream()
-            .filter(note -> 
-                note.getTitle().toLowerCase().contains(lowerQuery) ||
-                note.getContent().toLowerCase().contains(lowerQuery) ||
-                note.getCategory().toLowerCase().contains(lowerQuery) ||
-                note.getTags().stream().anyMatch(tag -> tag.toLowerCase().contains(lowerQuery))
-            )
-            .collect(Collectors.toList());
-    }
-    
-    /**
-     * Get notes by category
-     */
-    public List<SecureNote> getNotesByCategory(String category) {
-        return notes.stream()
-            .filter(note -> note.getCategory().equals(category))
-            .collect(Collectors.toList());
-    }
-    
-    /**
-     * Get all note categories
-     */
-    public List<String> getNoteCategories() {
-        return notes.stream()
-            .map(SecureNote::getCategory)
-            .distinct()
-            .sorted()
-            .collect(Collectors.toList());
-    }
-    
-    // ==================== PASSWORD MANAGER ====================
-    
-    /**
-     * Add a new stored password
-     */
-    public StoredPassword addPassword(String title, String username, String password, String website, 
-                                    String notes, String category, List<String> tags) {
-        StoredPassword storedPassword = new StoredPassword(
-            UUID.randomUUID().toString(),
-            title,
-            username,
-            password,
-            website,
-            notes,
-            category,
-            tags,
-            LocalDateTime.now(),
-            LocalDateTime.now()
-        );
-        
-        passwords.add(storedPassword);
-        
-        try {
-            savePasswords();
-        } catch (Exception e) {
-            System.err.println("Failed to save passwords: " + e.getMessage());
-        }
-        
-        return storedPassword;
-    }
-    
-    /**
-     * Update an existing password
-     */
-    public void updatePassword(String passwordId, String title, String username, String password, 
-                             String website, String notes, String category, List<String> tags) {
-        passwords.stream()
-            .filter(pwd -> pwd.getId().equals(passwordId))
-            .findFirst()
-            .ifPresent(pwd -> {
-                pwd.setTitle(title);
-                pwd.setUsername(username);
-                pwd.setPassword(password);
-                pwd.setWebsite(website);
-                pwd.setNotes(notes);
-                pwd.setCategory(category);
-                pwd.setTags(tags);
-                pwd.setModifiedDate(LocalDateTime.now());
-                
-                try {
-                    savePasswords();
-                } catch (Exception e) {
-                    System.err.println("Failed to save passwords: " + e.getMessage());
-                }
-            });
-    }
-    
-    /**
-     * Delete a password
-     */
-    public void deletePassword(String passwordId) {
-        passwords.removeIf(pwd -> pwd.getId().equals(passwordId));
-        
-        try {
-            savePasswords();
-        } catch (Exception e) {
-            System.err.println("Failed to save passwords: " + e.getMessage());
-        }
-    }
-    
-    /**
-     * Search passwords
-     */
-    public List<StoredPassword> searchPasswords(String query) {
-        if (query == null || query.trim().isEmpty()) {
-            return new ArrayList<>(passwords);
-        }
-        
-        String lowerQuery = query.toLowerCase();
-        return passwords.stream()
-            .filter(pwd -> 
-                pwd.getTitle().toLowerCase().contains(lowerQuery) ||
-                pwd.getUsername().toLowerCase().contains(lowerQuery) ||
-                pwd.getWebsite().toLowerCase().contains(lowerQuery) ||
-                pwd.getCategory().toLowerCase().contains(lowerQuery) ||
-                pwd.getTags().stream().anyMatch(tag -> tag.toLowerCase().contains(lowerQuery))
-            )
-            .collect(Collectors.toList());
-    }
-    
-    /**
-     * Generate secure password
-     */
-    public String generatePassword(int length, boolean includeUppercase, boolean includeLowercase, 
-                                 boolean includeNumbers, boolean includeSymbols) {
-        StringBuilder charset = new StringBuilder();
-        
-        if (includeUppercase) charset.append("ABCDEFGHIJKLMNOPQRSTUVWXYZ");
-        if (includeLowercase) charset.append("abcdefghijklmnopqrstuvwxyz");
-        if (includeNumbers) charset.append("0123456789");
-        if (includeSymbols) charset.append("!@#$%^&*()_+-=[]{}|;:,.<>?");
-        
-        if (charset.length() == 0) {
-            throw new IllegalArgumentException("At least one character type must be selected");
-        }
-        
-        SecureRandom random = new SecureRandom();
-        StringBuilder password = new StringBuilder();
-        
-        for (int i = 0; i < length; i++) {
-            int index = random.nextInt(charset.length());
-            password.append(charset.charAt(index));
-        }
-        
-        return password.toString();
-    }
-    
-    /**
-     * Check password strength
-     */
-    public PasswordStrength checkPasswordStrength(String password) {
-        if (password == null || password.isEmpty()) {
-            return new PasswordStrength(0, "Empty password", "Very Weak");
-        }
-        
-        int score = 0;
-        List<String> feedback = new ArrayList<>();
-        
-        // Length check
-        if (password.length() >= 12) {
-            score += 25;
-        } else if (password.length() >= 8) {
-            score += 15;
-            feedback.add("Consider using a longer password (12+ characters)");
-        } else {
-            score += 5;
-            feedback.add("Password is too short (minimum 8 characters)");
-        }
-        
-        // Character variety
-        boolean hasUpper = password.matches(".*[A-Z].*");
-        boolean hasLower = password.matches(".*[a-z].*");
-        boolean hasDigit = password.matches(".*\\d.*");
-        boolean hasSymbol = password.matches(".*[!@#$%^&*()_+\\-=\\[\\]{}|;:,.<>?].*");
-        
-        int varietyCount = 0;
-        if (hasUpper) varietyCount++;
-        if (hasLower) varietyCount++;
-        if (hasDigit) varietyCount++;
-        if (hasSymbol) varietyCount++;
-        
-        score += varietyCount * 15;
-        
-        if (varietyCount < 3) {
-            feedback.add("Use a mix of uppercase, lowercase, numbers, and symbols");
-        }
-        
-        // Common patterns check
-        if (password.matches(".*123.*") || password.matches(".*abc.*") || password.matches(".*qwe.*")) {
-            score -= 10;
-            feedback.add("Avoid common sequences like '123' or 'abc'");
-        }
-        
-        // Repetition check
-        if (password.matches(".*(.)\\1{2,}.*")) {
-            score -= 10;
-            feedback.add("Avoid repeating characters");
-        }
-        
-        score = Math.max(0, Math.min(100, score));
-        
-        String strength;
-        if (score >= 80) strength = "Very Strong";
-        else if (score >= 60) strength = "Strong";
-        else if (score >= 40) strength = "Fair";
-        else if (score >= 20) strength = "Weak";
-        else strength = "Very Weak";
-        
-        return new PasswordStrength(score, String.join("; ", feedback), strength);
-    }
-    
-    // ==================== DATA PERSISTENCE ====================
-    
-    /**
-     * Load encrypted notes from file
-     */
-    private void loadNotes() throws Exception {
-        Path notesPath = Paths.get(notesFilePath);
-        if (!Files.exists(notesPath)) {
-            return; // No notes file yet
-        }
-        
-        if (encryptionKey == null) {
-            throw new IllegalStateException("Encryption key not set");
-        }
-        
-        byte[] encryptedData = Files.readAllBytes(notesPath);
-        byte[] decryptedData = cryptoManager.decrypt(encryptedData, encryptionKey);
-        
-        try (ObjectInputStream ois = new ObjectInputStream(new ByteArrayInputStream(decryptedData))) {
-            @SuppressWarnings("unchecked")
-            List<SecureNote> loadedNotes = (List<SecureNote>) ois.readObject();
+        File file = new File(notesFile);
+        if (!file.exists()) {
+            // No existing notes file, start with empty list
             notes.clear();
-            notes.addAll(loadedNotes);
-        }
-        
-        // Clear sensitive data
-        Arrays.fill(decryptedData, (byte) 0);
-    }
-    
-    /**
-     * Save encrypted notes to file
-     */
-    private void saveNotes() throws Exception {
-        if (encryptionKey == null) {
-            throw new IllegalStateException("Encryption key not set");
-        }
-        
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        try (ObjectOutputStream oos = new ObjectOutputStream(baos)) {
-            oos.writeObject(new ArrayList<>(notes));
-        }
-        
-        byte[] data = baos.toByteArray();
-        byte[] encryptedData = cryptoManager.encrypt(data, encryptionKey);
-        
-        Files.write(Paths.get(notesFilePath), encryptedData);
-        
-        // Clear sensitive data
-        Arrays.fill(data, (byte) 0);
-    }
-    
-    /**
-     * Load encrypted passwords from file
-     */
-    private void loadPasswords() throws Exception {
-        Path passwordsPath = Paths.get(passwordsFilePath);
-        if (!Files.exists(passwordsPath)) {
-            return; // No passwords file yet
+            return;
         }
         
         if (encryptionKey == null) {
             throw new IllegalStateException("Encryption key not set");
         }
         
-        byte[] encryptedData = Files.readAllBytes(passwordsPath);
-        byte[] decryptedData = cryptoManager.decrypt(encryptedData, encryptionKey);
-        
-        try (ObjectInputStream ois = new ObjectInputStream(new ByteArrayInputStream(decryptedData))) {
-            @SuppressWarnings("unchecked")
-            List<StoredPassword> loadedPasswords = (List<StoredPassword>) ois.readObject();
-            passwords.clear();
-            passwords.addAll(loadedPasswords);
+        try {
+            // Read encrypted data
+            byte[] encryptedData = Files.readAllBytes(file.toPath());
+            
+            if (encryptedData.length < 12) {
+                throw new Exception("Invalid notes file format");
+            }
+            
+            // Extract IV (first 12 bytes)
+            byte[] iv = new byte[12];
+            System.arraycopy(encryptedData, 0, iv, 0, 12);
+            
+            // Extract encrypted content
+            byte[] encrypted = new byte[encryptedData.length - 12];
+            System.arraycopy(encryptedData, 12, encrypted, 0, encrypted.length);
+            
+            // Decrypt data
+            Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+            GCMParameterSpec gcmSpec = new GCMParameterSpec(128, iv);
+            cipher.init(Cipher.DECRYPT_MODE, encryptionKey, gcmSpec);
+            byte[] decryptedData = cipher.doFinal(encrypted);
+            
+            // Deserialize notes list
+            try (ObjectInputStream ois = new ObjectInputStream(new java.io.ByteArrayInputStream(decryptedData))) {
+                @SuppressWarnings("unchecked")
+                List<SecureNote> loadedNotes = (List<SecureNote>) ois.readObject();
+                notes.clear();
+                notes.addAll(loadedNotes);
+            }
+            
+        } catch (Exception e) {
+            if (e.getMessage().contains("Tag mismatch")) {
+                // Encryption key mismatch - likely different session or corrupted file
+                System.err.println("Notes file encryption key mismatch. Starting with empty notes list.");
+                notes.clear();
+                // Backup the corrupted file
+                try {
+                    String backupFile = notesFile + ".backup." + System.currentTimeMillis();
+                    Files.copy(Paths.get(notesFile), Paths.get(backupFile));
+                    Files.delete(Paths.get(notesFile));
+                    System.out.println("Corrupted notes file backed up to: " + backupFile);
+                } catch (Exception backupEx) {
+                    System.err.println("Could not backup corrupted file: " + backupEx.getMessage());
+                }
+                return;
+            }
+            throw new Exception("Failed to load notes: " + e.getMessage(), e);
         }
-        
-        // Clear sensitive data
-        Arrays.fill(decryptedData, (byte) 0);
     }
     
-    /**
-     * Save encrypted passwords to file
-     */
-    private void savePasswords() throws Exception {
+    public List<SecureNote> getAllNotes() {
+        return new ArrayList<>(notes);
+    }
+    
+    public List<SecureNote> searchNotes(String query) {
+        return new ArrayList<>(notes);
+    }
+    
+    public void addNote(SecureNote note) throws Exception {
+        notes.add(note);
+        System.out.println("📝 Adding note: " + note.getTitle() + " (Total notes: " + notes.size() + ")");
+        System.out.println("📝 Note ID: " + note.getId());
+        System.out.println("📝 Encryption key available: " + (encryptionKey != null));
+        saveNotes(); // Auto-save when adding notes
+        System.out.println("💾 Note saved to file: " + notesFile);
+        
+        // Verify save by checking file exists and has content
+        File file = new File(notesFile);
+        if (file.exists()) {
+            System.out.println("✅ Notes file exists, size: " + file.length() + " bytes");
+        } else {
+            System.out.println("❌ Notes file does not exist after save!");
+        }
+    }
+    
+    public void updateNote(SecureNote note) throws Exception {
+        // Find and update existing note
+        for (int i = 0; i < notes.size(); i++) {
+            if (notes.get(i).getId().equals(note.getId())) {
+                notes.set(i, note);
+                saveNotes(); // Auto-save when updating notes
+                return;
+            }
+        }
+        throw new Exception("Note not found: " + note.getId());
+    }
+    
+    public void removeNote(String id) throws Exception {
+        notes.removeIf(n -> n.getId().equals(id));
+        saveNotes(); // Auto-save when removing notes
+    }
+    
+    public void saveNotes() throws Exception {
         if (encryptionKey == null) {
+            System.out.println("❌ Cannot save notes: Encryption key not set");
             throw new IllegalStateException("Encryption key not set");
         }
         
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        try (ObjectOutputStream oos = new ObjectOutputStream(baos)) {
-            oos.writeObject(new ArrayList<>(passwords));
+        System.out.println("💾 Saving " + notes.size() + " notes to: " + notesFile);
+        System.out.println("💾 Encryption key algorithm: " + encryptionKey.getAlgorithm());
+        
+        try {
+            // Ensure directory exists
+            Files.createDirectories(Paths.get(notesFile).getParent());
+            
+            // Serialize notes list
+            java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
+            try (ObjectOutputStream oos = new ObjectOutputStream(baos)) {
+                oos.writeObject(notes);
+            }
+            byte[] serializedData = baos.toByteArray();
+            System.out.println("💾 Serialized data size: " + serializedData.length + " bytes");
+            
+            // Generate random IV
+            byte[] iv = new byte[12];
+            secureRandom.nextBytes(iv);
+            
+            // Encrypt data
+            Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+            GCMParameterSpec gcmSpec = new GCMParameterSpec(128, iv);
+            cipher.init(Cipher.ENCRYPT_MODE, encryptionKey, gcmSpec);
+            byte[] encryptedData = cipher.doFinal(serializedData);
+            System.out.println("💾 Encrypted data size: " + encryptedData.length + " bytes");
+            
+            // Combine IV and encrypted data
+            byte[] finalData = new byte[iv.length + encryptedData.length];
+            System.arraycopy(iv, 0, finalData, 0, iv.length);
+            System.arraycopy(encryptedData, 0, finalData, iv.length, encryptedData.length);
+            
+            // Write to file
+            Files.write(Paths.get(notesFile), finalData);
+            System.out.println("💾 Final file size: " + finalData.length + " bytes");
+            
+            // Verify file was written
+            File file = new File(notesFile);
+            if (file.exists() && file.length() > 0) {
+                System.out.println("✅ Notes saved successfully, file size: " + file.length() + " bytes");
+            } else {
+                System.out.println("❌ Notes file verification failed!");
+                throw new Exception("File verification failed after save");
+            }
+            
+        } catch (Exception e) {
+            System.out.println("❌ Failed to save notes: " + e.getMessage());
+            e.printStackTrace();
+            
+            com.ghostvault.logging.SystemErrorLog errorLog = new com.ghostvault.logging.SystemErrorLog(
+                "SecureNotesManager", "saveNotes", e, "Failed to save notes to encrypted file");
+            errorLog.logToConsole();
+            
+            throw new Exception("Failed to save notes: " + e.getMessage(), e);
         }
-        
-        byte[] data = baos.toByteArray();
-        byte[] encryptedData = cryptoManager.encrypt(data, encryptionKey);
-        
-        Files.write(Paths.get(passwordsFilePath), encryptedData);
-        
-        // Clear sensitive data
-        Arrays.fill(data, (byte) 0);
     }
     
-    // ==================== GETTERS ====================
-    
-    public ObservableList<SecureNote> getNotes() {
-        return notes;
+    public List<SecureNote> getNotes() {
+        return new ArrayList<>(notes);
     }
     
-    public ObservableList<StoredPassword> getPasswords() {
-        return passwords;
+    public void addNote(String title, String content, String category, List<String> tags) throws Exception {
+        SecureNote note = new SecureNote(title, content);
+        note.setCategory(category);
+        notes.add(note);
     }
     
-    /**
-     * Password strength result
-     */
-    public static class PasswordStrength {
-        private final int score;
-        private final String feedback;
-        private final String strength;
-        
-        public PasswordStrength(int score, String feedback, String strength) {
-            this.score = score;
-            this.feedback = feedback;
-            this.strength = strength;
-        }
-        
-        public int getScore() { return score; }
-        public String getFeedback() { return feedback; }
-        public String getStrength() { return strength; }
+    public void deleteNote(String id) throws Exception {
+        notes.removeIf(n -> n.getId().equals(id));
     }
 }

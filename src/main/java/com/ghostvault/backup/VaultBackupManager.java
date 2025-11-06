@@ -1,40 +1,41 @@
 package com.ghostvault.backup;
 
-import com.ghostvault.config.AppConfig;
 import com.ghostvault.core.FileManager;
 import com.ghostvault.core.MetadataManager;
 import com.ghostvault.security.CryptoManager;
-import com.ghostvault.audit.AuditManager;
-import com.ghostvault.exception.BackupException;
-
+import com.ghostvault.model.VaultFile;
 import javax.crypto.SecretKey;
+import javax.crypto.Cipher;
+import javax.crypto.spec.GCMParameterSpec;
 import java.io.*;
-import java.nio.file.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.*;
+import java.util.List;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
 
 /**
- * Manages secure backup and restore operations for the vault
- * Maintains encryption during backup/restore and handles integrity verification
+ * Enhanced VaultBackupManager with full backup and restore functionality
  */
 public class VaultBackupManager {
+    private FileManager fileManager;
+    private MetadataManager metadataManager;
+    private CryptoManager cryptoManager;
+    private com.ghostvault.audit.AuditManager auditManager;
+    private final SecureRandom secureRandom = new SecureRandom();
     
-    private final CryptoManager cryptoManager;
-    private final FileManager fileManager;
-    private final MetadataManager metadataManager;
-    private final AuditManager auditManager;
-    
-    // Backup format version for compatibility
-    private static final String BACKUP_VERSION = "1.0";
-    private static final String BACKUP_MANIFEST = "backup_manifest.json";
-    private static final String BACKUP_EXTENSION = ".gvbackup";
+    public VaultBackupManager(FileManager fileManager, MetadataManager metadataManager) {
+        this.fileManager = fileManager;
+        this.metadataManager = metadataManager;
+    }
     
     public VaultBackupManager(CryptoManager cryptoManager, FileManager fileManager, 
-                             MetadataManager metadataManager, AuditManager auditManager) {
+                             MetadataManager metadataManager, com.ghostvault.audit.AuditManager auditManager) {
         this.cryptoManager = cryptoManager;
         this.fileManager = fileManager;
         this.metadataManager = metadataManager;
@@ -42,715 +43,624 @@ public class VaultBackupManager {
     }
     
     /**
-     * Create a complete encrypted backup of the vault
+     * Create encrypted backup of entire vault
      */
-    public void createBackup(File backupFile, SecretKey key, BackupProgressCallback callback) throws BackupException {
-        if (backupFile == null || key == null) {
-            throw new BackupException("Backup file and encryption key are required");
+    public void createBackup(File backupFile, SecretKey key) throws Exception {
+        System.out.println("🔄 Starting backup creation...");
+        
+        if (fileManager == null) {
+            throw new Exception("FileManager not available for backup");
         }
         
-        try {
-            // Ensure backup file has correct extension
-            if (!backupFile.getName().endsWith(BACKUP_EXTENSION)) {
-                backupFile = new File(backupFile.getParent(), 
-                    backupFile.getName() + BACKUP_EXTENSION);
-            }
-            
-            // Create backup manifest
-            BackupManifest manifest = createBackupManifest();
-            
-            // Create temporary directory for backup preparation
-            Path tempDir = Files.createTempDirectory("ghostvault_backup");
-            
-            try {
-                // Prepare backup contents
-                prepareBackupContents(tempDir, manifest, key, callback);
-                
-                // Create encrypted backup archive
-                createEncryptedArchive(tempDir, backupFile, key, callback);
-                
-                // Verify backup integrity immediately after creation
-                verifyBackupIntegrity(backupFile, key, manifest);
-                
-                // Log successful backup
-                if (auditManager != null) {
-                    auditManager.logSecurityEvent("BACKUP_CREATED", 
-                        "Vault backup created successfully", 
-                        AuditManager.AuditSeverity.INFO, null, 
-                        "Backup file: " + backupFile.getName());
-                }
-                
-                if (callback != null) {
-                    callback.onProgress(100, "Backup completed successfully");
-                }
-                
-            } finally {
-                // Clean up temporary directory
-                deleteDirectory(tempDir);
-            }
-            
-        } catch (Exception e) {
-            // Log backup failure
-            if (auditManager != null) {
-                auditManager.logSecurityEvent("BACKUP_FAILED", 
-                    "Vault backup failed", 
-                    AuditManager.AuditSeverity.ERROR, null, 
-                    "Error: " + e.getMessage());
-            }
-            
-            throw new BackupException("Failed to create backup: " + e.getMessage(), e);
+        if (metadataManager == null) {
+            throw new Exception("MetadataManager not available for backup");
         }
+        
+        // Get vault directory
+        String vaultDir = com.ghostvault.config.AppConfig.getVaultDir();
+        File vaultFolder = new File(vaultDir);
+        
+        if (!vaultFolder.exists()) {
+            throw new Exception("Vault directory does not exist: " + vaultDir);
+        }
+        
+        System.out.println("📁 Vault directory: " + vaultDir);
+        
+        // Verify vault structure before backup
+        verifyVaultStructureForBackup(vaultFolder);
+        
+        // Create temporary zip file
+        File tempZip = File.createTempFile("vault_backup_", ".zip");
+        
+        try {
+            // Create zip archive of vault directory
+            createZipArchive(vaultFolder, tempZip);
+            
+            // Encrypt the zip file
+            encryptBackupFile(tempZip, backupFile, key);
+            
+            System.out.println("✅ Backup created successfully: " + backupFile.getAbsolutePath());
+            System.out.println("📊 Backup size: " + formatFileSize(backupFile.length()));
+            
+        } finally {
+            // Clean up temporary file
+            if (tempZip.exists()) {
+                tempZip.delete();
+            }
+        }
+    }
+    
+    /**
+     * Create zip archive of vault directory
+     */
+    private void createZipArchive(File sourceDir, File zipFile) throws Exception {
+        System.out.println("📦 Creating zip archive...");
+        
+        try (FileOutputStream fos = new FileOutputStream(zipFile);
+             ZipOutputStream zos = new ZipOutputStream(fos)) {
+            
+            addDirectoryToZip(sourceDir, sourceDir.getName(), zos);
+        }
+        
+        System.out.println("📦 Zip archive created: " + formatFileSize(zipFile.length()));
+    }
+    
+    /**
+     * Recursively add directory contents to zip
+     */
+    private void addDirectoryToZip(File dir, String baseName, ZipOutputStream zos) throws Exception {
+        File[] files = dir.listFiles();
+        if (files == null) return;
+        
+        for (File file : files) {
+            String entryName = baseName + "/" + file.getName();
+            
+            if (file.isDirectory()) {
+                // Add directory entry
+                ZipEntry dirEntry = new ZipEntry(entryName + "/");
+                zos.putNextEntry(dirEntry);
+                zos.closeEntry();
+                
+                // Recursively add directory contents
+                addDirectoryToZip(file, entryName, zos);
+            } else {
+                // Skip user-specific files that shouldn't be backed up
+                if (file.getName().equals("passwords.dat") || file.getName().equals("auth_attempts.dat")) {
+                    System.out.println("🔐 Skipped user-specific file: " + file.getName());
+                } else {
+                    // Add file entry
+                    ZipEntry fileEntry = new ZipEntry(entryName);
+                    zos.putNextEntry(fileEntry);
+                    
+                    try (FileInputStream fis = new FileInputStream(file)) {
+                        byte[] buffer = new byte[8192];
+                        int length;
+                        while ((length = fis.read(buffer)) > 0) {
+                            zos.write(buffer, 0, length);
+                        }
+                    }
+                    
+                    zos.closeEntry();
+                    System.out.println("📄 Added to backup: " + file.getName() + " (" + formatFileSize(file.length()) + ")");
+                }
+            }
+        }
+    }
+    
+    /**
+     * Encrypt backup file using AES-GCM
+     */
+    private void encryptBackupFile(File sourceFile, File encryptedFile, SecretKey key) throws Exception {
+        System.out.println("🔐 Encrypting backup file...");
+        
+        // Generate random IV
+        byte[] iv = new byte[12];
+        secureRandom.nextBytes(iv);
+        
+        // Setup cipher
+        Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+        GCMParameterSpec gcmSpec = new GCMParameterSpec(128, iv);
+        cipher.init(Cipher.ENCRYPT_MODE, key, gcmSpec);
+        
+        try (FileInputStream fis = new FileInputStream(sourceFile);
+             FileOutputStream fos = new FileOutputStream(encryptedFile)) {
+            
+            // Write IV first
+            fos.write(iv);
+            
+            // Write backup metadata
+            String metadata = createBackupMetadata();
+            byte[] metadataBytes = metadata.getBytes("UTF-8");
+            byte[] encryptedMetadata = cipher.update(metadataBytes);
+            
+            // Write metadata length and encrypted metadata
+            fos.write(intToBytes(encryptedMetadata.length));
+            fos.write(encryptedMetadata);
+            
+            // Encrypt and write file data
+            byte[] buffer = new byte[8192];
+            int bytesRead;
+            while ((bytesRead = fis.read(buffer)) != -1) {
+                byte[] encryptedChunk = cipher.update(buffer, 0, bytesRead);
+                if (encryptedChunk != null) {
+                    fos.write(encryptedChunk);
+                }
+            }
+            
+            // Write final encrypted block
+            byte[] finalBlock = cipher.doFinal();
+            if (finalBlock != null) {
+                fos.write(finalBlock);
+            }
+        }
+        
+        System.out.println("🔐 Backup encrypted successfully");
+    }
+    
+    /**
+     * Create backup metadata
+     */
+    private String createBackupMetadata() {
+        return String.format("GhostVault Backup\nVersion: 1.0\nCreated: %s\nType: Full Vault Backup",
+            LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+    }
+    
+    /**
+     * Convert int to byte array
+     */
+    private byte[] intToBytes(int value) {
+        return new byte[] {
+            (byte) (value >>> 24),
+            (byte) (value >>> 16),
+            (byte) (value >>> 8),
+            (byte) value
+        };
+    }
+    
+    /**
+     * Convert byte array to int
+     */
+    private int bytesToInt(byte[] bytes) {
+        return ((bytes[0] & 0xFF) << 24) |
+               ((bytes[1] & 0xFF) << 16) |
+               ((bytes[2] & 0xFF) << 8) |
+               (bytes[3] & 0xFF);
+    }
+    
+    /**
+     * Format file size for display
+     */
+    private String formatFileSize(long bytes) {
+        if (bytes < 1024) return bytes + " B";
+        if (bytes < 1024 * 1024) return String.format("%.1f KB", bytes / 1024.0);
+        if (bytes < 1024 * 1024 * 1024) return String.format("%.1f MB", bytes / (1024.0 * 1024.0));
+        return String.format("%.1f GB", bytes / (1024.0 * 1024.0 * 1024.0));
     }
     
     /**
      * Restore vault from encrypted backup
      */
-    public void restoreBackup(File backupFile, SecretKey key, BackupProgressCallback callback) throws BackupException {
-        if (backupFile == null || !backupFile.exists()) {
-            throw new BackupException("Backup file does not exist");
+    public void restoreBackup(File backupFile, SecretKey key) throws Exception {
+        System.out.println("🔄 Starting backup restoration...");
+        System.out.println("📁 Backup file: " + backupFile.getAbsolutePath());
+        System.out.println("📊 Backup size: " + formatFileSize(backupFile.length()));
+        
+        if (!backupFile.exists()) {
+            throw new Exception("Backup file does not exist: " + backupFile.getAbsolutePath());
         }
         
-        if (key == null) {
-            throw new BackupException("Encryption key is required for restore");
+        if (backupFile.length() == 0) {
+            throw new Exception("Backup file is empty: " + backupFile.getAbsolutePath());
         }
+        
+        // Create temporary file for decrypted zip
+        File tempZip = File.createTempFile("vault_restore_", ".zip");
         
         try {
-            // Create temporary directory for extraction
-            Path tempDir = Files.createTempDirectory("ghostvault_restore");
+            // Clear existing vault directory before restore
+            String vaultDir = com.ghostvault.config.AppConfig.getVaultDir();
+            File vaultFolder = new File(vaultDir);
             
-            try {
-                // Extract and decrypt backup archive
-                extractEncryptedArchive(backupFile, tempDir, key, callback);
-                
-                // Load and verify backup manifest
-                BackupManifest manifest = loadBackupManifest(tempDir);
-                verifyBackupCompatibility(manifest);
-                
-                // Backup current vault (if exists) before restore
-                backupCurrentVault();
-                
-                // Restore vault contents
-                restoreVaultContents(tempDir, manifest, key, callback);
-                
-                // Verify restored vault integrity
-                verifyRestoredVault(manifest);
-                
-                // Log successful restore
-                if (auditManager != null) {
-                    auditManager.logSecurityEvent("BACKUP_RESTORED", 
-                        "Vault restored from backup successfully", 
-                        AuditManager.AuditSeverity.INFO, null, 
-                        "Backup file: " + backupFile.getName());
-                }
-                
-                if (callback != null) {
-                    callback.onProgress(100, "Restore completed successfully");
-                }
-                
-            } finally {
-                // Clean up temporary directory
-                deleteDirectory(tempDir);
-            }
+            System.out.println("🗑️ Target vault directory: " + vaultDir);
+            System.out.println("📁 Vault directory exists: " + vaultFolder.exists());
             
-        } catch (Exception e) {
-            // Log restore failure
-            if (auditManager != null) {
-                auditManager.logSecurityEvent("BACKUP_RESTORE_FAILED", 
-                    "Vault restore failed", 
-                    AuditManager.AuditSeverity.ERROR, null, 
-                    "Error: " + e.getMessage());
-            }
-            
-            throw new BackupException("Failed to restore backup: " + e.getMessage(), e);
-        }
-    }
-    
-    /**
-     * Verify backup file integrity without full restore
-     */
-    public BackupInfo verifyBackup(File backupFile, SecretKey key) throws BackupException {
-        if (backupFile == null || !backupFile.exists()) {
-            throw new BackupException("Backup file does not exist");
-        }
-        
-        try {
-            // Simple verification: check if file has correct header and is readable
-            try (FileInputStream fis = new FileInputStream(backupFile)) {
-                // Read and verify header
-                byte[] header = new byte[8];
-                int bytesRead = fis.read(header);
-                if (bytesRead != 8 || !Arrays.equals(header, "GVBACKUP".getBytes())) {
-                    BackupInfo info = new BackupInfo();
-                    info.setValid(false);
-                    info.setErrorMessage("Invalid backup file format - missing or corrupted header");
-                    return info;
-                }
-                
-                // Read version
-                byte[] versionBytes = new byte[3];
-                fis.read(versionBytes);
-                String version = new String(versionBytes);
-                
-                // Basic file size check
-                long fileSize = backupFile.length();
-                if (fileSize < 100) { // Minimum reasonable backup size
-                    BackupInfo info = new BackupInfo();
-                    info.setValid(false);
-                    info.setErrorMessage("Backup file appears to be too small or corrupted");
-                    return info;
-                }
-                
-                // Create backup info with basic information
-                BackupInfo info = new BackupInfo();
-                info.setVersion(version);
-                info.setCreationDate(LocalDateTime.ofEpochSecond(
-                    backupFile.lastModified() / 1000, 0, java.time.ZoneOffset.UTC));
-                info.setFileCount(0); // Will be determined during actual restore
-                info.setTotalSize(fileSize);
-                info.setValid(true);
-                
-                return info;
-            }
-            
-        } catch (Exception e) {
-            BackupInfo info = new BackupInfo();
-            info.setValid(false);
-            info.setErrorMessage("Error reading backup file: " + e.getMessage());
-            return info;
-        }
-    }
-    
-    /**
-     * Create backup manifest with vault information
-     */
-    private BackupManifest createBackupManifest() throws Exception {
-        BackupManifest manifest = new BackupManifest();
-        manifest.setVersion(BACKUP_VERSION);
-        manifest.setCreationDate(LocalDateTime.now());
-        
-        // Get vault statistics
-        Path vaultPath = Paths.get(AppConfig.VAULT_DIR);
-        if (Files.exists(vaultPath)) {
-            // Count files and calculate total size
-            int fileCount = 0;
-            long totalSize = 0;
-            
-            Path filesDir = vaultPath.resolve("files");
-            if (Files.exists(filesDir)) {
-                try (DirectoryStream<Path> stream = Files.newDirectoryStream(filesDir)) {
-                    for (Path file : stream) {
-                        if (Files.isRegularFile(file)) {
-                            fileCount++;
-                            totalSize += Files.size(file);
-                        }
-                    }
+            if (vaultFolder.exists()) {
+                System.out.println("🗑️ Clearing existing vault contents...");
+                deleteDirectoryContents(vaultFolder);
+                System.out.println("✅ Vault directory cleared");
+            } else {
+                System.out.println("📁 Creating vault directory...");
+                boolean created = vaultFolder.mkdirs();
+                System.out.println("📁 Vault directory created: " + created);
+                if (!created) {
+                    throw new Exception("Failed to create vault directory: " + vaultDir);
                 }
             }
             
-            manifest.setFileCount(fileCount);
-            manifest.setTotalSize(totalSize);
-        }
-        
-        // Add integrity checksums
-        manifest.setVaultChecksum(calculateVaultChecksum());
-        
-        return manifest;
-    }
-    
-    /**
-     * Prepare backup contents in temporary directory
-     */
-    private void prepareBackupContents(Path tempDir, BackupManifest manifest, 
-                                     SecretKey key, BackupProgressCallback callback) throws Exception {
-        
-        Path vaultPath = Paths.get(AppConfig.VAULT_DIR);
-        if (!Files.exists(vaultPath)) {
-            throw new BackupException("Vault directory does not exist");
-        }
-        
-        int totalSteps = 4; // files, metadata, config, manifest
-        int currentStep = 0;
-        
-        // Copy encrypted files
-        if (callback != null) {
-            callback.onProgress((currentStep * 100) / totalSteps, "Backing up encrypted files...");
-        }
-        
-        Path filesDir = vaultPath.resolve("files");
-        Path backupFilesDir = tempDir.resolve("files");
-        Files.createDirectories(backupFilesDir);
-        
-        if (Files.exists(filesDir)) {
-            copyDirectory(filesDir, backupFilesDir);
-        }
-        currentStep++;
-        
-        // Copy metadata
-        if (callback != null) {
-            callback.onProgress((currentStep * 100) / totalSteps, "Backing up metadata...");
-        }
-        
-        Path metadataFile = vaultPath.resolve("metadata.enc");
-        if (Files.exists(metadataFile)) {
-            Files.copy(metadataFile, tempDir.resolve("metadata.enc"));
-        }
-        currentStep++;
-        
-        // Copy configuration
-        if (callback != null) {
-            callback.onProgress((currentStep * 100) / totalSteps, "Backing up configuration...");
-        }
-        
-        Path configDir = vaultPath.resolve("config");
-        Path backupConfigDir = tempDir.resolve("config");
-        if (Files.exists(configDir)) {
-            copyDirectory(configDir, backupConfigDir);
-        }
-        currentStep++;
-        
-        // Save manifest
-        if (callback != null) {
-            callback.onProgress((currentStep * 100) / totalSteps, "Creating backup manifest...");
-        }
-        
-        saveBackupManifest(tempDir, manifest);
-    }
-    
-    /**
-     * Create encrypted archive from prepared contents
-     */
-    private void createEncryptedArchive(Path sourceDir, File targetFile, 
-                                      SecretKey key, BackupProgressCallback callback) throws Exception {
-        
-        // Create temporary unencrypted archive first
-        Path tempArchive = Files.createTempFile("backup", ".zip");
-        
-        try {
-            // Create ZIP archive
-            createZipArchive(sourceDir, tempArchive.toFile(), callback);
+            // Decrypt backup file
+            System.out.println("🔓 Decrypting backup file...");
+            decryptBackupFile(backupFile, tempZip, key);
+            System.out.println("✅ Backup decrypted successfully");
+            System.out.println("📊 Decrypted size: " + formatFileSize(tempZip.length()));
             
-            // Encrypt the archive
-            if (callback != null) {
-                callback.onProgress(90, "Encrypting backup archive...");
+            // Verify decrypted file
+            if (!tempZip.exists() || tempZip.length() == 0) {
+                throw new Exception("Decryption failed - temporary file is empty or missing");
             }
             
-            byte[] archiveData = Files.readAllBytes(tempArchive);
-            byte[] encryptedBytes = cryptoManager.encrypt(archiveData, key);
+            // Extract zip to vault directory
+            System.out.println("📦 Extracting backup archive...");
+            extractZipArchive(tempZip, vaultFolder);
             
-            // Write encrypted archive to target file
-            try (FileOutputStream fos = new FileOutputStream(targetFile)) {
-                // Write header with version
-                fos.write("GVBACKUP".getBytes());
-                fos.write(BACKUP_VERSION.getBytes());
-                // Write the encrypted data directly (already contains IV + ciphertext+tag)
-                fos.write(encryptedBytes);
-            }
+            // Verify extraction by checking subdirectories
+            verifyBackupExtraction(vaultFolder);
             
-            // Clear sensitive data
-            cryptoManager.zeroize(archiveData);
+            // Reload metadata after restore
+            System.out.println("🔄 Reloading metadata after restore...");
+            reloadMetadataAfterRestore();
+            
+            System.out.println("✅ Backup restored successfully");
             
         } finally {
-            // Clean up temporary archive
-            Files.deleteIfExists(tempArchive);
+            // Clean up temporary file
+            if (tempZip.exists()) {
+                tempZip.delete();
+            }
         }
     }
     
     /**
-     * Extract and decrypt backup archive
+     * Reload metadata and verify file persistence after restore
      */
-    private void extractEncryptedArchive(File backupFile, Path targetDir, 
-                                       SecretKey key, BackupProgressCallback callback) throws Exception {
-        
-        if (callback != null) {
-            callback.onProgress(10, "Reading backup file...");
-        }
-        
-        try (FileInputStream fis = new FileInputStream(backupFile)) {
-            // Read and verify header
-            byte[] header = new byte[8];
-            fis.read(header);
-            if (!Arrays.equals(header, "GVBACKUP".getBytes())) {
-                throw new BackupException("Invalid backup file format");
-            }
-            
-            // Read version
-            byte[] versionBytes = new byte[3];
-            fis.read(versionBytes);
-            String version = new String(versionBytes);
-            
-            // Read encrypted data (contains IV + ciphertext+tag)
-            byte[] encryptedData = fis.readAllBytes();
-            
-            if (callback != null) {
-                callback.onProgress(30, "Decrypting backup archive...");
-            }
-            
-            // Decrypt archive directly
-            byte[] archiveData = cryptoManager.decrypt(encryptedData, key);
-            
-            // Create temporary archive file
-            Path tempArchive = Files.createTempFile("restore", ".zip");
-            
-            try {
-                Files.write(tempArchive, archiveData);
+    private void reloadMetadataAfterRestore() throws Exception {
+        try {
+            if (metadataManager != null) {
+                // Force reload metadata from disk
+                metadataManager.loadMetadata();
                 
-                if (callback != null) {
-                    callback.onProgress(50, "Extracting backup contents...");
+                // Verify that files are accessible
+                List<VaultFile> allFiles = metadataManager.getAllFiles();
+                System.out.println("📋 Metadata loaded: " + allFiles.size() + " files");
+                
+                // Verify file persistence
+                int accessibleFiles = 0;
+                for (VaultFile vaultFile : allFiles) {
+                    try {
+                        if (fileManager != null) {
+                            byte[] fileData = fileManager.retrieveFile(vaultFile);
+                            if (fileData != null && fileData.length > 0) {
+                                accessibleFiles++;
+                            }
+                        }
+                    } catch (Exception e) {
+                        System.err.println("⚠️ File not accessible after restore: " + vaultFile.getFileName());
+                    }
                 }
                 
-                // Extract ZIP archive
-                extractZipArchive(tempArchive.toFile(), targetDir, callback);
+                System.out.println("✅ Files accessible after restore: " + accessibleFiles + "/" + allFiles.size());
                 
-            } finally {
-                // Clean up
-                cryptoManager.zeroize(archiveData);
-                Files.deleteIfExists(tempArchive);
+                if (accessibleFiles < allFiles.size()) {
+                    System.err.println("⚠️ Warning: Some files may not be accessible after restore");
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("❌ Error reloading metadata after restore: " + e.getMessage());
+            throw e;
+        }
+    }
+    
+    /**
+     * Verify vault structure before backup to ensure all files are included
+     */
+    private void verifyVaultStructureForBackup(File vaultFolder) throws Exception {
+        System.out.println("🔍 Verifying vault structure for backup...");
+        
+        // Check for files directory
+        File filesDir = new File(vaultFolder, "files");
+        if (filesDir.exists() && filesDir.isDirectory()) {
+            File[] files = filesDir.listFiles();
+            int fileCount = (files != null) ? files.length : 0;
+            System.out.println("📁 Files directory contains: " + fileCount + " files");
+        } else {
+            System.out.println("⚠️ Files directory not found or empty");
+        }
+        
+        // Check for metadata
+        File metadataDir = new File(vaultFolder, "metadata");
+        if (metadataDir.exists() && metadataDir.isDirectory()) {
+            File[] metaFiles = metadataDir.listFiles();
+            int metaCount = (metaFiles != null) ? metaFiles.length : 0;
+            System.out.println("📋 Metadata directory contains: " + metaCount + " files");
+        } else {
+            System.out.println("⚠️ Metadata directory not found");
+        }
+        
+        // Get total vault size
+        long totalSize = calculateDirectorySize(vaultFolder);
+        System.out.println("📊 Total vault size: " + formatFileSize(totalSize));
+        
+        if (totalSize == 0) {
+            System.out.println("⚠️ Warning: Vault appears to be empty");
+        }
+    }
+    
+    /**
+     * Calculate total size of directory and all subdirectories
+     */
+    private long calculateDirectorySize(File directory) {
+        long size = 0;
+        if (directory.exists() && directory.isDirectory()) {
+            File[] files = directory.listFiles();
+            if (files != null) {
+                for (File file : files) {
+                    if (file.isDirectory()) {
+                        size += calculateDirectorySize(file);
+                    } else {
+                        size += file.length();
+                    }
+                }
+            }
+        }
+        return size;
+    }
+    
+    /**
+     * Verify backup extraction by checking all subdirectories
+     */
+    private void verifyBackupExtraction(File vaultFolder) {
+        System.out.println("🔍 Verifying backup extraction...");
+        
+        int totalFiles = 0;
+        long totalSize = 0;
+        
+        // Check files directory
+        File filesDir = new File(vaultFolder, "files");
+        if (filesDir.exists() && filesDir.isDirectory()) {
+            File[] files = filesDir.listFiles();
+            if (files != null) {
+                totalFiles += files.length;
+                for (File file : files) {
+                    totalSize += file.length();
+                    System.out.println("📄 Restored file: " + file.getName() + " (" + formatFileSize(file.length()) + ")");
+                }
+            }
+        }
+        
+        // Check metadata directory
+        File metadataDir = new File(vaultFolder, "metadata");
+        if (metadataDir.exists() && metadataDir.isDirectory()) {
+            File[] metaFiles = metadataDir.listFiles();
+            if (metaFiles != null) {
+                for (File file : metaFiles) {
+                    if (file.isFile()) {
+                        System.out.println("📋 Restored metadata: " + file.getName() + " (" + formatFileSize(file.length()) + ")");
+                    }
+                }
+            }
+        }
+        
+        // Check logs directory
+        File logsDir = new File(vaultFolder, "logs");
+        if (logsDir.exists() && logsDir.isDirectory()) {
+            File[] logFiles = logsDir.listFiles();
+            if (logFiles != null) {
+                for (File file : logFiles) {
+                    if (file.isFile()) {
+                        System.out.println("📝 Restored log: " + file.getName() + " (" + formatFileSize(file.length()) + ")");
+                    }
+                }
+            }
+        }
+        
+        System.out.println("✅ Backup extraction verified: " + totalFiles + " data files restored (" + formatFileSize(totalSize) + ")");
+        
+        if (totalFiles == 0) {
+            System.out.println("⚠️ Warning: No data files were found in backup");
+        }
+    }
+    
+    /**
+     * Decrypt backup file
+     */
+    private void decryptBackupFile(File encryptedFile, File decryptedFile, SecretKey key) throws Exception {
+        System.out.println("🔓 Decrypting backup file...");
+        
+        try (FileInputStream fis = new FileInputStream(encryptedFile);
+             FileOutputStream fos = new FileOutputStream(decryptedFile)) {
+            
+            // Read IV
+            byte[] iv = new byte[12];
+            if (fis.read(iv) != 12) {
+                throw new Exception("Invalid backup file: Cannot read IV");
+            }
+            
+            // Setup cipher
+            Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+            GCMParameterSpec gcmSpec = new GCMParameterSpec(128, iv);
+            cipher.init(Cipher.DECRYPT_MODE, key, gcmSpec);
+            
+            // Read metadata length
+            byte[] lengthBytes = new byte[4];
+            if (fis.read(lengthBytes) != 4) {
+                throw new Exception("Invalid backup file: Cannot read metadata length");
+            }
+            int metadataLength = bytesToInt(lengthBytes);
+            
+            // Read and decrypt metadata
+            byte[] encryptedMetadata = new byte[metadataLength];
+            if (fis.read(encryptedMetadata) != metadataLength) {
+                throw new Exception("Invalid backup file: Cannot read metadata");
+            }
+            
+            byte[] decryptedMetadata = cipher.update(encryptedMetadata);
+            String metadata = new String(decryptedMetadata, "UTF-8");
+            System.out.println("📋 Backup metadata: " + metadata.replace("\n", " | "));
+            
+            // Decrypt file data
+            byte[] buffer = new byte[8192];
+            int bytesRead;
+            while ((bytesRead = fis.read(buffer)) != -1) {
+                byte[] decryptedChunk = cipher.update(buffer, 0, bytesRead);
+                if (decryptedChunk != null) {
+                    fos.write(decryptedChunk);
+                }
+            }
+            
+            // Write final decrypted block
+            byte[] finalBlock = cipher.doFinal();
+            if (finalBlock != null) {
+                fos.write(finalBlock);
+            }
+        }
+        
+        System.out.println("🔓 Backup decrypted successfully");
+    }
+    
+    /**
+     * Delete all contents of a directory but keep the directory itself
+     */
+    private void deleteDirectoryContents(File directory) {
+        if (directory.exists() && directory.isDirectory()) {
+            File[] files = directory.listFiles();
+            if (files != null) {
+                for (File file : files) {
+                    // Don't delete password files during restore - they should remain user-specific
+                    if (!file.getName().equals("passwords.dat") && !file.getName().equals("auth_attempts.dat")) {
+                        if (file.isDirectory()) {
+                            deleteDirectoryContents(file);
+                            file.delete();
+                        } else {
+                            file.delete();
+                        }
+                        System.out.println("🗑️ Deleted: " + file.getName());
+                    } else {
+                        System.out.println("🔐 Preserved: " + file.getName() + " (user-specific)");
+                    }
+                }
             }
         }
     }
     
     /**
-     * Create ZIP archive from directory
+     * Extract zip archive to target directory
      */
-    private void createZipArchive(Path sourceDir, File targetFile, BackupProgressCallback callback) throws Exception {
-        try (ZipOutputStream zos = new ZipOutputStream(new FileOutputStream(targetFile))) {
-            Files.walk(sourceDir)
-                .filter(Files::isRegularFile)
-                .forEach(file -> {
-                    try {
-                        String entryName = sourceDir.relativize(file).toString().replace('\\', '/');
-                        ZipEntry entry = new ZipEntry(entryName);
-                        zos.putNextEntry(entry);
-                        Files.copy(file, zos);
-                        zos.closeEntry();
-                    } catch (Exception e) {
-                        throw new RuntimeException("Failed to add file to archive: " + file, e);
-                    }
-                });
+    private void extractZipArchive(File zipFile, File targetDir) throws Exception {
+        System.out.println("📦 Extracting backup archive...");
+        
+        // Create target directory if it doesn't exist
+        if (!targetDir.exists()) {
+            targetDir.mkdirs();
         }
-    }
-    
-    /**
-     * Extract ZIP archive to directory
-     */
-    private void extractZipArchive(File archiveFile, Path targetDir, BackupProgressCallback callback) throws Exception {
-        try (ZipInputStream zis = new ZipInputStream(new FileInputStream(archiveFile))) {
+        
+        try (FileInputStream fis = new FileInputStream(zipFile);
+             ZipInputStream zis = new ZipInputStream(fis)) {
+            
             ZipEntry entry;
             while ((entry = zis.getNextEntry()) != null) {
-                Path entryPath = targetDir.resolve(entry.getName());
+                String entryName = entry.getName();
                 
-                // Ensure entry path is within target directory (security check)
-                if (!entryPath.normalize().startsWith(targetDir.normalize())) {
-                    throw new BackupException("Archive contains invalid entry path: " + entry.getName());
+                // Skip the top-level vault directory and extract contents directly
+                if (entryName.contains("/")) {
+                    // Remove the first directory component if it exists
+                    String[] parts = entryName.split("/", 2);
+                    if (parts.length > 1) {
+                        entryName = parts[1];
+                    }
+                }
+                
+                // Skip empty entries
+                if (entryName.isEmpty()) {
+                    zis.closeEntry();
+                    continue;
+                }
+                
+                File entryFile = new File(targetDir, entryName);
+                
+                // Ensure parent directories exist
+                File parentDir = entryFile.getParentFile();
+                if (parentDir != null && !parentDir.exists()) {
+                    parentDir.mkdirs();
                 }
                 
                 if (entry.isDirectory()) {
-                    Files.createDirectories(entryPath);
+                    entryFile.mkdirs();
+                    System.out.println("📁 Created directory: " + entryName);
                 } else {
-                    Files.createDirectories(entryPath.getParent());
-                    Files.copy(zis, entryPath);
+                    // Extract file
+                    try (FileOutputStream fos = new FileOutputStream(entryFile)) {
+                        byte[] buffer = new byte[8192];
+                        int length;
+                        while ((length = zis.read(buffer)) > 0) {
+                            fos.write(buffer, 0, length);
+                        }
+                    }
+                    System.out.println("📄 Restored: " + entryName + " (" + formatFileSize(entryFile.length()) + ")");
                 }
                 
                 zis.closeEntry();
             }
         }
+        
+        System.out.println("📦 Archive extracted successfully");
     }
     
     /**
-     * Load backup manifest from directory
+     * Verify backup file integrity
      */
-    private BackupManifest loadBackupManifest(Path backupDir) throws Exception {
-        Path manifestFile = backupDir.resolve(BACKUP_MANIFEST);
-        if (!Files.exists(manifestFile)) {
-            throw new BackupException("Backup manifest not found");
+    public boolean verifyBackup(File backupFile, SecretKey key) throws Exception {
+        System.out.println("🔍 Verifying backup file...");
+        
+        if (!backupFile.exists()) {
+            System.out.println("❌ Backup file does not exist");
+            return false;
         }
         
-        String manifestJson = Files.readString(manifestFile);
-        return BackupManifest.fromJson(manifestJson);
-    }
-    
-    /**
-     * Save backup manifest to directory
-     */
-    private void saveBackupManifest(Path backupDir, BackupManifest manifest) throws Exception {
-        Path manifestFile = backupDir.resolve(BACKUP_MANIFEST);
-        String manifestJson = manifest.toJson();
-        Files.writeString(manifestFile, manifestJson);
-    }
-    
-    /**
-     * Verify backup compatibility with current version
-     */
-    private void verifyBackupCompatibility(BackupManifest manifest) throws BackupException {
-        if (!BACKUP_VERSION.equals(manifest.getVersion())) {
-            throw new BackupException("Incompatible backup version: " + manifest.getVersion());
-        }
-    }
-    
-    /**
-     * Calculate vault checksum for integrity verification
-     */
-    private String calculateVaultChecksum() throws Exception {
-        // This is a simplified checksum - in production would be more comprehensive
-        Path vaultPath = Paths.get(AppConfig.VAULT_DIR);
-        if (!Files.exists(vaultPath)) {
-            return "";
-        }
-        
-        StringBuilder checksumData = new StringBuilder();
-        
-        // Include metadata file checksum
-        Path metadataFile = vaultPath.resolve("metadata.enc");
-        if (Files.exists(metadataFile)) {
-            byte[] metadataBytes = Files.readAllBytes(metadataFile);
-            checksumData.append(cryptoManager.calculateSHA256(metadataBytes));
-        }
-        
-        return cryptoManager.calculateSHA256(checksumData.toString().getBytes());
-    }
-    
-    /**
-     * Backup current vault before restore (for rollback)
-     */
-    private void backupCurrentVault() throws Exception {
-        Path vaultPath = Paths.get(AppConfig.VAULT_DIR);
-        if (!Files.exists(vaultPath)) {
-            return; // No current vault to backup
-        }
-        
-        String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
-        Path backupPath = vaultPath.getParent().resolve("vault_backup_" + timestamp);
-        
-        copyDirectory(vaultPath, backupPath);
-    }
-    
-    /**
-     * Restore vault contents from backup directory
-     */
-    private void restoreVaultContents(Path backupDir, BackupManifest manifest, 
-                                    SecretKey key, BackupProgressCallback callback) throws Exception {
-        
-        Path vaultPath = Paths.get(AppConfig.VAULT_DIR);
-        
-        // Clear existing vault
-        if (Files.exists(vaultPath)) {
-            deleteDirectory(vaultPath);
-        }
-        
-        Files.createDirectories(vaultPath);
-        
-        int totalSteps = 3; // files, metadata, config
-        int currentStep = 0;
-        
-        // Restore files
-        if (callback != null) {
-            callback.onProgress((currentStep * 100) / totalSteps, "Restoring encrypted files...");
-        }
-        
-        Path backupFilesDir = backupDir.resolve("files");
-        if (Files.exists(backupFilesDir)) {
-            Path vaultFilesDir = vaultPath.resolve("files");
-            copyDirectory(backupFilesDir, vaultFilesDir);
-        }
-        currentStep++;
-        
-        // Restore metadata
-        if (callback != null) {
-            callback.onProgress((currentStep * 100) / totalSteps, "Restoring metadata...");
-        }
-        
-        Path backupMetadata = backupDir.resolve("metadata.enc");
-        if (Files.exists(backupMetadata)) {
-            Files.copy(backupMetadata, vaultPath.resolve("metadata.enc"));
-        }
-        currentStep++;
-        
-        // Restore configuration
-        if (callback != null) {
-            callback.onProgress((currentStep * 100) / totalSteps, "Restoring configuration...");
-        }
-        
-        Path backupConfigDir = backupDir.resolve("config");
-        if (Files.exists(backupConfigDir)) {
-            Path vaultConfigDir = vaultPath.resolve("config");
-            copyDirectory(backupConfigDir, vaultConfigDir);
-        }
-    }
-    
-    /**
-     * Verify restored vault integrity
-     */
-    private void verifyRestoredVault(BackupManifest manifest) throws Exception {
-        String currentChecksum = calculateVaultChecksum();
-        if (!currentChecksum.equals(manifest.getVaultChecksum())) {
-            throw new BackupException("Restored vault integrity verification failed");
-        }
-    }
-    
-    /**
-     * Verify backup integrity after creation
-     */
-    private void verifyBackupIntegrity(File backupFile, SecretKey key, BackupManifest manifest) throws Exception {
-        // Simple verification - just check if we can read the backup header and basic structure
-        BackupInfo info = verifyBackup(backupFile, key);
-        if (!info.isValid()) {
-            throw new BackupException("Backup integrity verification failed: " + info.getErrorMessage());
-        }
-        
-        // Additional check: verify file size is reasonable
-        if (backupFile.length() < 50) {
-            throw new BackupException("Backup file is too small to be valid");
-        }
-    }
-    
-    /**
-     * Extract only manifest for verification
-     */
-    private void extractManifestOnly(File backupFile, Path targetDir, SecretKey key) throws Exception {
-        // For simplicity, extract the full archive but only use manifest
-        // In production, could optimize to extract only manifest entry
-        extractEncryptedArchive(backupFile, targetDir, key, null);
-    }
-    
-    /**
-     * Copy directory recursively
-     */
-    private void copyDirectory(Path source, Path target) throws Exception {
-        Files.walk(source)
-            .forEach(sourcePath -> {
-                try {
-                    Path targetPath = target.resolve(source.relativize(sourcePath));
-                    if (Files.isDirectory(sourcePath)) {
-                        Files.createDirectories(targetPath);
-                    } else {
-                        Files.copy(sourcePath, targetPath, StandardCopyOption.REPLACE_EXISTING);
-                    }
-                } catch (Exception e) {
-                    throw new RuntimeException("Failed to copy: " + sourcePath, e);
+        try {
+            // Try to decrypt and read metadata
+            try (FileInputStream fis = new FileInputStream(backupFile)) {
+                // Read IV
+                byte[] iv = new byte[12];
+                if (fis.read(iv) != 12) {
+                    System.out.println("❌ Invalid backup file: Cannot read IV");
+                    return false;
                 }
-            });
-    }
-    
-    /**
-     * Delete directory recursively
-     */
-    private void deleteDirectory(Path directory) throws Exception {
-        if (Files.exists(directory)) {
-            Files.walk(directory)
-                .sorted(Comparator.reverseOrder())
-                .forEach(path -> {
-                    try {
-                        Files.delete(path);
-                    } catch (Exception e) {
-                        // Log but continue
-                        System.err.println("Failed to delete: " + path);
-                    }
-                });
-        }
-    }
-    
-    /**
-     * Callback interface for backup/restore progress
-     */
-    public interface BackupProgressCallback {
-        void onProgress(int percentage, String message);
-    }
-    
-    /**
-     * Backup information class
-     */
-    public static class BackupInfo {
-        private String version;
-        private LocalDateTime creationDate;
-        private int fileCount;
-        private long totalSize;
-        private boolean valid;
-        private String errorMessage;
-        
-        // Getters and setters
-        public String getVersion() { return version; }
-        public void setVersion(String version) { this.version = version; }
-        
-        public LocalDateTime getCreationDate() { return creationDate; }
-        public void setCreationDate(LocalDateTime creationDate) { this.creationDate = creationDate; }
-        
-        public int getFileCount() { return fileCount; }
-        public void setFileCount(int fileCount) { this.fileCount = fileCount; }
-        
-        public long getTotalSize() { return totalSize; }
-        public void setTotalSize(long totalSize) { this.totalSize = totalSize; }
-        
-        public boolean isValid() { return valid; }
-        public void setValid(boolean valid) { this.valid = valid; }
-        
-        public String getErrorMessage() { return errorMessage; }
-        public void setErrorMessage(String errorMessage) { this.errorMessage = errorMessage; }
-    }
-    
-    /**
-     * Backup manifest class
-     */
-    private static class BackupManifest {
-        private String version;
-        private LocalDateTime creationDate;
-        private int fileCount;
-        private long totalSize;
-        private String vaultChecksum;
-        
-        // Getters and setters
-        public String getVersion() { return version; }
-        public void setVersion(String version) { this.version = version; }
-        
-        public LocalDateTime getCreationDate() { return creationDate; }
-        public void setCreationDate(LocalDateTime creationDate) { this.creationDate = creationDate; }
-        
-        public int getFileCount() { return fileCount; }
-        public void setFileCount(int fileCount) { this.fileCount = fileCount; }
-        
-        public long getTotalSize() { return totalSize; }
-        public void setTotalSize(long totalSize) { this.totalSize = totalSize; }
-        
-        public String getVaultChecksum() { return vaultChecksum; }
-        public void setVaultChecksum(String vaultChecksum) { this.vaultChecksum = vaultChecksum; }
-        
-        public String toJson() {
-            // Simple JSON serialization - in production would use proper JSON library
-            return String.format(
-                "{\"version\":\"%s\",\"creationDate\":\"%s\",\"fileCount\":%d,\"totalSize\":%d,\"vaultChecksum\":\"%s\"}",
-                version, creationDate.toString(), fileCount, totalSize, vaultChecksum
-            );
-        }
-        
-        public static BackupManifest fromJson(String json) {
-            // Simple JSON deserialization - in production would use proper JSON library
-            BackupManifest manifest = new BackupManifest();
-            
-            // Extract values using simple string parsing
-            manifest.version = extractJsonValue(json, "version");
-            manifest.creationDate = LocalDateTime.parse(extractJsonValue(json, "creationDate"));
-            manifest.fileCount = Integer.parseInt(extractJsonValue(json, "fileCount"));
-            manifest.totalSize = Long.parseLong(extractJsonValue(json, "totalSize"));
-            manifest.vaultChecksum = extractJsonValue(json, "vaultChecksum");
-            
-            return manifest;
-        }
-        
-        private static String extractJsonValue(String json, String key) {
-            String pattern = "\"" + key + "\":\"";
-            int start = json.indexOf(pattern);
-            if (start == -1) {
-                // Try numeric value
-                pattern = "\"" + key + "\":";
-                start = json.indexOf(pattern);
-                if (start == -1) return "";
-                start += pattern.length();
-                int end = json.indexOf(",", start);
-                if (end == -1) end = json.indexOf("}", start);
-                return json.substring(start, end);
+                
+                // Setup cipher
+                Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+                GCMParameterSpec gcmSpec = new GCMParameterSpec(128, iv);
+                cipher.init(Cipher.DECRYPT_MODE, key, gcmSpec);
+                
+                // Read metadata length
+                byte[] lengthBytes = new byte[4];
+                if (fis.read(lengthBytes) != 4) {
+                    System.out.println("❌ Invalid backup file: Cannot read metadata length");
+                    return false;
+                }
+                int metadataLength = bytesToInt(lengthBytes);
+                
+                // Read and decrypt metadata
+                byte[] encryptedMetadata = new byte[metadataLength];
+                if (fis.read(encryptedMetadata) != metadataLength) {
+                    System.out.println("❌ Invalid backup file: Cannot read metadata");
+                    return false;
+                }
+                
+                byte[] decryptedMetadata = cipher.update(encryptedMetadata);
+                String metadata = new String(decryptedMetadata, "UTF-8");
+                
+                if (metadata.startsWith("GhostVault Backup")) {
+                    System.out.println("✅ Backup file is valid");
+                    System.out.println("📋 " + metadata.replace("\n", " | "));
+                    return true;
+                } else {
+                    System.out.println("❌ Invalid backup metadata");
+                    return false;
+                }
             }
-            start += pattern.length();
-            int end = json.indexOf("\"", start);
-            return json.substring(start, end);
+            
+        } catch (Exception e) {
+            System.out.println("❌ Backup verification failed: " + e.getMessage());
+            return false;
         }
     }
 }

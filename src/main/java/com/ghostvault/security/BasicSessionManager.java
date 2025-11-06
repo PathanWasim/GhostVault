@@ -1,7 +1,10 @@
 package com.ghostvault.security;
 
 import com.ghostvault.config.AppConfig;
+import com.ghostvault.core.DecoyManager;
 
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -34,12 +37,21 @@ public class BasicSessionManager {
     private final AtomicLong lastKeyboardActivity;
     private boolean activityMonitoringEnabled;
     
+    // CRITICAL: Decoy management for vault protection
+    private DecoyManager decoyManager;
+    private String vaultPath;
+    
     public BasicSessionManager() {
         this(AppConfig.SESSION_TIMEOUT_MINUTES);
     }
     
     public BasicSessionManager(int timeoutMinutes) {
+        this(timeoutMinutes, null);
+    }
+    
+    public BasicSessionManager(int timeoutMinutes, String vaultPath) {
         this.sessionTimeoutMinutes = timeoutMinutes;
+        this.vaultPath = vaultPath;
         this.lastActivityTime = new AtomicLong(System.currentTimeMillis());
         this.failedLoginAttempts = new AtomicInteger(0);
         this.loginHistory = new ArrayList<>();
@@ -52,6 +64,26 @@ public class BasicSessionManager {
         this.duressDetected = false;
         this.activityMonitoringEnabled = true;
         this.scheduler = Executors.newScheduledThreadPool(2);
+        
+        // Initialize DecoyManager if vault path is provided
+        if (vaultPath != null) {
+            initializeDecoyManager(vaultPath);
+        }
+    }
+    
+    /**
+     * Initialize DecoyManager with proper vault paths
+     */
+    private void initializeDecoyManager(String vaultPath) {
+        try {
+            Path realVaultPath = Paths.get(vaultPath);
+            Path decoyVaultPath = Paths.get(vaultPath + "_decoy");
+            this.decoyManager = new DecoyManager(realVaultPath, decoyVaultPath);
+            System.out.println("✓ DecoyManager initialized for session");
+        } catch (Exception e) {
+            System.err.println("⚠️ Warning: Could not initialize DecoyManager: " + e.getMessage());
+            this.decoyManager = null;
+        }
     }
     
     /**
@@ -380,6 +412,120 @@ public class BasicSessionManager {
         endSession();
         if (scheduler != null && !scheduler.isShutdown()) {
             scheduler.shutdown();
+        }
+    }
+    
+    // ========================= DECOY MODE METHODS =========================
+    
+    /**
+     * Check if currently in decoy mode
+     */
+    public boolean isDecoyMode() {
+        return decoyManager != null && decoyManager.isDecoyMode();
+    }
+    
+    /**
+     * Activate decoy mode safely
+     */
+    public void activateDecoyMode() {
+        if (decoyManager == null) {
+            System.err.println("⚠️ Cannot activate decoy mode - DecoyManager not initialized");
+            return;
+        }
+        
+        try {
+            // Verify vault integrity before switching
+            if (!decoyManager.verifyRealVaultIntegrity()) {
+                System.err.println("⚠️ Cannot activate decoy mode - vault integrity check failed");
+                return;
+            }
+            
+            decoyManager.switchToDecoyMode();
+            decoyManager.autoGenerateForNewDevice();
+            decoyManager.ensureMinimumDecoyFiles(8); // Ensure at least 8 decoy files
+            
+            logSecurityEvent("DECOY MODE ACTIVATED - Real vault protected");
+            System.out.println("🎭 Decoy mode activated successfully");
+            System.out.println("🔒 Real vault protected and hidden");
+            
+        } catch (Exception e) {
+            System.err.println("⚠️ Failed to activate decoy mode: " + e.getMessage());
+            logSecurityEvent("DECOY MODE ACTIVATION FAILED: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Deactivate decoy mode and return to real vault
+     */
+    public void deactivateDecoyMode() {
+        if (decoyManager == null || !decoyManager.isDecoyMode()) {
+            System.out.println("Not in decoy mode");
+            return;
+        }
+        
+        try {
+            decoyManager.switchToRealMode();
+            logSecurityEvent("DECOY MODE DEACTIVATED - Returned to real vault");
+            System.out.println("✓ Returned to real vault mode");
+            
+        } catch (Exception e) {
+            System.err.println("⚠️ Failed to deactivate decoy mode: " + e.getMessage());
+            logSecurityEvent("DECOY MODE DEACTIVATION FAILED: " + e.getMessage());
+            // Emergency fallback
+            try {
+                decoyManager.emergencySwitchToRealVault();
+            } catch (Exception ex) {
+                System.err.println("Emergency switch failed: " + ex.getMessage());
+            }
+        }
+    }
+    
+    /**
+     * Refresh decoy vault with new fake data
+     */
+    public void refreshDecoyData() {
+        if (decoyManager == null || !decoyManager.isDecoyMode()) {
+            return;
+        }
+        
+        try {
+            decoyManager.refreshDecoyVault();
+            logSecurityEvent("DECOY DATA REFRESHED");
+            System.out.println("✓ Decoy data refreshed");
+        } catch (Exception e) {
+            System.err.println("⚠️ Failed to refresh decoy data: " + e.getMessage());
+            logSecurityEvent("DECOY DATA REFRESH FAILED: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Get current vault path (real or decoy)
+     */
+    public String getCurrentVaultPath() {
+        if (decoyManager != null) {
+            return decoyManager.getCurrentVaultPath().toString();
+        }
+        return vaultPath;
+    }
+    
+    /**
+     * Get DecoyManager instance (for advanced operations)
+     */
+    public DecoyManager getDecoyManager() {
+        return decoyManager;
+    }
+    
+    /**
+     * Emergency switch to real vault (bypasses all checks)
+     */
+    public void emergencyRealVaultAccess() {
+        if (decoyManager != null) {
+            try {
+                decoyManager.emergencySwitchToRealVault();
+                logSecurityEvent("EMERGENCY REAL VAULT ACCESS");
+            } catch (Exception e) {
+                System.err.println("Emergency access failed: " + e.getMessage());
+            }
         }
     }
     

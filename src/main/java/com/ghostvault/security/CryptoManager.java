@@ -1,36 +1,226 @@
 package com.ghostvault.security;
 
-import com.ghostvault.config.AppConfig;
-
-import javax.crypto.*;
+import javax.crypto.Cipher;
+import javax.crypto.SecretKey;
+import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.GCMParameterSpec;
+import javax.crypto.spec.PBEKeySpec;
 import javax.crypto.spec.SecretKeySpec;
-import java.security.GeneralSecurityException;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
+import java.security.spec.KeySpec;
 import java.util.Arrays;
 
 /**
- * Handles all cryptographic operations for the vault using AEAD (AES-GCM)
- * 
- * SECURITY IMPROVEMENTS:
- * - Uses AES-GCM (Authenticated Encryption with Associated Data) instead of AES-CBC+HMAC
- * - Eliminates padding oracle vulnerabilities
- * - Provides built-in authentication without separate HMAC
- * - Simpler and more secure API
- * 
- * @version 2.0.0 - AEAD Implementation
+ * Enhanced crypto manager for secure encryption operations
+ * Implements AES-256-GCM encryption and PBKDF2 password hashing
  */
 public class CryptoManager {
     
-    // AES-GCM configuration
-    private static final String AEAD_ALGORITHM = "AES";
-    private static final String AEAD_TRANSFORMATION = "AES/GCM/NoPadding";
-    private static final int GCM_IV_LENGTH = 12; // 96 bits (recommended for GCM)
-    private static final int GCM_TAG_LENGTH = 128; // 128 bits authentication tag
+    /**
+     * Container for encrypted data with salt, IV, and ciphertext
+     */
+    public static class EncryptedData {
+        private final byte[] salt;
+        private final byte[] iv;
+        private final byte[] ciphertext;
+        
+        public EncryptedData(byte[] salt, byte[] iv, byte[] ciphertext) {
+            this.salt = salt != null ? salt.clone() : null;
+            this.iv = iv != null ? iv.clone() : null;
+            this.ciphertext = ciphertext != null ? ciphertext.clone() : null;
+        }
+        
+        // Legacy constructor for backward compatibility
+        public EncryptedData(byte[] ciphertext, byte[] iv) {
+            this(null, iv, ciphertext);
+        }
+        
+        public byte[] getSalt() { return salt != null ? salt.clone() : null; }
+        public byte[] getIv() { return iv != null ? iv.clone() : null; }
+        public byte[] getCiphertext() { return ciphertext != null ? ciphertext.clone() : null; }
+        
+        /**
+         * Get the total size of the encrypted data
+         */
+        public int getTotalSize() {
+            int size = 0;
+            if (salt != null) size += salt.length;
+            if (iv != null) size += iv.length;
+            if (ciphertext != null) size += ciphertext.length;
+            return size;
+        }
+        
+        /**
+         * Serialize to byte array for storage
+         */
+        public byte[] toByteArray() {
+            int totalSize = getTotalSize();
+            byte[] result = new byte[totalSize];
+            int offset = 0;
+            
+            if (salt != null) {
+                System.arraycopy(salt, 0, result, offset, salt.length);
+                offset += salt.length;
+            }
+            if (iv != null) {
+                System.arraycopy(iv, 0, result, offset, iv.length);
+                offset += iv.length;
+            }
+            if (ciphertext != null) {
+                System.arraycopy(ciphertext, 0, result, offset, ciphertext.length);
+            }
+            
+            return result;
+        }
+        
+        /**
+         * Deserialize from byte array
+         */
+        public static EncryptedData fromByteArray(byte[] data) {
+            if (data == null || data.length < SecurityConfiguration.SALT_LENGTH + SecurityConfiguration.IV_LENGTH) {
+                throw new IllegalArgumentException("Invalid encrypted data format");
+            }
+            
+            byte[] salt = new byte[SecurityConfiguration.SALT_LENGTH];
+            byte[] iv = new byte[SecurityConfiguration.IV_LENGTH];
+            byte[] ciphertext = new byte[data.length - SecurityConfiguration.SALT_LENGTH - SecurityConfiguration.IV_LENGTH];
+            
+            System.arraycopy(data, 0, salt, 0, SecurityConfiguration.SALT_LENGTH);
+            System.arraycopy(data, SecurityConfiguration.SALT_LENGTH, iv, 0, SecurityConfiguration.IV_LENGTH);
+            System.arraycopy(data, SecurityConfiguration.SALT_LENGTH + SecurityConfiguration.IV_LENGTH, ciphertext, 0, ciphertext.length);
+            
+            return new EncryptedData(salt, iv, ciphertext);
+        }
+    }
     
-    private SecretKey masterKey;
+    /**
+     * Encrypt data using AES-256-GCM with a password-derived key
+     * @param data The data to encrypt
+     * @param password The password to derive the key from
+     * @return EncryptedData containing salt, IV, and ciphertext with auth tag
+     * @throws Exception if encryption fails
+     */
+    public EncryptedData encryptWithPassword(byte[] data, String password) throws Exception {
+        if (data == null) {
+            throw new IllegalArgumentException("Data cannot be null");
+        }
+        if (password == null || password.isEmpty()) {
+            throw new IllegalArgumentException("Password cannot be null or empty");
+        }
+        
+        // Generate unique salt and IV for this encryption
+        byte[] salt = generateSalt();
+        byte[] iv = new byte[SecurityConfiguration.IV_LENGTH];
+        secureRandom.nextBytes(iv);
+        
+        // Derive key from password and salt
+        SecretKey key = deriveEncryptionKey(password, salt);
+        
+        try {
+            // Encrypt with AES-GCM
+            Cipher cipher = Cipher.getInstance(SecurityConfiguration.ENCRYPTION_ALGORITHM);
+            GCMParameterSpec gcmSpec = new GCMParameterSpec(SecurityConfiguration.GCM_TAG_LENGTH * 8, iv);
+            cipher.init(Cipher.ENCRYPT_MODE, key, gcmSpec);
+            
+            byte[] ciphertext = cipher.doFinal(data);
+            
+            return new EncryptedData(salt, iv, ciphertext);
+        } finally {
+            // Clear key from memory
+            secureWipe(key);
+        }
+    }
+    
+    /**
+     * Decrypt data using AES-256-GCM with a password-derived key
+     * @param encryptedData The encrypted data containing salt, IV, and ciphertext
+     * @param password The password to derive the key from
+     * @return The decrypted data
+     * @throws Exception if decryption fails or authentication fails
+     */
+    public byte[] decryptWithPassword(EncryptedData encryptedData, String password) throws Exception {
+        if (encryptedData == null) {
+            throw new IllegalArgumentException("Encrypted data cannot be null");
+        }
+        if (password == null || password.isEmpty()) {
+            throw new IllegalArgumentException("Password cannot be null or empty");
+        }
+        
+        byte[] salt = encryptedData.getSalt();
+        byte[] iv = encryptedData.getIv();
+        byte[] ciphertext = encryptedData.getCiphertext();
+        
+        if (salt == null || iv == null || ciphertext == null) {
+            throw new IllegalArgumentException("Invalid encrypted data format");
+        }
+        
+        // Derive key from password and salt
+        SecretKey key = deriveEncryptionKey(password, salt);
+        
+        try {
+            // Decrypt with AES-GCM
+            Cipher cipher = Cipher.getInstance(SecurityConfiguration.ENCRYPTION_ALGORITHM);
+            GCMParameterSpec gcmSpec = new GCMParameterSpec(SecurityConfiguration.GCM_TAG_LENGTH * 8, iv);
+            cipher.init(Cipher.DECRYPT_MODE, key, gcmSpec);
+            
+            return cipher.doFinal(ciphertext);
+        } finally {
+            // Clear key from memory
+            secureWipe(key);
+        }
+    }
+    
+    /**
+     * Legacy encrypt method for backward compatibility
+     */
+    public EncryptedData encrypt(byte[] data, SecretKey key) throws Exception {
+        if (data == null) {
+            throw new IllegalArgumentException("Data cannot be null");
+        }
+        if (key == null) {
+            throw new IllegalArgumentException("Key cannot be null");
+        }
+        
+        // Generate IV
+        byte[] iv = new byte[SecurityConfiguration.IV_LENGTH];
+        secureRandom.nextBytes(iv);
+        
+        // Encrypt with AES-GCM
+        Cipher cipher = Cipher.getInstance(SecurityConfiguration.ENCRYPTION_ALGORITHM);
+        GCMParameterSpec gcmSpec = new GCMParameterSpec(SecurityConfiguration.GCM_TAG_LENGTH * 8, iv);
+        cipher.init(Cipher.ENCRYPT_MODE, key, gcmSpec);
+        
+        byte[] ciphertext = cipher.doFinal(data);
+        
+        return new EncryptedData(null, iv, ciphertext);
+    }
+    
+    /**
+     * Legacy decrypt method for backward compatibility
+     */
+    public byte[] decrypt(EncryptedData encryptedData, SecretKey key) throws Exception {
+        if (encryptedData == null) {
+            throw new IllegalArgumentException("Encrypted data cannot be null");
+        }
+        if (key == null) {
+            throw new IllegalArgumentException("Key cannot be null");
+        }
+        
+        byte[] iv = encryptedData.getIv();
+        byte[] ciphertext = encryptedData.getCiphertext();
+        
+        if (iv == null || ciphertext == null) {
+            throw new IllegalArgumentException("Invalid encrypted data format");
+        }
+        
+        // Decrypt with AES-GCM
+        Cipher cipher = Cipher.getInstance(SecurityConfiguration.ENCRYPTION_ALGORITHM);
+        GCMParameterSpec gcmSpec = new GCMParameterSpec(SecurityConfiguration.GCM_TAG_LENGTH * 8, iv);
+        cipher.init(Cipher.DECRYPT_MODE, key, gcmSpec);
+        
+        return cipher.doFinal(ciphertext);
+    }
+    
     private final SecureRandom secureRandom;
     
     public CryptoManager() {
@@ -38,286 +228,120 @@ public class CryptoManager {
     }
     
     /**
-     * Initialize crypto manager with a key
-     */
-    public void initializeWithKey(SecretKey key) {
-        if (key == null) {
-            throw new IllegalArgumentException("Key cannot be null");
-        }
-        this.masterKey = key;
-    }
-    
-    /**
-     * Create a SecretKey from raw key bytes
-     */
-    public SecretKey keyFromBytes(byte[] keyBytes) {
-        if (keyBytes == null || keyBytes.length != 32) { // 256 bits
-            throw new IllegalArgumentException("Key must be 32 bytes (256 bits)");
-        }
-        return new SecretKeySpec(keyBytes, AEAD_ALGORITHM);
-    }
-    
-    /**
-     * Encrypt data using AES-GCM AEAD
-     * 
-     * @param plaintext Data to encrypt
-     * @param key Encryption key
-     * @param aad Additional Authenticated Data (can be null)
-     * @return IV (12 bytes) || ciphertext+tag
-     */
-    public byte[] encrypt(byte[] plaintext, SecretKey key, byte[] aad) throws GeneralSecurityException {
-        if (plaintext == null) {
-            throw new IllegalArgumentException("Plaintext cannot be null");
-        }
-        if (key == null) {
-            throw new IllegalArgumentException("Key cannot be null");
-        }
-        
-        // Generate random IV (12 bytes for GCM)
-        byte[] iv = new byte[GCM_IV_LENGTH];
-        secureRandom.nextBytes(iv);
-        
-        // Initialize cipher
-        Cipher cipher = Cipher.getInstance(AEAD_TRANSFORMATION);
-        GCMParameterSpec gcmSpec = new GCMParameterSpec(GCM_TAG_LENGTH, iv);
-        cipher.init(Cipher.ENCRYPT_MODE, key, gcmSpec);
-        
-        // Add AAD if provided
-        if (aad != null && aad.length > 0) {
-            cipher.updateAAD(aad);
-        }
-        
-        // Encrypt (includes authentication tag)
-        byte[] ciphertextWithTag = cipher.doFinal(plaintext);
-        
-        // Combine IV + ciphertext+tag
-        byte[] result = new byte[GCM_IV_LENGTH + ciphertextWithTag.length];
-        System.arraycopy(iv, 0, result, 0, GCM_IV_LENGTH);
-        System.arraycopy(ciphertextWithTag, 0, result, GCM_IV_LENGTH, ciphertextWithTag.length);
-        
-        return result;
-    }
-    
-    /**
-     * Encrypt data using AES-GCM AEAD (no AAD)
-     */
-    public byte[] encrypt(byte[] plaintext, SecretKey key) throws GeneralSecurityException {
-        return encrypt(plaintext, key, null);
-    }
-    
-    /**
-     * Encrypt data using master key
-     */
-    public EncryptedData encrypt(byte[] plaintext) throws GeneralSecurityException {
-        if (masterKey == null) {
-            throw new IllegalStateException("Crypto manager not initialized with master key");
-        }
-        
-        byte[] combined = encrypt(plaintext, masterKey, null);
-        
-        // Split into IV and ciphertext for EncryptedData compatibility
-        byte[] iv = Arrays.copyOfRange(combined, 0, GCM_IV_LENGTH);
-        byte[] ciphertextWithTag = Arrays.copyOfRange(combined, GCM_IV_LENGTH, combined.length);
-        
-        return new EncryptedData(ciphertextWithTag, iv, null); // No separate HMAC in GCM
-    }
-    
-    /**
-     * Decrypt data using AES-GCM AEAD
-     * 
-     * @param ivAndCiphertext IV (12 bytes) || ciphertext+tag
-     * @param key Decryption key
-     * @param aad Additional Authenticated Data (must match encryption AAD)
-     * @return Decrypted plaintext
-     * @throws GeneralSecurityException if authentication fails or decryption error
-     */
-    public byte[] decrypt(byte[] ivAndCiphertext, SecretKey key, byte[] aad) throws GeneralSecurityException {
-        if (ivAndCiphertext == null || ivAndCiphertext.length < GCM_IV_LENGTH + 16) {
-            throw new IllegalArgumentException("Invalid ciphertext format");
-        }
-        if (key == null) {
-            throw new IllegalArgumentException("Key cannot be null");
-        }
-        
-        // Extract IV and ciphertext+tag
-        byte[] iv = Arrays.copyOfRange(ivAndCiphertext, 0, GCM_IV_LENGTH);
-        byte[] ciphertextWithTag = Arrays.copyOfRange(ivAndCiphertext, GCM_IV_LENGTH, ivAndCiphertext.length);
-        
-        // Initialize cipher
-        Cipher cipher = Cipher.getInstance(AEAD_TRANSFORMATION);
-        GCMParameterSpec gcmSpec = new GCMParameterSpec(GCM_TAG_LENGTH, iv);
-        cipher.init(Cipher.DECRYPT_MODE, key, gcmSpec);
-        
-        // Add AAD if provided
-        if (aad != null && aad.length > 0) {
-            cipher.updateAAD(aad);
-        }
-        
-        // Decrypt and verify authentication tag
-        // Will throw AEADBadTagException if authentication fails
-        try {
-            return cipher.doFinal(ciphertextWithTag);
-        } catch (javax.crypto.AEADBadTagException e) {
-            throw new GeneralSecurityException("Decryption failed: Invalid key or corrupted data. " +
-                "This usually indicates the wrong password was used or the data has been tampered with.", e);
-        }
-    }
-    
-    /**
-     * Decrypt data using AES-GCM AEAD (no AAD)
-     */
-    public byte[] decrypt(byte[] ivAndCiphertext, SecretKey key) throws GeneralSecurityException {
-        return decrypt(ivAndCiphertext, key, null);
-    }
-    
-    /**
-     * Decrypt data using master key (EncryptedData format)
-     */
-    public byte[] decrypt(EncryptedData encryptedData) throws GeneralSecurityException {
-        if (masterKey == null) {
-            throw new IllegalStateException("Crypto manager not initialized with master key");
-        }
-        
-        // Combine IV and ciphertext
-        byte[] combined = new byte[encryptedData.getIv().length + encryptedData.getCiphertext().length];
-        System.arraycopy(encryptedData.getIv(), 0, combined, 0, encryptedData.getIv().length);
-        System.arraycopy(encryptedData.getCiphertext(), 0, combined, encryptedData.getIv().length, encryptedData.getCiphertext().length);
-        
-        return decrypt(combined, masterKey, null);
-    }
-    
-    /**
-     * Decrypt data with provided key (EncryptedData format)
-     */
-    public byte[] decrypt(EncryptedData encryptedData, SecretKey key) throws GeneralSecurityException {
-        // Combine IV and ciphertext
-        byte[] combined = new byte[encryptedData.getIv().length + encryptedData.getCiphertext().length];
-        System.arraycopy(encryptedData.getIv(), 0, combined, 0, encryptedData.getIv().length);
-        System.arraycopy(encryptedData.getCiphertext(), 0, combined, encryptedData.getIv().length, encryptedData.getCiphertext().length);
-        
-        return decrypt(combined, key, null);
-    }
-    
-    /**
-     * Calculate SHA-256 hash of data for integrity verification
-     */
-    public String calculateSHA256(byte[] data) throws GeneralSecurityException {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(data);
-            
-            // Convert to hex string
-            StringBuilder hexString = new StringBuilder();
-            for (byte b : hash) {
-                String hex = Integer.toHexString(0xff & b);
-                if (hex.length() == 1) {
-                    hexString.append('0');
-                }
-                hexString.append(hex);
-            }
-            return hexString.toString();
-        } catch (NoSuchAlgorithmException e) {
-            throw new GeneralSecurityException("SHA-256 algorithm not available", e);
-        }
-    }
-    
-    /**
-     * Generate cryptographically secure salt
+     * Generate a cryptographically secure random salt
+     * @return 32-byte salt
      */
     public byte[] generateSalt() {
-        return generateSecureRandom(AppConfig.SALT_SIZE);
+        byte[] salt = new byte[SecurityConfiguration.SALT_LENGTH];
+        secureRandom.nextBytes(salt);
+        return salt;
     }
     
     /**
-     * Generate secure random bytes
+     * Hash a password using PBKDF2 with SHA-256
+     * @param password The password to hash
+     * @param salt The salt to use
+     * @return The password hash
+     * @throws Exception if hashing fails
      */
-    public byte[] generateSecureRandom(int length) {
-        byte[] bytes = new byte[length];
-        secureRandom.nextBytes(bytes);
-        return bytes;
+    public byte[] hashPassword(String password, byte[] salt) throws Exception {
+        if (password == null || password.isEmpty()) {
+            throw new IllegalArgumentException("Password cannot be null or empty");
+        }
+        if (salt == null || salt.length != SecurityConfiguration.SALT_LENGTH) {
+            throw new IllegalArgumentException("Salt must be " + SecurityConfiguration.SALT_LENGTH + " bytes");
+        }
+        
+        KeySpec spec = new PBEKeySpec(
+            password.toCharArray(), 
+            salt, 
+            SecurityConfiguration.PBKDF2_ITERATIONS, 
+            SecurityConfiguration.KEY_LENGTH
+        );
+        
+        SecretKeyFactory factory = SecretKeyFactory.getInstance(SecurityConfiguration.KEY_DERIVATION_ALGORITHM);
+        byte[] hash = factory.generateSecret(spec).getEncoded();
+        
+        // Clear the password from memory
+        ((PBEKeySpec) spec).clearPassword();
+        
+        return hash;
     }
     
     /**
-     * Securely wipe sensitive data from memory (zeroize)
+     * Verify a password against a stored hash
+     * @param password The password to verify
+     * @param salt The salt used for hashing
+     * @param storedHash The stored password hash
+     * @return true if password matches
+     * @throws Exception if verification fails
      */
-    public void zeroize(byte[] data) {
-        if (data != null) {
-            MemoryUtils.secureWipe(data);
-        }
+    public boolean verifyPassword(String password, byte[] salt, byte[] storedHash) throws Exception {
+        byte[] computedHash = hashPassword(password, salt);
+        boolean matches = Arrays.equals(computedHash, storedHash);
+        
+        // Clear computed hash from memory
+        secureWipe(computedHash);
+        
+        return matches;
     }
     
     /**
-     * Clear sensitive key material from memory
+     * Derive an encryption key from a password and salt
+     * @param password The password
+     * @param salt The salt
+     * @return SecretKey for AES encryption
+     * @throws Exception if key derivation fails
      */
-    public void clearKeys() {
-        if (masterKey != null) {
-            byte[] keyBytes = masterKey.getEncoded();
-            zeroize(keyBytes);
-            masterKey = null;
-        }
+    public SecretKey deriveEncryptionKey(String password, byte[] salt) throws Exception {
+        byte[] keyBytes = hashPassword(password, salt);
+        SecretKey key = new SecretKeySpec(keyBytes, SecurityConfiguration.AES_ALGORITHM);
+        
+        // Clear key bytes from memory
+        secureWipe(keyBytes);
+        
+        return key;
     }
     
     /**
-     * Get master key for other components (use with caution)
+     * Securely wipe sensitive data from memory using SecureMemoryManager
+     * @param data The data to wipe
      */
-    public SecretKey getMasterKey() {
-        return masterKey;
+    public void secureWipe(byte[] data) {
+        SecureMemoryManager.getInstance().secureWipe(data);
     }
     
     /**
-     * Container for encrypted data (backward compatibility)
-     * Note: HMAC field is deprecated and unused in GCM mode
+     * Securely wipe a SecretKey from memory
+     * @param key The key to wipe
      */
-    public static class EncryptedData {
-        private final byte[] ciphertext;
-        private final byte[] iv;
-        private final byte[] hmac; // Deprecated - kept for compatibility
-        
-        public EncryptedData(byte[] ciphertext, byte[] iv) {
-            this(ciphertext, iv, null);
-        }
-        
-        public EncryptedData(byte[] ciphertext, byte[] iv, byte[] hmac) {
-            this.ciphertext = ciphertext.clone();
-            this.iv = iv.clone();
-            this.hmac = hmac != null ? hmac.clone() : null;
-        }
-        
-        public byte[] getCiphertext() {
-            return ciphertext.clone();
-        }
-        
-        public byte[] getIv() {
-            return iv.clone();
-        }
-        
-        @Deprecated
-        public byte[] getHmac() {
-            return hmac != null ? hmac.clone() : null;
-        }
-        
-        /**
-         * Get combined data (IV + ciphertext) for storage
-         */
-        public byte[] getCombinedData() {
-            byte[] combined = new byte[iv.length + ciphertext.length];
-            System.arraycopy(iv, 0, combined, 0, iv.length);
-            System.arraycopy(ciphertext, 0, combined, iv.length, ciphertext.length);
-            return combined;
-        }
-        
-        /**
-         * Create EncryptedData from combined data (IV + ciphertext)
-         */
-        public static EncryptedData fromCombinedData(byte[] combinedData) {
-            if (combinedData == null || combinedData.length < GCM_IV_LENGTH + 16) {
-                throw new IllegalArgumentException("Invalid encrypted data format");
+    public void secureWipe(SecretKey key) {
+        if (key != null) {
+            try {
+                // Get the encoded key and wipe it
+                byte[] encoded = key.getEncoded();
+                if (encoded != null) {
+                    // Overwrite the key data with zeros
+                    java.util.Arrays.fill(encoded, (byte) 0);
+                }
+            } catch (Exception e) {
+                // Best effort - some keys might not support getEncoded()
+                System.err.println("⚠️ Could not securely wipe key: " + e.getMessage());
             }
-            
-            byte[] iv = Arrays.copyOfRange(combinedData, 0, GCM_IV_LENGTH);
-            byte[] ciphertext = Arrays.copyOfRange(combinedData, GCM_IV_LENGTH, combinedData.length);
-            
-            return new EncryptedData(ciphertext, iv, null);
         }
+    }
+    
+    public String calculateSHA256(byte[] data) throws Exception {
+        java.security.MessageDigest digest = java.security.MessageDigest.getInstance("SHA-256");
+        byte[] hash = digest.digest(data);
+        StringBuilder hexString = new StringBuilder();
+        for (byte b : hash) {
+            String hex = Integer.toHexString(0xff & b);
+            if (hex.length() == 1) {
+                hexString.append('0');
+            }
+            hexString.append(hex);
+        }
+        return hexString.toString();
     }
 }

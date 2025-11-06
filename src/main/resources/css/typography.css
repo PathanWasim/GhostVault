@@ -1,0 +1,392 @@
+/* Typography System for GhostVault */
+
+/* Font Imports */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&display=swap');
+
+/* CSS Variables for Typography */
+:root {
+    /* Font Families */
+    --font-family-primary: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --font-family-mono: 'JetBrains Mono', 'Fira Code', 'Monaco', 'Consolas', monospace;
+
+    /* Font Weights */
+    --font-weight-light: 300;
+    --font-weight-regular: 400;
+    --font-weight-medium: 500;
+    --font-weight-semibold: 600;
+    --font-weight-bold: 700;
+
+    /* Font Sizes */
+    --font-size-xs: 0.75rem;
+    /* 12px */
+    --font-size-sm: 0.875rem;
+    /* 14px */
+    --font-size-base: 1rem;
+    /* 16px */
+    --font-size-lg: 1.125rem;
+    /* 18px */
+    --font-size-xl: 1.25rem;
+    /* 20px */
+    --font-size-2xl: 1.5rem;
+    /* 24px */
+    --font-size-3xl: 1.875rem;
+    /* 30px */
+    --font-size-4xl: 2.25rem;
+    /* 36px */
+
+    /* Line Heights */
+    --line-height-tight: 1.25;
+    --line-height-normal: 1.5;
+    --line-height-relaxed: 1.75;
+
+    /* Letter Spacing */
+    --letter-spacing-tight: -0.025em;
+    --letter-spacing-normal: 0;
+    --letter-spacing-wide: 0.025em;
+}
+
+/* Base Typography */
+.root {
+    -fx-font-family: var(--font-family-primary);
+    -fx-font-size: var(--font-size-base);
+    -fx-font-weight: var(--font-weight-regular);
+}
+
+/* Heading Styles */
+.heading-1 {
+    -fx-font-family: var(--font-family-primary);
+    -fx-font-size: var(--font-size-4xl);
+    -fx-font-weight: var(--font-weight-bold);
+    -fx-text-fill: var(--text-primary);
+}
+
+.heading-2 {
+    -fx-font-family: var(--font-family-primary);
+    -fx-font-size: var(--font-size-3xl);
+    -fx-font-weight: var(--font-weight-semibold);
+    -fx-text-fill: var(--text-primary);
+}
+
+.heading-3 {
+    -fx-font-family: var(--font-family-primary);
+    -fx-font-size: var(--font-size-2xl);
+    -fx-font-weight: var(--font-weight-semibold);
+    -fx-text-fill: var(--text-primary);
+}
+
+.heading-4 {
+    -fx-font-family: var(--font-family-primary);
+    -fx-font-size: var(--font-size-xl);
+    -fx-font-weight: var(--font-weight-medium);
+    -fx-text-fill: var(--text-primary);
+}
+
+.heading-5 {
+    -fx-font-family: var(--font-family-primary);
+    -fx-font-size: var(--font-size-lg);
+    -fx-font-weight: var(--font-weight-medium);
+    -fx-text-fill: var(--text-primary);
+}
+
+.heading-6 {
+    -fx-font-family: var(--font-family-primary);
+    -fx-font-size: var(--font-size-base);
+    -fx-font-weight: var(--font-weight-semibold);
+    -fx-text-fill: var(--text-primary);
+}
+
+/* Body Text Styles */
+.body-large {
+    -fx-font-family: var(--font-family-primary);
+    -fx-font-size: var(--font-size-lg);
+    -fx-font-weight: var(--font-weight-regular);
+    -fx-text-fill: var(--text-primary);
+}
+
+.body-regular {
+    -fx-font-family: var(--font-family-primary);
+    -fx-font-size: var(--font-size-base);
+    -fx-font-weight: var(--font-weight-regular);
+    -fx-text-fill: var(--text-primary);
+}
+
+.body-small {
+    -fx-font-family: var(--font-family-primary);
+    -fx-font-size: var(--font-size-sm);
+    -fx-font-weight: var(--font-weight-regular);
+    -fx-text-fill: var(--text-secondary);
+}
+
+.body-xs {
+    -fx-font-family: var(--font-family-primary);
+    -fx-font-size: var(--font-size-xs);
+    -fx-font-weight: var(--font-weight-regular);
+    -fx-text-fill: var(--text-secondary);
+}
+
+/* Caption and Helper Text */
+.caption {
+    -fx-font-family: var(--font-family-primary);
+    -fx-font-size: var(--font-size-sm);
+    -fx-font-weight: var(--font-weight-regular);
+    -fx-text-fill: var(--text-muted);
+}
+
+.helper-text {
+    -fx-font-family: var(--font-family-primary);
+    -fx-font-size: var(--font-size-xs);
+    -fx-font-weight: var(--font-weight-regular);
+    -fx-text-fill: var(--text-muted);
+}
+
+/* Code and Monospace Text */
+.code-inline {
+    -fx-font-family: var(--font-family-mono);
+    -fx-font-size: var(--font-size-sm);
+    -fx-font-weight: var(--font-weight-regular);
+    -fx-text-fill: var(--text-primary);
+    -fx-background-color: var(--surface-secondary);
+    -fx-background-radius: 4px;
+    -fx-padding: 2px 6px;
+}
+
+.code-block {
+    -fx-font-family: var(--font-family-mono);
+    -fx-font-size: var(--font-size-sm);
+    -fx-font-weight: var(--font-weight-regular);
+    -fx-text-fill: var(--text-primary);
+    -fx-background-color: var(--surface-secondary);
+    -fx-background-radius: 8px;
+    -fx-padding: 12px 16px;
+}
+
+/* Button Typography */
+.button-text-large {
+    -fx-font-family: var(--font-family-primary);
+    -fx-font-size: var(--font-size-base);
+    -fx-font-weight: var(--font-weight-medium);
+}
+
+.button-text-regular {
+    -fx-font-family: var(--font-family-primary);
+    -fx-font-size: var(--font-size-sm);
+    -fx-font-weight: var(--font-weight-medium);
+}
+
+.button-text-small {
+    -fx-font-family: var(--font-family-primary);
+    -fx-font-size: var(--font-size-xs);
+    -fx-font-weight: var(--font-weight-medium);
+}
+
+/* Link Typography */
+.link {
+    -fx-font-family: var(--font-family-primary);
+    -fx-font-size: var(--font-size-base);
+    -fx-font-weight: var(--font-weight-regular);
+    -fx-text-fill: var(--accent-primary);
+    -fx-underline: true;
+}
+
+.link:hover {
+    -fx-text-fill: var(--accent-hover);
+}
+
+.link-small {
+    -fx-font-family: var(--font-family-primary);
+    -fx-font-size: var(--font-size-sm);
+    -fx-font-weight: var(--font-weight-regular);
+    -fx-text-fill: var(--accent-primary);
+    -fx-underline: true;
+}
+
+/* Label Typography */
+.label-large {
+    -fx-font-family: var(--font-family-primary);
+    -fx-font-size: var(--font-size-base);
+    -fx-font-weight: var(--font-weight-medium);
+    -fx-text-fill: var(--text-primary);
+}
+
+.label-regular {
+    -fx-font-family: var(--font-family-primary);
+    -fx-font-size: var(--font-size-sm);
+    -fx-font-weight: var(--font-weight-medium);
+    -fx-text-fill: var(--text-primary);
+}
+
+.label-small {
+    -fx-font-family: var(--font-family-primary);
+    -fx-font-size: var(--font-size-xs);
+    -fx-font-weight: var(--font-weight-medium);
+    -fx-text-fill: var(--text-secondary);
+}
+
+/* Input Typography */
+.input-text {
+    -fx-font-family: var(--font-family-primary);
+    -fx-font-size: var(--font-size-base);
+    -fx-font-weight: var(--font-weight-regular);
+    -fx-text-fill: var(--text-primary);
+}
+
+.input-placeholder {
+    -fx-font-family: var(--font-family-primary);
+    -fx-font-size: var(--font-size-base);
+    -fx-font-weight: var(--font-weight-regular);
+    -fx-text-fill: var(--text-muted);
+}
+
+/* Status and Badge Typography */
+.status-text {
+    -fx-font-family: var(--font-family-primary);
+    -fx-font-size: var(--font-size-xs);
+    -fx-font-weight: var(--font-weight-semibold);
+    -fx-text-fill: var(--text-inverse);
+}
+
+.badge-text {
+    -fx-font-family: var(--font-family-primary);
+    -fx-font-size: var(--font-size-xs);
+    -fx-font-weight: var(--font-weight-medium);
+    -fx-text-fill: var(--text-inverse);
+}
+
+/* Table Typography */
+.table-header {
+    -fx-font-family: var(--font-family-primary);
+    -fx-font-size: var(--font-size-sm);
+    -fx-font-weight: var(--font-weight-semibold);
+    -fx-text-fill: var(--text-secondary);
+}
+
+.table-cell {
+    -fx-font-family: var(--font-family-primary);
+    -fx-font-size: var(--font-size-sm);
+    -fx-font-weight: var(--font-weight-regular);
+    -fx-text-fill: var(--text-primary);
+}
+
+/* Menu Typography */
+.menu-item-text {
+    -fx-font-family: var(--font-family-primary);
+    -fx-font-size: var(--font-size-sm);
+    -fx-font-weight: var(--font-weight-regular);
+    -fx-text-fill: var(--text-primary);
+}
+
+.menu-item-shortcut {
+    -fx-font-family: var(--font-family-primary);
+    -fx-font-size: var(--font-size-xs);
+    -fx-font-weight: var(--font-weight-regular);
+    -fx-text-fill: var(--text-muted);
+}
+
+/* Tooltip Typography */
+.tooltip-text {
+    -fx-font-family: var(--font-family-primary);
+    -fx-font-size: var(--font-size-xs);
+    -fx-font-weight: var(--font-weight-regular);
+    -fx-text-fill: var(--text-inverse);
+}
+
+/* Error and Success Typography */
+.error-text {
+    -fx-font-family: var(--font-family-primary);
+    -fx-font-size: var(--font-size-sm);
+    -fx-font-weight: var(--font-weight-regular);
+    -fx-text-fill: var(--error-primary);
+}
+
+.success-text {
+    -fx-font-family: var(--font-family-primary);
+    -fx-font-size: var(--font-size-sm);
+    -fx-font-weight: var(--font-weight-regular);
+    -fx-text-fill: var(--success-primary);
+}
+
+.warning-text {
+    -fx-font-family: var(--font-family-primary);
+    -fx-font-size: var(--font-size-sm);
+    -fx-font-weight: var(--font-weight-regular);
+    -fx-text-fill: var(--warning-primary);
+}
+
+/* Utility Classes */
+.text-light {
+    -fx-font-weight: var(--font-weight-light);
+}
+
+.text-regular {
+    -fx-font-weight: var(--font-weight-regular);
+}
+
+.text-medium {
+    -fx-font-weight: var(--font-weight-medium);
+}
+
+.text-semibold {
+    -fx-font-weight: var(--font-weight-semibold);
+}
+
+.text-bold {
+    -fx-font-weight: var(--font-weight-bold);
+}
+
+.text-uppercase {
+    -fx-text-transform: uppercase;
+}
+
+.text-lowercase {
+    -fx-text-transform: lowercase;
+}
+
+.text-capitalize {
+    -fx-text-transform: capitalize;
+}
+
+/* Responsive Typography (for different screen sizes) */
+@media (max-width: 768px) {
+    .heading-1 {
+        -fx-font-size: var(--font-size-3xl);
+    }
+
+    .heading-2 {
+        -fx-font-size: var(--font-size-2xl);
+    }
+
+    .heading-3 {
+        -fx-font-size: var(--font-size-xl);
+    }
+}
+
+/* Accessibility Enhancements */
+.high-contrast .text-primary {
+    -fx-text-fill: #ffffff;
+}
+
+.high-contrast .text-secondary {
+    -fx-text-fill: #e0e0e0;
+}
+
+.high-contrast .text-muted {
+    -fx-text-fill: #c0c0c0;
+}
+
+/* Print Styles */
+@media print {
+    .root {
+        -fx-font-family: 'Times New Roman', serif;
+        -fx-text-fill: #000000;
+    }
+
+    .heading-1,
+    .heading-2,
+    .heading-3,
+    .heading-4,
+    .heading-5,
+    .heading-6 {
+        -fx-text-fill: #000000;
+    }
+}

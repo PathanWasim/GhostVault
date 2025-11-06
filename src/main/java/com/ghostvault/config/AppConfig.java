@@ -9,14 +9,18 @@ public class AppConfig {
     public static final String APP_NAME = "GhostVault";
     public static final String APP_VERSION = "1.0.0";
     
-    // Vault configuration
-    public static final String VAULT_DIR = System.getProperty("user.home") + "/.ghostvault";
-    public static final String FILES_DIR = VAULT_DIR + "/files";
-    public static final String DECOYS_DIR = VAULT_DIR + "/decoys";
-    public static final String CONFIG_FILE = VAULT_DIR + "/config.enc";
-    public static final String METADATA_FILE = VAULT_DIR + "/metadata.enc";
-    public static final String SALT_FILE = VAULT_DIR + "/.salt";
-    public static final String LOG_FILE = VAULT_DIR + "/audit.log.enc";
+    // Vault configuration - dynamic path based on permissions
+    public static String getVaultDir() {
+        return System.getProperty("ghostvault.vault.path", System.getProperty("user.home") + "/.ghostvault");
+    }
+    
+    public static final String VAULT_DIR = getVaultDir();
+    public static final String FILES_DIR = getVaultDir() + "/files";
+    public static final String DECOYS_DIR = getVaultDir() + "/decoys";
+    public static final String CONFIG_FILE = getVaultDir() + "/config.enc";
+    public static final String METADATA_FILE = getVaultDir() + "/metadata.enc";
+    public static final String SALT_FILE = getVaultDir() + "/.salt";
+    public static final String LOG_FILE = getVaultDir() + "/audit.log.enc";
     
     // Security settings
     public static final int MAX_LOGIN_ATTEMPTS = 3;

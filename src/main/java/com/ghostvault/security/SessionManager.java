@@ -1,27 +1,12 @@
 package com.ghostvault.security;
 
-import com.ghostvault.config.AppConfig;
-import javafx.animation.KeyFrame;
-import javafx.animation.Timeline;
-import javafx.application.Platform;
-import javafx.scene.Scene;
-import javafx.scene.input.KeyEvent;
-import javafx.scene.input.MouseEvent;
-import javafx.stage.Stage;
-import javafx.util.Duration;
-
-import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
-// Use java.lang.Runnable (no import required)
-
 /**
- * Manages user sessions with configurable timeout, activity tracking, and security monitoring
+ * Simple SessionManager stub for compilation
  */
 public class SessionManager {
+    private boolean sessionActive = false;
     
+<<<<<<< HEAD
     private final int sessionTimeoutMinutes;
     private final AtomicLong lastActivityTime;
     private final AtomicInteger failedLoginAttempts;
@@ -103,94 +88,17 @@ public class SessionManager {
     /**
      * End the current session
      */
+=======
+    public void startSession() {
+        sessionActive = true;
+    }
+    
+>>>>>>> 5e3dbee5708a73a7823118329611adf0497308f8
     public void endSession() {
-        this.sessionActive = false;
-        
-        // Stop timers
-        if (sessionTimer != null) {
-            sessionTimer.stop();
-        }
-        if (warningTimer != null) {
-            warningTimer.stop();
-        }
-        
-        // Clear activity monitoring
-        clearActivityMonitoring();
-        
-        logSessionEvent("Session ended");
-    }
-    
-    /**
-     * Record user activity to reset timeout
-     */
-    public void recordActivity() {
-        if (sessionActive) {
-            lastActivityTime.set(System.currentTimeMillis());
-            
-            // Reset session timer
-            if (sessionTimer != null) {
-                sessionTimer.stop();
-                startSessionTimer();
-            }
-            
-            // Stop warning timer if running
-            if (warningTimer != null) {
-                warningTimer.stop();
-            }
-        }
-    }
-    
-    /**
-     * Record mouse activity
-     */
-    public void recordMouseActivity() {
-        lastMouseActivity.set(System.currentTimeMillis());
-        recordActivity();
-    }
-    
-    /**
-     * Record keyboard activity
-     */
-    public void recordKeyboardActivity() {
-        lastKeyboardActivity.set(System.currentTimeMillis());
-        recordActivity();
-    }
-    
-    /**
-     * Start session timeout timer
-     */
-    private void startSessionTimer() {
-        // Warning timer (1 minute before timeout)
-        int warningTimeMinutes = Math.max(1, sessionTimeoutMinutes - 1);
-        
-        warningTimer = new Timeline(new KeyFrame(Duration.minutes(warningTimeMinutes), e -> {
-            if (sessionActive) {
-                notifyWarningListeners();
-            }
-        }));
-        warningTimer.play();
-        
-        // Session timeout timer
-        sessionTimer = new Timeline(new KeyFrame(Duration.minutes(sessionTimeoutMinutes), e -> {
-            if (sessionActive) {
-                handleSessionTimeout();
-            }
-        }));
-        sessionTimer.play();
-    }
-    
-    /**
-     * Handle session timeout
-     */
-    private void handleSessionTimeout() {
-        logSessionEvent("Session timeout");
         sessionActive = false;
-        
-        Platform.runLater(() -> {
-            notifyTimeoutListeners();
-        });
     }
     
+<<<<<<< HEAD
     /**
      * Setup activity monitoring for the current scene
      */
@@ -339,10 +247,13 @@ public class SessionManager {
     /**
      * Check if session is active
      */
+=======
+>>>>>>> 5e3dbee5708a73a7823118329611adf0497308f8
     public boolean isSessionActive() {
         return sessionActive;
     }
     
+<<<<<<< HEAD
     /**
      * Check if duress has been detected
      */
@@ -615,6 +526,10 @@ public class SessionManager {
             sessionTimer.play();
         }
         recordActivity();
+=======
+    public void extendSession() {
+        // Stub implementation
+>>>>>>> 5e3dbee5708a73a7823118329611adf0497308f8
     }
     
     /**

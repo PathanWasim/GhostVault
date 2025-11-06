@@ -457,7 +457,7 @@ public class CompactNotesWindow {
                     note.getTitle().toLowerCase().contains(searchTerm.toLowerCase()) ||
                     note.getContent().toLowerCase().contains(searchTerm.toLowerCase()) ||
                     note.getCategory().toLowerCase().contains(searchTerm.toLowerCase()) ||
-                    note.getTags().stream().anyMatch(tag -> tag.toLowerCase().contains(searchTerm.toLowerCase())))
+                    (note.getTags() != null && note.getTags().toLowerCase().contains(searchTerm.toLowerCase())))
                 .map(note -> "📄 " + note.getTitle())
                 .collect(java.util.stream.Collectors.toList());
             
