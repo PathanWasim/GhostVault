@@ -11,6 +11,8 @@ import com.ghostvault.security.*;
 import com.ghostvault.ui.*;
 import javafx.application.Platform;
 import javafx.scene.Scene;
+import javafx.scene.control.Alert;
+import javafx.scene.control.ButtonType;
 import javafx.stage.Stage;
 
 import javax.crypto.SecretKey;
@@ -36,6 +38,7 @@ public class ApplicationIntegrator {
     private VaultBackupManager backupManager;
     private AdvancedSecurityManager advancedSecurityManager;
     private ThreatDetectionEngine threatDetectionEngine;
+    private SecurityAttemptManager securityAttemptManager;
     
     // UI components
     private UIManager uiManager;
@@ -133,6 +136,9 @@ public class ApplicationIntegrator {
         
         // Backup management
         backupManager = new VaultBackupManager(cryptoManager, fileManager, metadataManager, auditManager);
+        
+        // Security attempt management
+        securityAttemptManager = new SecurityAttemptManager(auditManager);
         
         System.out.println("🔐 Core components initialized");
     }
@@ -233,6 +239,9 @@ public class ApplicationIntegrator {
             });
         });
         
+        // Integrate SecurityAttemptManager with SessionManager
+        sessionManager.setSecurityAttemptManager(securityAttemptManager);
+        
         // UI manager integration with notification manager
         uiManager.setNotificationManager(notificationManager);
         
@@ -243,14 +252,240 @@ public class ApplicationIntegrator {
     }
     
     /**
-     * Determine initial application state
+     * Determine initial application state with enhanced configuration detection
      */
     private void determineInitialState() throws Exception {
-        if (!passwordManager.arePasswordsConfigured()) {
+        System.out.println("🔍 Determining initial application state...");
+        
+        try {
+            // Get detailed configuration validation
+            var configValidation = passwordManager.getConfigurationValidation();
+            
+            System.out.println("📋 Configuration Status: " + configValidation.getStatus());
+            
+            switch (configValidation.getStatus()) {
+                case VALID:
+                    // Configuration is valid, proceed to login
+                    System.out.println("✅ Valid configuration found - proceeding to login");
+                    transitionToState(ApplicationState.LOGIN);
+                    break;
+                    
+                case MISSING:
+                    // No configuration found, first run setup required
+                    System.out.println("📝 No configuration found - first run setup required");
+                    transitionToState(ApplicationState.FIRST_RUN_SETUP);
+                    break;
+                    
+                case CORRUPTED:
+                case INCOMPLETE:
+                    // Configuration has issues, attempt recovery
+                    System.out.println("⚠️ Configuration issues detected, attempting recovery...");
+                    handleConfigurationRecovery(configValidation);
+                    break;
+                    
+                case BACKUP_AVAILABLE:
+                    // Primary config missing but backup available
+                    System.out.println("🔄 Primary configuration missing, backup available");
+                    handleBackupRecovery(configValidation);
+                    break;
+                    
+                case INACCESSIBLE:
+                    // Configuration file cannot be accessed
+                    System.err.println("❌ Configuration file inaccessible");
+                    handleConfigurationError(configValidation);
+                    break;
+                    
+                default:
+                    // Unknown status
+                    System.err.println("❓ Unknown configuration status");
+                    handleConfigurationError(configValidation);
+                    break;
+            }
+            
+        } catch (Exception e) {
+            System.err.println("❌ Error determining initial state: " + e.getMessage());
+            
+            // Log the error
+            if (auditManager != null) {
+                auditManager.logSecurityEvent("INITIALIZATION_ERROR", 
+                    "Failed to determine initial application state", 
+                    AuditManager.AuditSeverity.CRITICAL, null, e.getMessage());
+            }
+            
+            // Default to first run setup on error
             transitionToState(ApplicationState.FIRST_RUN_SETUP);
-        } else {
-            transitionToState(ApplicationState.LOGIN);
         }
+    }
+    
+    /**
+     * Handle configuration recovery scenarios
+     */
+    private void handleConfigurationRecovery(com.ghostvault.config.ConfigurationValidator.ValidationResult validation) {
+        try {
+            System.out.println("🔧 Attempting configuration recovery...");
+            
+            if (passwordManager.recoverConfiguration()) {
+                System.out.println("✅ Configuration recovered successfully");
+                
+                // Log successful recovery
+                auditManager.logSecurityEvent("CONFIG_RECOVERY_SUCCESS", 
+                    "Configuration successfully recovered", 
+                    AuditManager.AuditSeverity.INFO, null, 
+                    "Original status: " + validation.getStatus());
+                
+                // Proceed to login
+                transitionToState(ApplicationState.LOGIN);
+                
+            } else {
+                System.err.println("❌ Configuration recovery failed");
+                
+                // Log failed recovery
+                auditManager.logSecurityEvent("CONFIG_RECOVERY_FAILED", 
+                    "Configuration recovery failed", 
+                    AuditManager.AuditSeverity.WARNING, null, 
+                    "Status: " + validation.getStatus() + ", Error: " + validation.getErrorMessage());
+                
+                // Show recovery dialog to user
+                showConfigurationRecoveryDialog(validation);
+            }
+            
+        } catch (Exception e) {
+            System.err.println("❌ Exception during configuration recovery: " + e.getMessage());
+            showConfigurationRecoveryDialog(validation);
+        }
+    }
+    
+    /**
+     * Handle backup recovery scenarios
+     */
+    private void handleBackupRecovery(com.ghostvault.config.ConfigurationValidator.ValidationResult validation) {
+        try {
+            System.out.println("🔄 Attempting backup recovery...");
+            
+            if (passwordManager.recoverConfiguration()) {
+                System.out.println("✅ Configuration restored from backup");
+                
+                // Log successful backup recovery
+                auditManager.logSecurityEvent("BACKUP_RECOVERY_SUCCESS", 
+                    "Configuration restored from backup", 
+                    AuditManager.AuditSeverity.INFO, null, null);
+                
+                // Show notification to user
+                notificationManager.showInfo("Configuration Restored", 
+                    "Your configuration has been restored from backup.");
+                
+                // Proceed to login
+                transitionToState(ApplicationState.LOGIN);
+                
+            } else {
+                System.err.println("❌ Backup recovery failed");
+                handleConfigurationError(validation);
+            }
+            
+        } catch (Exception e) {
+            System.err.println("❌ Exception during backup recovery: " + e.getMessage());
+            handleConfigurationError(validation);
+        }
+    }
+    
+    /**
+     * Handle configuration errors
+     */
+    private void handleConfigurationError(com.ghostvault.config.ConfigurationValidator.ValidationResult validation) {
+        System.err.println("❌ Configuration error: " + validation.getErrorMessage());
+        
+        // Log configuration error
+        auditManager.logSecurityEvent("CONFIG_ERROR", 
+            "Configuration error encountered", 
+            AuditManager.AuditSeverity.CRITICAL, null, 
+            "Status: " + validation.getStatus() + ", Error: " + validation.getErrorMessage());
+        
+        // Show error dialog to user
+        Platform.runLater(() -> {
+            showConfigurationErrorDialog(validation);
+        });
+        
+        // Default to first run setup
+        transitionToState(ApplicationState.FIRST_RUN_SETUP);
+    }
+    
+    /**
+     * Show configuration recovery dialog to user
+     */
+    private void showConfigurationRecoveryDialog(com.ghostvault.config.ConfigurationValidator.ValidationResult validation) {
+        Platform.runLater(() -> {
+            Alert recoveryDialog = new Alert(Alert.AlertType.WARNING);
+            recoveryDialog.setTitle("Configuration Recovery");
+            recoveryDialog.setHeaderText("Configuration Issue Detected");
+            
+            StringBuilder message = new StringBuilder();
+            message.append("Status: ").append(validation.getStatus().getDescription()).append("\n\n");
+            
+            if (validation.getErrorMessage() != null) {
+                message.append("Error: ").append(validation.getErrorMessage()).append("\n\n");
+            }
+            
+            if (validation.getRecoveryAction() != null) {
+                message.append("Recommended Action: ").append(validation.getRecoveryAction()).append("\n\n");
+            }
+            
+            message.append("You can:\n");
+            message.append("• Try automatic recovery (if available)\n");
+            message.append("• Proceed with first-time setup (will create new configuration)\n");
+            message.append("• Exit and manually fix the configuration");
+            
+            recoveryDialog.setContentText(message.toString());
+            
+            // Add custom buttons
+            ButtonType recoveryButton = new ButtonType("Try Recovery");
+            ButtonType setupButton = new ButtonType("First-Time Setup");
+            ButtonType exitButton = new ButtonType("Exit");
+            
+            recoveryDialog.getButtonTypes().setAll(recoveryButton, setupButton, exitButton);
+            
+            recoveryDialog.showAndWait().ifPresent(response -> {
+                if (response == recoveryButton && validation.canRecover()) {
+                    // Try recovery again
+                    handleConfigurationRecovery(validation);
+                } else if (response == setupButton) {
+                    // Proceed with first-time setup
+                    transitionToState(ApplicationState.FIRST_RUN_SETUP);
+                } else {
+                    // Exit application
+                    shutdown();
+                }
+            });
+        });
+    }
+    
+    /**
+     * Show configuration error dialog to user
+     */
+    private void showConfigurationErrorDialog(com.ghostvault.config.ConfigurationValidator.ValidationResult validation) {
+        Alert errorDialog = new Alert(Alert.AlertType.ERROR);
+        errorDialog.setTitle("Configuration Error");
+        errorDialog.setHeaderText("Cannot Access Configuration");
+        
+        StringBuilder message = new StringBuilder();
+        message.append("Status: ").append(validation.getStatus().getDescription()).append("\n\n");
+        message.append("Error: ").append(validation.getErrorMessage()).append("\n\n");
+        message.append("The application cannot start with the current configuration.\n");
+        message.append("Please check file permissions and disk space, then restart the application.");
+        
+        errorDialog.setContentText(message.toString());
+        
+        ButtonType exitButton = new ButtonType("Exit");
+        ButtonType setupButton = new ButtonType("Try First-Time Setup");
+        
+        errorDialog.getButtonTypes().setAll(setupButton, exitButton);
+        
+        errorDialog.showAndWait().ifPresent(response -> {
+            if (response == setupButton) {
+                transitionToState(ApplicationState.FIRST_RUN_SETUP);
+            } else {
+                shutdown();
+            }
+        });
     }
     
     /**
@@ -282,6 +517,15 @@ public class ApplicationIntegrator {
      * Handle user authentication
      */
     public void handleAuthentication(String password) {
+        // Check if account is locked before attempting authentication
+        if (securityAttemptManager.isLocked()) {
+            Platform.runLater(() -> {
+                int remainingSeconds = securityAttemptManager.getRemainingLockoutSeconds();
+                showLoginError(String.format("Account temporarily locked. Please wait %d seconds before trying again.", remainingSeconds));
+            });
+            return;
+        }
+        
         CompletableFuture.supplyAsync(() -> {
             return errorHandler.handleWithRecovery("password_validation", 
                 () -> passwordManager.detectPassword(password.toCharArray()), 
@@ -298,6 +542,7 @@ public class ApplicationIntegrator {
         }).exceptionally(throwable -> {
             Platform.runLater(() -> {
                 errorHandler.handleError("Authentication", (Exception) throwable);
+                securityAttemptManager.recordFailedAttempt("Authentication system error", "System");
                 showLoginError("Authentication failed. Please try again.");
             });
             return null;
@@ -311,6 +556,9 @@ public class ApplicationIntegrator {
         try {
             // Unwrap Vault Master Key
             currentKey = passwordManager.unwrapVMK(password.toCharArray());
+            
+            // Reset security attempts on successful login
+            securityAttemptManager.resetAttempts();
             
             // Start session
             sessionManager.startSession();
@@ -326,11 +574,16 @@ public class ApplicationIntegrator {
                 "Master vault access granted", 
                 AuditManager.AuditSeverity.INFO, null, null);
             
+            // Enhanced security logging
+            securityAttemptManager.getSecurityLogger().logAuthenticationEvent("LOGIN_SUCCESS", 
+                "Master vault access granted", "User", "Authentication method: Master password");
+            
             // Show vault interface
             showVaultInterface(false); // false = not decoy mode
             
         } catch (Exception e) {
             errorHandler.handleError("Master login", e);
+            securityAttemptManager.recordFailedAttempt("Master password validation failed", "System");
         }
     }
     
@@ -343,6 +596,10 @@ public class ApplicationIntegrator {
             auditManager.logSecurityEvent("PANIC_MODE_ACTIVATED", 
                 "Emergency data destruction initiated", 
                 AuditManager.AuditSeverity.CRITICAL, null, null);
+            
+            // Enhanced security logging for critical event
+            securityAttemptManager.getSecurityLogger().logSystemSecurityEvent("PANIC_MODE_ACTIVATED", 
+                "Emergency data destruction initiated", "User", "Panic password authentication");
             
             // Transition to panic mode
             transitionToState(ApplicationState.PANIC_MODE);
@@ -374,6 +631,9 @@ public class ApplicationIntegrator {
             // Initialize decoy vault with minimum files
             decoyManager.ensureMinimumDecoyFiles(8);
             
+            // Reset security attempts on successful login (even decoy)
+            securityAttemptManager.resetAttempts();
+            
             // Create decoy security context
             securityContext = new SecurityContext(null, PasswordManager.PasswordType.DECOY);
             
@@ -388,11 +648,16 @@ public class ApplicationIntegrator {
                 "Vault access granted", 
                 AuditManager.AuditSeverity.INFO, null, null);
             
+            // Enhanced security logging (appears as normal login for security)
+            securityAttemptManager.getSecurityLogger().logAuthenticationEvent("LOGIN_SUCCESS", 
+                "Vault access granted", "User", "Authentication method: Standard password");
+            
             // Show decoy vault interface
             showVaultInterface(true); // true = decoy mode
             
         } catch (Exception e) {
             errorHandler.handleError("Decoy login", e);
+            securityAttemptManager.recordFailedAttempt("Decoy password validation failed", "System");
         }
     }
     
@@ -400,7 +665,10 @@ public class ApplicationIntegrator {
      * Handle invalid password
      */
     private void handleInvalidPassword() {
-        // Record failed attempt
+        // Record failed attempt in security manager
+        securityAttemptManager.recordFailedAttempt("Invalid password entered", "User");
+        
+        // Also record in session manager for compatibility
         sessionManager.recordFailedLogin("user");
         
         // Log failed login
@@ -408,12 +676,20 @@ public class ApplicationIntegrator {
             "Invalid password attempt", 
             AuditManager.AuditSeverity.WARNING, null, null);
         
-        // Show error message
-        showLoginError("Invalid password. Please try again.");
-        
-        // Check for too many failed attempts
-        if (sessionManager.isAccountLocked("user")) {
-            showLoginError("Too many failed attempts. Please wait before trying again.");
+        // Check if account is now locked
+        if (securityAttemptManager.isLocked()) {
+            int remainingSeconds = securityAttemptManager.getRemainingLockoutSeconds();
+            showLoginError(String.format("Too many failed attempts. Account locked for %d seconds.", remainingSeconds));
+        } else {
+            int attempts = securityAttemptManager.getAttemptCount();
+            int maxAttempts = securityAttemptManager.getMaxAttempts();
+            int remaining = maxAttempts - attempts;
+            
+            if (remaining <= 1) {
+                showLoginError(String.format("Invalid password. Warning: %d attempt remaining before lockout.", remaining));
+            } else {
+                showLoginError(String.format("Invalid password. %d attempts remaining.", remaining));
+            }
         }
     }
     
@@ -581,6 +857,25 @@ public class ApplicationIntegrator {
      */
     private void showLoginError(String message) {
         notificationManager.showError("Login Error", message);
+        
+        // Also update login UI if available
+        updateLoginUIStatus(message);
+    }
+    
+    /**
+     * Update login UI with status information
+     */
+    private void updateLoginUIStatus(String message) {
+        // Update the login controller with security status
+        if (uiManager != null) {
+            try {
+                // Get the current login controller and update it
+                uiManager.updateLoginStatus(message, securityAttemptManager);
+            } catch (Exception e) {
+                System.err.println("Failed to update login UI: " + e.getMessage());
+            }
+        }
+        System.out.println("🔒 Login Status: " + message);
     }
     
     /**
@@ -614,6 +909,11 @@ public class ApplicationIntegrator {
             // Cleanup system tray
             if (systemTrayManager != null) {
                 systemTrayManager.cleanup();
+            }
+            
+            // Shutdown security logging
+            if (securityAttemptManager != null) {
+                securityAttemptManager.shutdown();
             }
             
             // Shutdown background executor
@@ -656,6 +956,13 @@ public class ApplicationIntegrator {
      */
     public ErrorHandler getErrorHandler() {
         return errorHandler;
+    }
+    
+    /**
+     * Get security attempt manager
+     */
+    public SecurityAttemptManager getSecurityAttemptManager() {
+        return securityAttemptManager;
     }
     
     /**

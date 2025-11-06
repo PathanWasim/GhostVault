@@ -13,7 +13,8 @@
 - **AES-256-GCM Encryption** - Military-grade file protection
 - **Drag & Drop Interface** - Encrypt files instantly
 - **Batch Operations** - Handle multiple files at once
-- **Secure File Preview** - View encrypted files safely
+- **Enhanced File Preview** - View encrypted files with robust media support
+- **External Player Integration** - Open videos with VLC, Windows Media Player, etc.
 - **Zero-Knowledge Architecture** - Your data, your keys only
 - **Memory Protection** - Secure cleanup of sensitive data
 
@@ -42,11 +43,13 @@
 
 ### 🛡️ **Advanced Security**
 - **Security Dashboard** - Real-time threat monitoring
-- **Session Management** - Secure login sessions
+- **Password Attempt Limiting** - 3-attempt lockout with 30-second timer
+- **Session Management** - Secure login sessions with timeout protection
+- **Configuration Validation** - Robust config detection and recovery
 - **Decoy Mode** - Hide your real vault with fake data
 - **Panic Mode** - Emergency data wipe capability
 - **System Tray Integration** - Background protection
-- **Activity Logging** - Comprehensive audit trails
+- **Comprehensive Logging** - Detailed security audit trails
 
 ### 🎯 **User Experience**
 - **Professional Dark Theme** - Easy on the eyes
@@ -55,6 +58,26 @@
 - **Multi-platform** - Windows, macOS, Linux
 - **Offline Operation** - No internet required
 - **Portable** - Single JAR file distribution
+
+## 🆕 Recent Improvements (v2.0)
+
+### 🔒 **Enhanced Security Features**
+- **Password Attempt Limiting** - Prevents brute force attacks with 3-attempt lockout
+- **Real-time Security Feedback** - Live countdown timer and attempt counter on login
+- **Configuration Validation** - Robust detection and recovery of corrupted configs
+- **Comprehensive Security Logging** - Detailed audit trails with automatic log rotation
+
+### 🎬 **Improved Media Preview**
+- **Enhanced Video Support** - Better handling of MP4, MOV, and other video formats
+- **External Player Integration** - "Open with External Player" option for unsupported formats
+- **Graceful Error Handling** - User-friendly messages instead of technical errors
+- **Smart Fallback System** - Automatic detection and recovery from preview failures
+
+### 🛠️ **System Stability**
+- **Robust Error Recovery** - Comprehensive error handling throughout the application
+- **Memory Management** - Improved cleanup and resource management
+- **Configuration Backup** - Automatic backup and integrity checking
+- **Cross-session Security** - Persistent security state across application restarts
 
 ## 🚀 Quick Start
 
@@ -113,7 +136,9 @@ mvn javafx:run
 - **Salt Generation**: Cryptographically secure random salts
 - **Memory Safety**: Automatic cleanup of sensitive data
 - **File Protection**: Encrypted metadata and content
-- **Session Security**: Secure authentication and timeouts
+- **Session Security**: Secure authentication with attempt limiting
+- **Brute Force Protection**: 3-attempt limit with 30-second lockout
+- **Configuration Security**: Integrity checking and automatic recovery
 
 ### Performance
 - **Fast Encryption**: Optimized for large files

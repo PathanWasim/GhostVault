@@ -70,25 +70,19 @@ public class GhostVault extends Application {
      */
     private void handleApplicationExit() {
         try {
-            // Show confirmation dialog
-            javafx.scene.control.Alert alert = new javafx.scene.control.Alert(
-                javafx.scene.control.Alert.AlertType.CONFIRMATION);
-            alert.setTitle("Exit GhostVault");
-            alert.setHeaderText("Are you sure you want to exit?");
-            alert.setContentText("All unsaved work will be lost.");
-            
-            java.util.Optional<javafx.scene.control.ButtonType> result = alert.showAndWait();
-            if (result.isPresent() && result.get() == javafx.scene.control.ButtonType.OK) {
-                // Perform graceful shutdown through integrator
-                if (applicationIntegrator != null) {
-                    applicationIntegrator.shutdown();
-                } else {
-                    Platform.exit();
-                }
+            // Perform graceful shutdown through integrator
+            if (applicationIntegrator != null) {
+                applicationIntegrator.shutdown();
             }
+            
+            // Force exit to prevent hanging
+            Platform.exit();
+            System.exit(0);
+            
         } catch (Exception e) {
             System.err.println("Error during application exit: " + e.getMessage());
             Platform.exit();
+            System.exit(0);
         }
     }
     

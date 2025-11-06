@@ -3,9 +3,11 @@ package com.ghostvault.ui;
 import com.ghostvault.ai.SmartFileOrganizer;
 import com.ghostvault.ai.SmartFileOrganizer.FileCategory;
 import com.ghostvault.model.VaultFile;
+import com.ghostvault.ui.preview.*;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
+import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.control.cell.PropertyValueFactory;
@@ -77,9 +79,9 @@ public class FileManagerWindow {
         root.setRight(rightPanel);
         root.setBottom(bottomPanel);
         
-        // Create scene with styling
+        // Create scene with dashboard styling
         Scene scene = new Scene(root);
-        scene.getStylesheets().add(getClass().getResource("/styles/professional.css").toExternalForm());
+        scene.getStylesheets().add(getClass().getResource("/ghostvault-dark.css").toExternalForm());
         stage.setScene(scene);
     }
     
@@ -153,9 +155,18 @@ public class FileManagerWindow {
         Label header = new Label("📂 File Vault - AI Organized");
         header.getStyleClass().addAll("card-header", "label");
         
-        // File table
+        // File table with modern styling
         fileTable = new TableView<>();
-        fileTable.getStyleClass().add("table-view");
+        fileTable.getStyleClass().addAll("table-view", "modern-table");
+        fileTable.setRowFactory(tv -> {
+            TableRow<VaultFile> row = new TableRow<>();
+            row.setOnMouseClicked(event -> {
+                if (event.getClickCount() == 2 && !row.isEmpty()) {
+                    openFilePreviewFromMenu();
+                }
+            });
+            return row;
+        });
         
         // Columns
         TableColumn<VaultFile, String> iconCol = new TableColumn<>("Type");
@@ -201,7 +212,7 @@ public class FileManagerWindow {
         // Context menu
         ContextMenu contextMenu = new ContextMenu();
         MenuItem openItem = new MenuItem("🔍 View Details");
-        openItem.setOnAction(e -> viewFileDetails());
+        openItem.setOnAction(e -> openFilePreviewFromMenu());
         MenuItem editTagsItem = new MenuItem("🏷️ Edit Tags");
         editTagsItem.setOnAction(e -> editFileTags());
         MenuItem deleteItem = new MenuItem("🗑️ Delete File");
@@ -487,20 +498,532 @@ public class FileManagerWindow {
             return;
         }
         
-        FileCategory category = organizer.categorizeFile(selected);
-        LocalDateTime date = LocalDateTime.ofInstant(Instant.ofEpochMilli(selected.getUploadTime()), ZoneId.systemDefault());
+        // Use the Enhanced Media Preview System for file viewing
+        try {
+            openFilePreview(selected);
+        } catch (Exception e) {
+            // Fallback to basic details view if preview fails
+            FileCategory category = organizer.categorizeFile(selected);
+            LocalDateTime date = LocalDateTime.ofInstant(Instant.ofEpochMilli(selected.getUploadTime()), ZoneId.systemDefault());
+            
+            showAlert("📄 File Details", 
+                "📝 Name: " + selected.getOriginalName() + "\\n" +
+                "📁 Category: " + category.getIcon() + " " + category.getDisplayName() + "\\n" +
+                "📏 Size: " + formatFileSize(selected.getSize()) + "\\n" +
+                "📅 Added: " + date.format(DateTimeFormatter.ofPattern("MMM dd, yyyy HH:mm")) + "\\n" +
+                "🏷️ Tags: " + (selected.getTags().isEmpty() ? "None" : selected.getTags()) + "\\n" +
+                "🔐 Hash: " + selected.getHash() + "\\n\\n" +
+                "🤖 AI Analysis:\\n" +
+                "• Automatically categorized as " + category.getDisplayName() + "\\n" +
+                "• Recommended for " + (category == FileCategory.WORK ? "business folder" : "personal archive") + "\\n" +
+                "• Security level: High (encrypted)\\n\\n" +
+                "⚠️ Preview not available: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Open file preview using the Enhanced Media Preview System
+     */
+    private void openFilePreview(VaultFile file) {
+        try {
+            String extension = file.getExtension().toLowerCase();
+            
+            // Debug: Show what file type we detected
+            System.out.println("Opening preview for: " + file.getOriginalName() + " (." + extension + ")");
+            System.out.println("isImageFile(" + extension + "): " + isImageFile(extension));
+            System.out.println("isTextOrCodeFile(" + extension + "): " + isTextOrCodeFile(extension));
+            System.out.println("isSystemAppFile(" + extension + "): " + isSystemAppFile(extension));
+            System.out.println("isVideoFile(" + extension + "): " + isVideoFile(extension));
+            System.out.println("isAudioFile(" + extension + "): " + isAudioFile(extension));
+            
+            // Route based on file type
+            if (isSystemAppFile(extension)) {
+                // PDF, Word, PowerPoint, Excel - open with system default apps
+                System.out.println("Routing to system default application");
+                openWithExternalApp(file);
+                return;
+            } else if (isImageFile(extension)) {
+                // Images - show image preview
+                System.out.println("Routing to image preview");
+                try {
+                    byte[] fileData = generateSampleFileData(file);
+                    createImagePreviewDialog(file, fileData);
+                    System.out.println("Image preview dialog created successfully");
+                } catch (Exception e) {
+                    System.err.println("Error creating image preview: " + e.getMessage());
+                    e.printStackTrace();
+                    showAlert("Preview Error", "Failed to open image preview: " + e.getMessage());
+                }
+            } else if (isTextOrCodeFile(extension)) {
+                // All text and code files - show as text
+                System.out.println("Routing to text preview (includes code files)");
+                try {
+                    byte[] fileData = generateSampleFileData(file);
+                    createTextPreviewDialog(file, fileData);
+                    System.out.println("Text preview dialog created successfully");
+                } catch (Exception e) {
+                    System.err.println("Error creating text preview: " + e.getMessage());
+                    e.printStackTrace();
+                    showAlert("Preview Error", "Failed to open text preview: " + e.getMessage());
+                }
+            } else if (isVideoFile(extension) || isAudioFile(extension)) {
+                // Video and audio files - media player
+                System.out.println("Routing to media player");
+                try {
+                    byte[] fileData = generateSampleFileData(file);
+                    MediaViewerDialog dialog = new MediaViewerDialog(file, fileData);
+                    dialog.show();
+                    System.out.println("Media player dialog created successfully");
+                } catch (Exception e) {
+                    System.err.println("Error creating media player: " + e.getMessage());
+                    e.printStackTrace();
+                    showAlert("Preview Error", "Failed to open media player: " + e.getMessage());
+                }
+            } else {
+                // Unknown file types - simple text preview
+                System.out.println("Routing to simple text preview for unknown file type");
+                try {
+                    byte[] fileData = generateSampleFileData(file);
+                    createTextPreviewDialog(file, fileData);
+                    System.out.println("Simple text preview created successfully");
+                } catch (Exception e) {
+                    System.err.println("Error creating simple preview: " + e.getMessage());
+                    e.printStackTrace();
+                    showAlert("Preview Error", "Failed to open file preview: " + e.getMessage());
+                }
+            }
+            
+        } catch (Exception e) {
+            System.err.println("Error in openFilePreview: " + e.getMessage());
+            e.printStackTrace();
+            showAlert("Preview Error", "Failed to open file preview: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Check if file is an image
+     */
+    private boolean isImageFile(String extension) {
+        return extension.equals("jpg") || extension.equals("jpeg") || extension.equals("png") || 
+               extension.equals("gif") || extension.equals("bmp") || extension.equals("tiff") || 
+               extension.equals("webp");
+    }
+    
+    /**
+     * Check if file is a video
+     */
+    private boolean isVideoFile(String extension) {
+        return extension.equals("mp4") || extension.equals("avi") || extension.equals("mkv") || 
+               extension.equals("mov") || extension.equals("wmv") || extension.equals("flv");
+    }
+    
+    /**
+     * Check if file is audio
+     */
+    private boolean isAudioFile(String extension) {
+        return extension.equals("mp3") || extension.equals("wav") || extension.equals("aac") || 
+               extension.equals("flac") || extension.equals("ogg") || extension.equals("m4a");
+    }
+    
+    /**
+     * Check if file is text or code (treat all as text files)
+     */
+    private boolean isTextOrCodeFile(String extension) {
+        // Text files
+        if (extension.equals("txt") || extension.equals("md") || extension.equals("log") || 
+            extension.equals("csv") || extension.equals("xml") || extension.equals("json") ||
+            extension.equals("yaml") || extension.equals("yml") || extension.equals("ini") ||
+            extension.equals("cfg") || extension.equals("conf") || extension.equals("properties")) {
+            return true;
+        }
         
-        showAlert("📄 File Details", 
-            "📝 Name: " + selected.getOriginalName() + "\\n" +
-            "📁 Category: " + category.getIcon() + " " + category.getDisplayName() + "\\n" +
-            "📏 Size: " + formatFileSize(selected.getSize()) + "\\n" +
-            "📅 Added: " + date.format(DateTimeFormatter.ofPattern("MMM dd, yyyy HH:mm")) + "\\n" +
-            "🏷️ Tags: " + (selected.getTags().isEmpty() ? "None" : selected.getTags()) + "\\n" +
-            "🔐 Hash: " + selected.getHash() + "\\n\\n" +
-            "🤖 AI Analysis:\\n" +
-            "• Automatically categorized as " + category.getDisplayName() + "\\n" +
-            "• Recommended for " + (category == FileCategory.WORK ? "business folder" : "personal archive") + "\\n" +
-            "• Security level: High (encrypted)");
+        // Code files - treat as text files
+        if (extension.equals("java") || extension.equals("js") || extension.equals("py") || 
+            extension.equals("cpp") || extension.equals("c") || extension.equals("h") ||
+            extension.equals("html") || extension.equals("css") || extension.equals("php") || 
+            extension.equals("sql") || extension.equals("sh") || extension.equals("bat") ||
+            extension.equals("ts") || extension.equals("jsx") || extension.equals("tsx") ||
+            extension.equals("vue") || extension.equals("go") || extension.equals("rs") ||
+            extension.equals("kt") || extension.equals("swift") || extension.equals("rb") ||
+            extension.equals("pl") || extension.equals("r") || extension.equals("scala") ||
+            extension.equals("clj") || extension.equals("hs") || extension.equals("elm") ||
+            extension.equals("dart") || extension.equals("lua") || extension.equals("groovy")) {
+            return true;
+        }
+        
+        return false;
+    }
+    
+    /**
+     * Check if file should open with system default app
+     */
+    private boolean isSystemAppFile(String extension) {
+        return extension.equals("pdf") || extension.equals("doc") || extension.equals("docx") || 
+               extension.equals("xls") || extension.equals("xlsx") || extension.equals("ppt") || 
+               extension.equals("pptx") || extension.equals("odt") || extension.equals("ods") ||
+               extension.equals("odp") || extension.equals("rtf");
+    }
+    
+    /**
+     * Show security warning for media file preview
+     */
+    private void showSecurityWarning(VaultFile file, Runnable onProceed) {
+        Alert warning = new Alert(Alert.AlertType.WARNING);
+        warning.setTitle("Security Notice");
+        warning.setHeaderText("Media File Preview");
+        warning.setContentText("File: " + file.getOriginalName() + "\n\n" +
+            "SECURITY NOTICE:\n" +
+            "• This is a demonstration preview using sample data\n" +
+            "• In production, files would be properly encrypted\n" +
+            "• Real implementation would decrypt files securely\n" +
+            "• Temporary decrypted data would be wiped after use\n\n" +
+            "Current Status:\n" +
+            "• File names are encrypted (as shown in the list)\n" +
+            "• File content encryption needs full implementation\n" +
+            "• Preview shows sample data for demonstration\n\n" +
+            "Do you want to continue with the preview?");
+        
+        // Apply dark theme
+        warning.getDialogPane().getStylesheets().add(
+            getClass().getResource("/ghostvault-dark.css").toExternalForm());
+        
+        ButtonType proceedButton = new ButtonType("Show Preview");
+        ButtonType cancelButton = new ButtonType("Cancel", ButtonBar.ButtonData.CANCEL_CLOSE);
+        warning.getButtonTypes().setAll(proceedButton, cancelButton);
+        
+        warning.showAndWait().ifPresent(response -> {
+            if (response == proceedButton) {
+                onProceed.run();
+            }
+        });
+    }
+    
+    /**
+     * Open file with external application
+     */
+    private void openWithExternalApp(VaultFile file) {
+        try {
+            // In a real implementation, you would:
+            // 1. Decrypt the file to a temporary location
+            // 2. Open it with the default system application
+            // 3. Clean up the temporary file after use
+            
+            Alert info = new Alert(Alert.AlertType.INFORMATION);
+            info.setTitle("External Application");
+            info.setHeaderText("Open with External App");
+            info.setContentText("File: " + file.getOriginalName() + "\n\n" +
+                "In a full implementation, this would:\n" +
+                "• Decrypt the file to a secure temporary location\n" +
+                "• Open it with the default system application\n" +
+                "• Automatically clean up the temporary file\n\n" +
+                "For security, the temporary file would be:\n" +
+                "• Created in a secure directory\n" +
+                "• Deleted immediately after use\n" +
+                "• Protected from unauthorized access");
+            
+            // Apply dark theme to dialog
+            info.getDialogPane().getStylesheets().add(
+                getClass().getResource("/ghostvault-dark.css").toExternalForm());
+            
+            info.showAndWait();
+            
+        } catch (Exception e) {
+            showAlert("Error", "Failed to open file with external application: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Create image preview dialog
+     */
+    private void createImagePreviewDialog(VaultFile file, byte[] fileData) {
+        Stage dialog = new Stage();
+        dialog.initModality(Modality.APPLICATION_MODAL);
+        dialog.initOwner(stage);
+        dialog.setTitle("Image Preview: " + file.getOriginalName());
+        
+        VBox content = new VBox(10);
+        content.setPadding(new Insets(20));
+        content.setAlignment(Pos.CENTER);
+        
+        Label header = new Label("🖼️ " + file.getOriginalName());
+        header.setStyle("-fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: #4fc3f7;");
+        
+        // Create sample image display
+        javafx.scene.image.Image sampleImage = createSampleImageForPreview(file.getOriginalName());
+        javafx.scene.image.ImageView imageView = new javafx.scene.image.ImageView(sampleImage);
+        imageView.setPreserveRatio(true);
+        imageView.setFitWidth(500);
+        imageView.setFitHeight(400);
+        
+        ScrollPane scrollPane = new ScrollPane(imageView);
+        scrollPane.setFitToWidth(true);
+        scrollPane.setFitToHeight(true);
+        scrollPane.setPrefSize(520, 420);
+        
+        // Zoom controls
+        HBox zoomControls = new HBox(10);
+        zoomControls.setAlignment(Pos.CENTER);
+        
+        Button zoomInBtn = new Button("🔍+");
+        Button zoomOutBtn = new Button("🔍-");
+        Button fitBtn = new Button("Fit");
+        
+        zoomInBtn.setOnAction(e -> {
+            imageView.setFitWidth(imageView.getFitWidth() * 1.2);
+            imageView.setFitHeight(imageView.getFitHeight() * 1.2);
+        });
+        
+        zoomOutBtn.setOnAction(e -> {
+            imageView.setFitWidth(imageView.getFitWidth() * 0.8);
+            imageView.setFitHeight(imageView.getFitHeight() * 0.8);
+        });
+        
+        fitBtn.setOnAction(e -> {
+            imageView.setFitWidth(500);
+            imageView.setFitHeight(400);
+        });
+        
+        zoomControls.getChildren().addAll(zoomInBtn, zoomOutBtn, fitBtn);
+        
+        Label info = new Label("Sample Image Preview\nActual encrypted image would be displayed here");
+        info.setStyle("-fx-text-fill: #cccccc; -fx-text-alignment: center;");
+        
+        content.getChildren().addAll(header, scrollPane, zoomControls, info);
+        
+        Scene scene = new Scene(content, 600, 550);
+        scene.getStylesheets().add(getClass().getResource("/ghostvault-dark.css").toExternalForm());
+        dialog.setScene(scene);
+        dialog.show();
+    }
+    
+    /**
+     * Create sample image for preview
+     */
+    private javafx.scene.image.Image createSampleImageForPreview(String filename) {
+        try {
+            javafx.scene.image.WritableImage image = new javafx.scene.image.WritableImage(400, 300);
+            javafx.scene.image.PixelWriter pixelWriter = image.getPixelWriter();
+            
+            // Create a pattern based on filename hash
+            int hash = filename.hashCode();
+            double hue = Math.abs(hash % 360);
+            
+            for (int x = 0; x < 400; x++) {
+                for (int y = 0; y < 300; y++) {
+                    double brightness = 0.3 + (0.4 * Math.sin(x * 0.02) * Math.cos(y * 0.02));
+                    javafx.scene.paint.Color color = javafx.scene.paint.Color.hsb(hue, 0.7, Math.abs(brightness));
+                    pixelWriter.setColor(x, y, color);
+                }
+            }
+            
+            return image;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+    
+    /**
+     * Create text preview dialog for all text and code files
+     */
+    private void createTextPreviewDialog(VaultFile file, byte[] fileData) {
+        Stage dialog = new Stage();
+        dialog.initModality(Modality.APPLICATION_MODAL);
+        dialog.initOwner(stage);
+        dialog.setTitle("Text Preview: " + file.getOriginalName());
+        
+        VBox content = new VBox(10);
+        content.setPadding(new Insets(20));
+        
+        // Header with file info
+        Label header = new Label("📄 " + file.getOriginalName());
+        header.setStyle("-fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: #4fc3f7;");
+        
+        // File type indicator
+        String extension = file.getExtension().toLowerCase();
+        String fileTypeLabel = getFileTypeDescription(extension);
+        Label typeLabel = new Label(fileTypeLabel);
+        typeLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #888888;");
+        
+        // Text area with content
+        TextArea textArea = new TextArea(new String(fileData));
+        textArea.setEditable(false);
+        textArea.setWrapText(true);
+        textArea.setPrefSize(700, 500);
+        
+        // Use monospace font for code files, regular font for text files
+        if (isCodeLikeFile(extension)) {
+            textArea.setStyle("-fx-font-family: 'Consolas', 'Monaco', 'Courier New', monospace; " +
+                             "-fx-font-size: 12px; " +
+                             "-fx-control-inner-background: #2a2d47; " +
+                             "-fx-text-fill: #ffffff;");
+        } else {
+            textArea.setStyle("-fx-font-family: 'Segoe UI', 'Arial', sans-serif; " +
+                             "-fx-font-size: 13px; " +
+                             "-fx-control-inner-background: #2a2d47; " +
+                             "-fx-text-fill: #ffffff;");
+        }
+        
+        // Status bar
+        String content_text = new String(fileData);
+        int lines = content_text.split("\n").length;
+        int chars = content_text.length();
+        Label statusLabel = new Label(String.format("Lines: %d | Characters: %d | Type: %s", 
+                                                   lines, chars, extension.toUpperCase()));
+        statusLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #cccccc; -fx-padding: 5px;");
+        
+        content.getChildren().addAll(header, typeLabel, textArea, statusLabel);
+        VBox.setVgrow(textArea, Priority.ALWAYS);
+        
+        Scene scene = new Scene(content, 750, 600);
+        scene.getStylesheets().add(getClass().getResource("/ghostvault-dark.css").toExternalForm());
+        dialog.setScene(scene);
+        dialog.show();
+    }
+    
+    /**
+     * Get file type description for display
+     */
+    private String getFileTypeDescription(String extension) {
+        switch (extension) {
+            case "java": return "Java Source Code";
+            case "js": return "JavaScript";
+            case "ts": return "TypeScript";
+            case "py": return "Python Script";
+            case "cpp": case "c": return "C/C++ Source Code";
+            case "html": return "HTML Document";
+            case "css": return "CSS Stylesheet";
+            case "php": return "PHP Script";
+            case "sql": return "SQL Script";
+            case "json": return "JSON Data";
+            case "xml": return "XML Document";
+            case "yaml": case "yml": return "YAML Configuration";
+            case "md": return "Markdown Document";
+            case "txt": return "Plain Text";
+            case "log": return "Log File";
+            case "csv": return "CSV Data";
+            case "sh": return "Shell Script";
+            case "bat": return "Batch Script";
+            default: return "Text File";
+        }
+    }
+    
+    /**
+     * Check if file should use monospace font (code-like files)
+     */
+    private boolean isCodeLikeFile(String extension) {
+        return extension.equals("java") || extension.equals("js") || extension.equals("ts") ||
+               extension.equals("py") || extension.equals("cpp") || extension.equals("c") ||
+               extension.equals("html") || extension.equals("css") || extension.equals("php") ||
+               extension.equals("sql") || extension.equals("json") || extension.equals("xml") ||
+               extension.equals("yaml") || extension.equals("yml") || extension.equals("sh") ||
+               extension.equals("bat") || extension.equals("jsx") || extension.equals("tsx") ||
+               extension.equals("vue") || extension.equals("go") || extension.equals("rs") ||
+               extension.equals("kt") || extension.equals("swift") || extension.equals("rb");
+    }
+    
+
+    
+
+    
+    /**
+     * Create a simple preview dialog for files that don't have specialized dialogs
+     */
+    private void createSimplePreviewDialog(VaultFile file, byte[] fileData) {
+        // Redirect to text preview for consistency
+        createTextPreviewDialog(file, fileData);
+    }
+    
+    /**
+     * Generate sample file data for demonstration purposes
+     * In a real implementation, this would decrypt and load the actual file content
+     * 
+     * SECURITY NOTE: In production, this method would:
+     * 1. Decrypt the file using the user's key
+     * 2. Load the decrypted content into memory
+     * 3. Securely wipe the decrypted data after use
+     */
+    private byte[] generateSampleFileData(VaultFile file) {
+        String extension = file.getExtension().toLowerCase();
+        
+        // SECURITY WARNING: This is demonstration data only
+        // Real implementation would decrypt actual encrypted file content
+        
+        // For images, create a simple colored rectangle as sample data
+        if (extension.equals("jpg") || extension.equals("jpeg") || extension.equals("png") || 
+            extension.equals("gif") || extension.equals("bmp")) {
+            // Create a simple sample image (this would be actual decrypted image data in real implementation)
+            return createSampleImageData(file.getOriginalName());
+        }
+        
+        // Generate appropriate sample content based on file type
+        switch (extension) {
+            case "txt":
+            case "md":
+                return ("# Sample Content for " + file.getOriginalName() + "\n\n" +
+                       "This is a preview of the file content.\n" +
+                       "In a real implementation, this would show the actual decrypted file content.\n\n" +
+                       "File Details:\n" +
+                       "- Size: " + formatFileSize(file.getSize()) + "\n" +
+                       "- Hash: " + file.getHash() + "\n" +
+                       "- Tags: " + file.getTags()).getBytes();
+            
+            case "java":
+            case "js":
+            case "py":
+            case "cpp":
+            case "c":
+                return ("// Sample code content for " + file.getOriginalName() + "\n" +
+                       "public class SampleCode {\n" +
+                       "    public static void main(String[] args) {\n" +
+                       "        System.out.println(\"This is a preview of the code file.\");\n" +
+                       "        System.out.println(\"Actual content would be decrypted and displayed here.\");\n" +
+                       "    }\n" +
+                       "}").getBytes();
+            
+            default:
+                return ("Preview for: " + file.getOriginalName() + "\n" +
+                       "File type: " + extension + "\n" +
+                       "Size: " + formatFileSize(file.getSize()) + "\n\n" +
+                       "This file would be decrypted and displayed using the appropriate preview component.").getBytes();
+        }
+    }
+    
+    /**
+     * Create sample image data for demonstration
+     */
+    private byte[] createSampleImageData(String filename) {
+        // Create a simple sample image as PNG bytes
+        try {
+            // Create a simple colored rectangle image
+            javafx.scene.image.WritableImage image = new javafx.scene.image.WritableImage(400, 300);
+            javafx.scene.image.PixelWriter pixelWriter = image.getPixelWriter();
+            
+            // Create a simple pattern based on filename hash
+            int hash = filename.hashCode();
+            double hue = Math.abs(hash % 360);
+            
+            for (int x = 0; x < 400; x++) {
+                for (int y = 0; y < 300; y++) {
+                    // Create a simple gradient pattern
+                    double brightness = 0.3 + (0.7 * (x + y) / (400.0 + 300.0));
+                    javafx.scene.paint.Color color = javafx.scene.paint.Color.hsb(hue, 0.6, brightness);
+                    pixelWriter.setColor(x, y, color);
+                }
+            }
+            
+            // For demonstration, create a simple PNG-like header
+            // In real implementation, this would be actual decrypted image bytes
+            java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
+            
+            // Write a simple image identifier
+            baos.write("PNG_SAMPLE_IMAGE".getBytes());
+            baos.write(filename.getBytes());
+            
+            return baos.toByteArray();
+            
+        } catch (Exception e) {
+            return ("Sample image: " + filename).getBytes();
+        }
     }
     
     private void editFileTags() {
@@ -682,6 +1205,20 @@ public class FileManagerWindow {
             "• Categories: " + FileCategory.values().length + "\\n" +
             "• AI suggestions: " + suggestionsView.getItems().size() + "\\n" +
             "• Organization score: 87/100");
+    }
+    
+    /**
+     * Open file preview from menu or double-click
+     */
+    private void openFilePreviewFromMenu() {
+        VaultFile selected = fileTable.getSelectionModel().getSelectedItem();
+        if (selected == null) {
+            showAlert("No Selection", "Please select a file to view details.");
+            return;
+        }
+        
+        // Open the file preview
+        openFilePreview(selected);
     }
     
     private void showAlert(String title, String message) {

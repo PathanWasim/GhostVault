@@ -28,6 +28,7 @@ public class UIManager {
     private boolean isDarkTheme = true; // Default to dark theme
     private Map<String, Scene> sceneCache = new HashMap<>();
     private com.ghostvault.integration.ApplicationIntegrator applicationIntegrator;
+    private LoginController currentLoginController;
     
     // Scene identifiers
     public static final String FIRST_RUN_SETUP_SCENE = "first_run_setup";
@@ -111,6 +112,8 @@ public class UIManager {
         if (controller != null) {
             controller.setUIManager(this);
             controller.setApplicationIntegrator(applicationIntegrator);
+            // Store reference to current login controller
+            this.currentLoginController = controller;
         }
         
         return scene;
@@ -411,5 +414,29 @@ public class UIManager {
      */
     public void showTypewriterEffect(javafx.scene.control.Label label, String text) {
         AnimationManager.typewriter(label, text).play();
+    }
+    
+    /**
+     * Update login status with security information
+     */
+    public void updateLoginStatus(String message, com.ghostvault.security.SecurityAttemptManager securityManager) {
+        if (currentLoginController != null) {
+            try {
+                // Update the login controller with attempt information
+                if (securityManager.isLocked()) {
+                    // Start lockout countdown
+                    currentLoginController.startLockoutCountdown(securityManager);
+                } else {
+                    // Show attempt counter
+                    int attempts = securityManager.getAttemptCount();
+                    int maxAttempts = securityManager.getMaxAttempts();
+                    if (attempts > 0) {
+                        currentLoginController.updateAttemptDisplay(attempts, maxAttempts);
+                    }
+                }
+            } catch (Exception e) {
+                System.err.println("Error updating login controller: " + e.getMessage());
+            }
+        }
     }
 }

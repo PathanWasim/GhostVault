@@ -1,6 +1,7 @@
 package com.ghostvault.security;
 
 import com.ghostvault.config.AppConfig;
+import com.ghostvault.config.ConfigurationValidator;
 
 import javax.crypto.SecretKey;
 import java.io.*;
@@ -71,6 +72,7 @@ public class PasswordManager {
     
     private final String vaultPath;
     private final CryptoManager cryptoManager;
+    private final ConfigurationValidator configValidator;
     private KDF.KdfParams kdfParams;
     private byte[] masterVerifier;
     private byte[] wrappedVMK;
@@ -78,6 +80,7 @@ public class PasswordManager {
     private byte[] decoyVerifier;
     private byte[] wrappedDVMK;
     private boolean isConfigured;
+    private ConfigurationValidator.ValidationResult lastValidationResult;
     
     // Timing attack mitigation
     private static final int MIN_DELAY_MS = 900;
@@ -87,46 +90,122 @@ public class PasswordManager {
     public PasswordManager(String vaultPath) throws Exception {
         this.vaultPath = vaultPath;
         this.cryptoManager = new CryptoManager();
+        this.configValidator = new ConfigurationValidator();
         this.secureRandom = new SecureRandom();
         this.isConfigured = false;
         loadPasswordConfiguration();
     }
     
     /**
-     * Load password configuration from encrypted config file
+     * Load password configuration from encrypted config file with enhanced validation
      */
     private void loadPasswordConfiguration() throws Exception {
-        File configFile = new File(AppConfig.CONFIG_FILE);
+        System.out.println("🔍 Loading password configuration with enhanced validation");
         
-        System.out.println("🔍 Looking for password configuration at: " + AppConfig.CONFIG_FILE);
-        System.out.println("📁 Config file exists: " + configFile.exists());
+        // Validate configuration using ConfigurationValidator
+        lastValidationResult = configValidator.validateConfiguration();
         
-        if (configFile.exists()) {
-            try {
-                byte[] configData = Files.readAllBytes(configFile.toPath());
+        System.out.println("📋 Configuration validation result: " + lastValidationResult.getStatus());
+        
+        switch (lastValidationResult.getStatus()) {
+            case VALID:
+                loadValidConfiguration();
+                break;
                 
-                // Deserialize configuration
-                ByteArrayInputStream bais = new ByteArrayInputStream(configData);
-                try (ObjectInputStream ois = new ObjectInputStream(bais)) {
-                    PasswordConfiguration config = (PasswordConfiguration) ois.readObject();
-                    
-                    // Deserialize KDF params
-                    this.kdfParams = deserializeKdfParams(config.getKdfParams());
-                    
-                    // Load verifiers and wrapped keys
-                    this.masterVerifier = config.getMasterVerifier();
-                    this.wrappedVMK = config.getWrappedVMK();
-                    this.panicVerifier = config.getPanicVerifier();
-                    this.decoyVerifier = config.getDecoyVerifier();
-                    this.wrappedDVMK = config.getWrappedDVMK();
-                    
-                    this.isConfigured = true;
+            case BACKUP_AVAILABLE:
+                System.out.println("⚠️ Primary config corrupted, attempting backup recovery");
+                if (configValidator.restoreFromBackup()) {
+                    System.out.println("✅ Configuration restored from backup");
+                    loadValidConfiguration();
+                } else {
+                    handleConfigurationError("Failed to restore from backup");
                 }
+                break;
                 
-            } catch (Exception e) {
-                System.err.println("Warning: Could not load password configuration: " + e.getMessage());
+            case CORRUPTED:
+                System.err.println("❌ Configuration file is corrupted");
+                if (configValidator.performRecovery()) {
+                    System.out.println("✅ Configuration recovered");
+                    loadValidConfiguration();
+                } else {
+                    handleConfigurationError("Configuration corrupted and cannot be recovered");
+                }
+                break;
+                
+            case INCOMPLETE:
+                System.err.println("⚠️ Configuration is incomplete");
+                if (configValidator.performRecovery()) {
+                    System.out.println("✅ Configuration completed from backup");
+                    loadValidConfiguration();
+                } else {
+                    handleConfigurationError("Configuration incomplete and cannot be recovered");
+                }
+                break;
+                
+            case MISSING:
+                System.out.println("📝 No configuration found - first run setup required");
                 this.isConfigured = false;
+                break;
+                
+            case INACCESSIBLE:
+                handleConfigurationError("Configuration file cannot be accessed: " + 
+                    lastValidationResult.getErrorMessage());
+                break;
+                
+            default:
+                handleConfigurationError("Unknown configuration status: " + 
+                    lastValidationResult.getStatus());
+                break;
+        }
+    }
+    
+    /**
+     * Load valid configuration file
+     */
+    private void loadValidConfiguration() throws Exception {
+        try {
+            File configFile = new File(AppConfig.CONFIG_FILE);
+            byte[] configData = Files.readAllBytes(configFile.toPath());
+            
+            // Deserialize configuration
+            ByteArrayInputStream bais = new ByteArrayInputStream(configData);
+            try (ObjectInputStream ois = new ObjectInputStream(bais)) {
+                PasswordConfiguration config = (PasswordConfiguration) ois.readObject();
+                
+                // Deserialize KDF params
+                this.kdfParams = deserializeKdfParams(config.getKdfParams());
+                
+                // Load verifiers and wrapped keys
+                this.masterVerifier = config.getMasterVerifier();
+                this.wrappedVMK = config.getWrappedVMK();
+                this.panicVerifier = config.getPanicVerifier();
+                this.decoyVerifier = config.getDecoyVerifier();
+                this.wrappedDVMK = config.getWrappedDVMK();
+                
+                this.isConfigured = true;
+                
+                System.out.println("✅ Password configuration loaded successfully");
             }
+            
+        } catch (Exception e) {
+            throw new Exception("Failed to load valid configuration: " + e.getMessage(), e);
+        }
+    }
+    
+    /**
+     * Handle configuration errors with appropriate logging and recovery
+     */
+    private void handleConfigurationError(String errorMessage) {
+        System.err.println("❌ Configuration Error: " + errorMessage);
+        this.isConfigured = false;
+        
+        // Log detailed error information
+        if (lastValidationResult != null) {
+            System.err.println("📊 Validation Details:");
+            System.err.println("   Status: " + lastValidationResult.getStatus());
+            System.err.println("   Error: " + lastValidationResult.getErrorMessage());
+            System.err.println("   Recovery Action: " + lastValidationResult.getRecoveryAction());
+            System.err.println("   Can Recover: " + lastValidationResult.canRecover());
         }
     }
     
@@ -208,6 +287,15 @@ public class PasswordManager {
                 // Save configuration
                 savePasswordConfiguration();
                 this.isConfigured = true;
+                
+                // Create backup and checksum after successful initialization
+                try {
+                    configValidator.createBackup();
+                    configValidator.createChecksum(Paths.get(AppConfig.CONFIG_FILE));
+                    System.out.println("✅ Configuration backup and checksum created");
+                } catch (Exception e) {
+                    System.err.println("⚠️ Failed to create configuration backup: " + e.getMessage());
+                }
                 
                 // Verify password detection works
                 PasswordType testResult = detectPassword(masterPassword);
@@ -522,10 +610,63 @@ public class PasswordManager {
     }
     
     /**
-     * Check if passwords are configured
+     * Check if passwords are configured with enhanced validation
      */
     public boolean arePasswordsConfigured() {
-        return isConfigured;
+        // If we haven't validated recently, re-validate
+        if (lastValidationResult == null) {
+            try {
+                lastValidationResult = configValidator.validateConfiguration();
+            } catch (Exception e) {
+                System.err.println("Configuration validation failed: " + e.getMessage());
+                return false;
+            }
+        }
+        
+        // Return true only if configuration is valid and we're marked as configured
+        return isConfigured && lastValidationResult.isValid();
+    }
+    
+    /**
+     * Get configuration validation result
+     */
+    public ConfigurationValidator.ValidationResult getConfigurationValidation() {
+        if (lastValidationResult == null) {
+            lastValidationResult = configValidator.validateConfiguration();
+        }
+        return lastValidationResult;
+    }
+    
+    /**
+     * Get configuration status
+     */
+    public ConfigurationValidator.ConfigurationStatus getConfigurationStatus() {
+        return getConfigurationValidation().getStatus();
+    }
+    
+    /**
+     * Get detailed configuration information
+     */
+    public String getConfigurationInfo() {
+        return configValidator.getConfigurationInfo();
+    }
+    
+    /**
+     * Attempt to recover configuration
+     */
+    public boolean recoverConfiguration() {
+        boolean recovered = configValidator.performRecovery();
+        if (recovered) {
+            try {
+                // Reload configuration after recovery
+                loadPasswordConfiguration();
+                return isConfigured;
+            } catch (Exception e) {
+                System.err.println("Failed to reload configuration after recovery: " + e.getMessage());
+                return false;
+            }
+        }
+        return false;
     }
     
     /**

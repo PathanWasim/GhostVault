@@ -29,6 +29,9 @@ public class SessionManager {
     private final List<Runnable> timeoutListeners;
     private final List<Runnable> warningListeners;
     
+    // Integration with SecurityAttemptManager
+    private SecurityAttemptManager securityAttemptManager;
+    
     private Timeline sessionTimer;
     private Timeline warningTimer;
     private boolean sessionActive;
@@ -76,6 +79,11 @@ public class SessionManager {
         this.suspiciousActivityCount.set(0);
         this.failedLoginAttempts.set(0);
         
+        // Reset security attempt manager on successful session start
+        if (securityAttemptManager != null) {
+            securityAttemptManager.resetAttempts();
+        }
+        
         // Start session timer
         startSessionTimer();
         
@@ -83,6 +91,13 @@ public class SessionManager {
         setupActivityMonitoring();
         
         logSessionEvent("Session started");
+    }
+    
+    /**
+     * Start a new session (compatibility method)
+     */
+    public void startSession() {
+        startSession(null);
     }
     
     /**
@@ -264,7 +279,7 @@ public class SessionManager {
     }
     
     /**
-     * Record failed login attempt
+     * Record failed login attempt with SecurityAttemptManager integration
      */
     public void recordFailedLogin(String username, String ipAddress) {
         int attempts = failedLoginAttempts.incrementAndGet();
@@ -277,6 +292,12 @@ public class SessionManager {
         );
         
         loginHistory.add(attempt);
+        
+        // Integrate with SecurityAttemptManager if available
+        if (securityAttemptManager != null) {
+            String sourceInfo = String.format("User: %s, IP: %s", username, ipAddress);
+            securityAttemptManager.recordFailedAttempt("Invalid credentials", sourceInfo);
+        }
         
         logSecurityEvent("Failed login attempt #" + attempts + " for user: " + username);
         
@@ -564,12 +585,7 @@ public class SessionManager {
         addTimeoutListener(callback);
     }
     
-    /**
-     * Start session (compatibility method)
-     */
-    public void startSession() {
-        startSession(null);
-    }
+
     
     /**
      * Record failed login (compatibility method)
@@ -578,12 +594,7 @@ public class SessionManager {
         recordFailedLogin(username, "Unknown IP");
     }
     
-    /**
-     * Check if account is locked (compatibility method)
-     */
-    public boolean isAccountLocked(String username) {
-        return failedLoginAttempts.get() >= 5; // Simple implementation
-    }
+
     
     /**
      * Pause session (compatibility method)
@@ -604,5 +615,90 @@ public class SessionManager {
             sessionTimer.play();
         }
         recordActivity();
+    }
+    
+    /**
+     * Set SecurityAttemptManager for integration
+     */
+    public void setSecurityAttemptManager(SecurityAttemptManager securityAttemptManager) {
+        this.securityAttemptManager = securityAttemptManager;
+        System.out.println("🔗 SecurityAttemptManager integrated with SessionManager");
+    }
+    
+    /**
+     * Check if account is locked via SecurityAttemptManager
+     */
+    public boolean isAccountLocked(String username) {
+        if (securityAttemptManager != null) {
+            return securityAttemptManager.isLocked();
+        }
+        
+        // Fallback to legacy logic
+        return failedLoginAttempts.get() >= AppConfig.MAX_LOGIN_ATTEMPTS;
+    }
+    
+    /**
+     * Get remaining lockout time from SecurityAttemptManager
+     */
+    public long getRemainingLockoutTime() {
+        if (securityAttemptManager != null) {
+            return securityAttemptManager.getRemainingLockoutTime();
+        }
+        return 0;
+    }
+    
+    /**
+     * Get security status from SecurityAttemptManager
+     */
+    public String getSecurityStatus() {
+        if (securityAttemptManager != null) {
+            return securityAttemptManager.getSecurityStatus();
+        }
+        
+        int attempts = failedLoginAttempts.get();
+        if (attempts > 0) {
+            return String.format("LEGACY - %d failed attempts", attempts);
+        }
+        return "NORMAL - No failed attempts";
+    }
+    
+    /**
+     * Reset security state through SecurityAttemptManager
+     */
+    public void resetSecurityState() {
+        failedLoginAttempts.set(0);
+        
+        if (securityAttemptManager != null) {
+            securityAttemptManager.resetAttempts();
+        }
+        
+        logSessionEvent("Security state reset");
+    }
+    
+    /**
+     * Get integrated security statistics
+     */
+    public String getIntegratedSecurityStats() {
+        StringBuilder stats = new StringBuilder();
+        stats.append("Session Manager Security Statistics:\n");
+        stats.append("Session Active: ").append(sessionActive).append("\n");
+        stats.append("Failed Attempts (Legacy): ").append(failedLoginAttempts.get()).append("\n");
+        stats.append("Login History Size: ").append(loginHistory.size()).append("\n");
+        stats.append("Suspicious Activity Count: ").append(suspiciousActivityCount.get()).append("\n");
+        
+        if (securityAttemptManager != null) {
+            stats.append("\nSecurityAttemptManager Integration:\n");
+            stats.append("Status: ").append(securityAttemptManager.getSecurityStatus()).append("\n");
+            stats.append("Attempt Count: ").append(securityAttemptManager.getAttemptCount()).append("\n");
+            stats.append("Is Locked: ").append(securityAttemptManager.isLocked()).append("\n");
+            
+            if (securityAttemptManager.isLocked()) {
+                stats.append("Remaining Lockout: ").append(securityAttemptManager.getRemainingLockoutSeconds()).append(" seconds\n");
+            }
+        } else {
+            stats.append("\nSecurityAttemptManager: Not integrated\n");
+        }
+        
+        return stats.toString();
     }
 }
