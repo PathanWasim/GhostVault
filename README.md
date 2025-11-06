@@ -59,6 +59,27 @@
 - **Offline Operation** - No internet required
 - **Portable** - Single JAR file distribution
 
+## ✨ Key Features (Current Version)
+
+### 🔐 **Core Security**
+- **Master Password Protection** - Single password protects everything
+- **AES-256-GCM Encryption** - Military-grade file encryption
+- **Secure File Storage** - All files encrypted at rest
+- **Memory Protection** - Sensitive data cleared from memory
+
+### 🎬 **Media Preview System**
+- **Video Preview** - MP4, MOV, and other formats with JavaFX MediaPlayer
+- **External Player Support** - "Open with External Player" for VLC, Windows Media Player
+- **Image Preview** - JPG, PNG, GIF, and other image formats
+- **Text File Preview** - Code files, documents, and plain text
+- **Smart Error Handling** - Graceful fallbacks when preview fails
+
+### 🔒 **Authentication Security**
+- **Brute Force Protection** - 3-attempt limit with 30-second lockout
+- **Real-time Feedback** - Live countdown timer and attempt counter
+- **Session Management** - Secure login sessions with timeout
+- **Configuration Validation** - Automatic config integrity checking
+
 ## 🆕 Recent Improvements (v2.0)
 
 ### 🔒 **Enhanced Security Features**
@@ -126,10 +147,11 @@ mvn javafx:run
 ## 🏗️ Technical Details
 
 ### Architecture
-- **82 Java Classes** - Clean, modular design
+- **Clean, Modular Design** - Well-structured Java codebase
 - **JavaFX UI** - Modern, responsive interface
 - **Maven Build** - Professional build system
 - **Layered Security** - Multiple protection levels
+- **Enhanced Preview System** - Robust media handling with fallbacks
 
 ### Security Implementation
 - **Encryption**: AES-256-GCM with PBKDF2 key derivation
@@ -150,10 +172,11 @@ mvn javafx:run
 
 ### Quick Build
 ```bash
-# Windows
-build-executable.bat
+# Build and run
+mvn clean compile
+mvn javafx:run
 
-# Linux/Mac
+# Package for distribution
 mvn clean package -Dmaven.test.skip=true
 ```
 
@@ -166,16 +189,21 @@ mvn javafx:run
 mvn compile
 ```
 
-See [BUILD.md](BUILD.md) for detailed instructions.
+Run `mvn javafx:run` to start the application in development mode.
 
 ## 📦 Distribution
 
-The build creates a `dist/` folder containing:
-- **GhostVault.jar** - Complete application (~50MB)
-- **GhostVault.bat** - Windows launcher script
-- **README.txt** - User documentation
+Build the application with Maven:
+```bash
+mvn clean package
+```
 
-**Sharing**: Copy the entire `dist/` folder. Recipients need Java 17+.
+This creates a JAR file in the `target/` directory. Run with:
+```bash
+java -jar target/ghostvault-1.0.0.jar
+```
+
+**Requirements**: Java 17+ must be installed on the target system.
 
 ## 🔧 Configuration
 
@@ -217,7 +245,7 @@ This project is licensed under the **MIT License** - see [LICENSE](LICENSE) for 
 
 - **🐛 Bug Reports**: [GitHub Issues](https://github.com/PathanWasim/GhostVault/issues)
 - **💬 Discussions**: [GitHub Discussions](https://github.com/PathanWasim/GhostVault/discussions)
-- **📖 Documentation**: Check `dist/README.txt` for user guide
+- **📖 Documentation**: This README contains all usage information
 
 ## ⭐ Why Choose GhostVault?
 
