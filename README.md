@@ -62,10 +62,12 @@
 ## ✨ Key Features (Current Version)
 
 ### 🔐 **Core Security**
-- **Master Password Protection** - Single password protects everything
-- **AES-256-GCM Encryption** - Military-grade file encryption
-- **Secure File Storage** - All files encrypted at rest
-- **Memory Protection** - Sensitive data cleared from memory
+- **Triple-Password Authentication** - Master, Decoy, and Panic password modes
+- **AES-256-GCM Encryption** - Authenticated encryption with 128-bit authentication tags
+- **Argon2id Key Derivation** - Memory-hard KDF resistant to GPU attacks
+- **KEK-Wrapped VMK Architecture** - Cryptographic erasure-capable design
+- **Secure File Storage** - All files encrypted at rest with unique IVs
+- **Memory Protection** - Sensitive data cleared from memory with secure zeroization
 
 ### 🎬 **Media Preview System**
 - **Video Preview** - MP4, MOV, and other formats with JavaFX MediaPlayer
@@ -147,20 +149,36 @@ mvn javafx:run
 ## 🏗️ Technical Details
 
 ### Architecture
-- **Clean, Modular Design** - Well-structured Java codebase
-- **JavaFX UI** - Modern, responsive interface
-- **Maven Build** - Professional build system
-- **Layered Security** - Multiple protection levels
-- **Enhanced Preview System** - Robust media handling with fallbacks
+- **Clean, Modular Design** - Well-structured Java codebase with 100+ classes
+- **JavaFX 17 UI** - Modern, responsive interface with system tray integration
+- **Maven Build System** - Professional build with dependency management
+- **Layered Security Architecture**:
+  - **Cryptographic Layer**: AES-256-GCM + Argon2id
+  - **Business Logic Layer**: File management, threat detection, backup
+  - **UI Layer**: JavaFX controllers with integrated media players
+  - **Storage Layer**: Master vault, decoy vault, encrypted backups
+- **Enhanced Preview System** - Robust media handling with external player fallbacks
+- **Component Integration**: 30+ UI components, comprehensive security modules
 
 ### Security Implementation
-- **Encryption**: AES-256-GCM with PBKDF2 key derivation
-- **Salt Generation**: Cryptographically secure random salts
-- **Memory Safety**: Automatic cleanup of sensitive data
-- **File Protection**: Encrypted metadata and content
-- **Session Security**: Secure authentication with attempt limiting
-- **Brute Force Protection**: 3-attempt limit with 30-second lockout
-- **Configuration Security**: Integrity checking and automatic recovery
+- **Encryption**: AES-256-GCM (Authenticated Encryption with Associated Data)
+  - 12-byte (96-bit) IV for optimal GCM performance
+  - 128-bit authentication tag for integrity verification
+  - No padding oracle vulnerabilities (NoPadding mode)
+- **Key Derivation**: Argon2id with adaptive parameters
+  - Memory-hard function (64MB default)
+  - Resistant to GPU/ASIC attacks
+  - Benchmarked parameters for optimal security/performance balance
+- **Password Architecture**: KEK-wrapped VMK design
+  - Master/Decoy: KEK-wrapped Vault Master Keys (allows vault access)
+  - Panic: Verifier-only (no key recovery - enables cryptographic erasure)
+  - Constant-time password detection with timing parity
+- **Salt Generation**: 32-byte cryptographically secure random salts per vault
+- **Memory Safety**: Secure zeroization of sensitive data (char[] for passwords, never String)
+- **File Protection**: Encrypted metadata and content with SHA-256 integrity hashing
+- **Session Security**: Secure authentication with attempt limiting and lockout
+- **Brute Force Protection**: 3-attempt limit with 30-second lockout + jitter
+- **Configuration Security**: Integrity checking, automatic backup, and recovery
 
 ### Performance
 - **Fast Encryption**: Optimized for large files
@@ -209,16 +227,38 @@ java -jar target/ghostvault-1.0.0.jar
 
 ### Vault Location
 - **Default**: `~/.ghostvault/`
-- **Files**: Encrypted file storage
-- **Notes**: `secure_notes.enc`
-- **Passwords**: `stored_passwords.enc`
-- **Config**: Application settings
+- **Files**: Encrypted file storage in `vault/` directory
+- **Notes**: `secure_notes.enc` (AES-256-GCM encrypted)
+- **Passwords**: `stored_passwords.enc` (AES-256-GCM encrypted)
+- **Config**: `config.enc` (KEK-wrapped VMK + verifiers)
+- **Metadata**: `metadata.json` (encrypted file metadata)
+- **Backups**: `backups/` directory with versioned encrypted backups
+- **Logs**: `logs/` directory with security audit trails
 
 ### Security Settings
-- **Encryption**: AES-256-GCM
-- **Key Derivation**: PBKDF2-SHA256
-- **Iterations**: 100,000+
-- **Salt Length**: 32 bytes
+- **Encryption**: 
+  - Algorithm: AES-256-GCM (Authenticated Encryption)
+  - IV: 12 bytes (96 bits) per encryption
+  - Authentication Tag: 16 bytes (128 bits)
+  - No padding (stream cipher mode)
+- **Key Derivation**: 
+  - Algorithm: Argon2id (memory-hard KDF)
+  - Memory: 64MB (65536 KB)
+  - Iterations: 3 (time cost)
+  - Parallelism: 1 thread
+  - Output: 32 bytes (256 bits)
+- **Salt**: 
+  - Length: 32 bytes (256 bits)
+  - Generation: Cryptographically secure random per vault
+  - Reused for all passwords in same vault
+- **Password Architecture**:
+  - Master/Decoy: KEK-wrapped VMK (allows vault access)
+  - Panic: Verifier-only (no key recovery)
+  - Timing: 900ms + 0-300ms jitter per attempt
+- **Session Management**:
+  - Timeout: Configurable (default 15 minutes)
+  - Failed Attempts: 3 attempts before 30-second lockout
+  - Lockout: Exponential backoff on repeated failures
 
 ## 🆘 System Requirements
 
