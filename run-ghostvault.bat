@@ -5,7 +5,7 @@ echo    Secure File Encryption System
 echo ========================================
 echo.
 
-REM Check if Java is installed
+
 java -version >nul 2>&1
 if %errorlevel% neq 0 (
     echo ERROR: Java is not installed or not in PATH
