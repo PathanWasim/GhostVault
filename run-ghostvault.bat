@@ -18,7 +18,7 @@ if %errorlevel% neq 0 (
 REM Check if Maven is installed
 mvn -version >nul 2>&1
 if %errorlevel% neq 0 (
-    echo ERROR: Maven is not installed or not in PATH
+    echo ERROR: Maven is not installed or not in Path
     echo Please install Maven from: https://maven.apache.org/download.cgi
     echo.
     pause
