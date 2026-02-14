@@ -294,7 +294,7 @@ This project is licensed under the **MIT License** - see [LICENSE](LICENSE) for 
 - **🎯 Zero-Knowledge** - We never see your data or passwords
 - **📱 User-Friendly** - Professional interface, easy to use
 - **🌍 Cross-Platform** - Works on Windows, Mac, and Linux
-- **📦 Portable** - Single file, no installation required
+- **📦 Portable** - Single file executable, no installation required
 - **🔓 Open Source** - Transparent, auditable code
 
 ---
